@@ -1,0 +1,66 @@
+{
+  "_comment": "ตำแหน่ง/ระดับ ในระบบ PRSC Portal — แมปตำแหน่งไปเป็น permissions (JSONB array) ที่ rbac ใช้",
+  "levels": {
+    "student": "นักเรียน (แจ้งปัญหา / ดูสถานะของตัวเอง)",
+    "class_committee": "หัวหน้าห้อง + รอง 4 ฝ่าย (รับเรื่องระดับห้อง)",
+    "level_president": "ประธานระดับ (รับเรื่องต่อจากห้อง)",
+    "student_council": "สภานักเรียน / ประธานสภา (รับเรื่องสูงสุด)"
+  },
+  "topic_types": {
+    "living": "แจ้งสภาพความเป็นอยู่",
+    "problem": "แจ้งปัญหา",
+    "suggestion": "ข้อเสนอแนะ"
+  },
+  "categories": {
+    "academic": "วิชาการ",
+    "discipline": "วินัย",
+    "activity": "กิจกรรม",
+    "reception": "ปฏิคม",
+    "sanitation": "สุขาภิบาล",
+    "other": "อื่นๆ"
+  },
+  "roles": {
+    "student": {
+      "label": "นักเรียน",
+      "permissions": ["SUBMIT_ISSUE", "VIEW_OWN_ISSUES"]
+    },
+    "class_president": {
+      "label": "หัวหน้าห้อง",
+      "permissions": ["SUBMIT_ISSUE", "VIEW_OWN_ISSUES", "RECEIVE_ISSUES", "MANAGE_ISSUE_STEPS", "SET_COUNTDOWN", "ESCALATE_ISSUE", "VIEW_LEVEL_PYRAMID"]
+    },
+    "vice_academic": {
+      "label": "รองวิชาการ",
+      "permissions": ["SUBMIT_ISSUE", "VIEW_OWN_ISSUES", "RECEIVE_ISSUES", "MANAGE_ISSUE_STEPS", "SET_COUNTDOWN", "ESCALATE_ISSUE", "VIEW_LEVEL_PYRAMID"]
+    },
+    "vice_discipline": {
+      "label": "รองวินัย",
+      "permissions": ["SUBMIT_ISSUE", "VIEW_OWN_ISSUES", "RECEIVE_ISSUES", "MANAGE_ISSUE_STEPS", "SET_COUNTDOWN", "ESCALATE_ISSUE", "VIEW_LEVEL_PYRAMID"]
+    },
+    "vice_activity": {
+      "label": "รองกิจกรรม",
+      "permissions": ["SUBMIT_ISSUE", "VIEW_OWN_ISSUES", "RECEIVE_ISSUES", "MANAGE_ISSUE_STEPS", "SET_COUNTDOWN", "ESCALATE_ISSUE", "VIEW_LEVEL_PYRAMID"]
+    },
+    "vice_reception": {
+      "label": "รองปฏิคม",
+      "permissions": ["SUBMIT_ISSUE", "VIEW_OWN_ISSUES", "RECEIVE_ISSUES", "MANAGE_ISSUE_STEPS", "SET_COUNTDOWN", "ESCALATE_ISSUE", "VIEW_LEVEL_PYRAMID"]
+    },
+    "level_president": {
+      "label": "ประธานระดับ",
+      "permissions": ["SUBMIT_ISSUE", "VIEW_OWN_ISSUES", "RECEIVE_ISSUES", "MANAGE_ISSUE_STEPS", "SET_COUNTDOWN", "ESCALATE_ISSUE", "VIEW_LEVEL_PYRAMID", "MANAGE_STUDENTS"]
+    },
+    "council_member": {
+      "label": "สภานักเรียน",
+      "permissions": ["SUBMIT_ISSUE", "VIEW_OWN_ISSUES", "RECEIVE_ISSUES", "MANAGE_ISSUE_STEPS", "SET_COUNTDOWN", "ESCALATE_ISSUE", "VIEW_LEVEL_PYRAMID", "VIEW_DASHBOARD"]
+    },
+    "council_president": {
+      "label": "ประธานสภา",
+      "is_admin": true,
+      "permissions": ["SUBMIT_ISSUE", "VIEW_OWN_ISSUES", "RECEIVE_ISSUES", "MANAGE_ISSUE_STEPS", "SET_COUNTDOWN", "ESCALATE_ISSUE", "VIEW_LEVEL_PYRAMID", "MANAGE_STUDENTS", "VIEW_DASHBOARD", "MANAGE_SETTINGS"]
+    },
+    "admin": {
+      "label": "ผู้ดูแลระบบ (Admin)",
+      "is_admin": true,
+      "permissions": ["VIEW_LEVEL_PYRAMID", "MANAGE_STUDENTS", "VIEW_DASHBOARD", "MANAGE_SETTINGS"]
+    }
+  }
+}

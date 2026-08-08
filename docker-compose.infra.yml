@@ -1,0 +1,40 @@
+# /docker-compose.infra.yml
+version: "3.8"
+services:
+  db:
+    image: postgres:16-alpine
+    env_file:
+      - .env
+    volumes:
+      - ${ENV_NAME}_postgres_data:/var/lib/postgresql/data
+    networks:
+      - shared_network
+      - db-management
+    deploy:
+      replicas: 1
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - ${ENV_NAME}_redis_data:/data
+    networks:
+      - shared_network
+    deploy:
+      replicas: 1
+
+volumes:
+  staging_postgres_data:
+  production_postgres_data:
+  staging_redis_data:
+  production_redis_data:
+
+# ใช้ Alias ชื่อ shared_network แล้วชี้ name ไปที่ตัวแปร
+networks:
+  shared_network:
+    name: app-internal-${ENV_NAME}
+    external: true
+  traefik-public:
+    external: true
+  db-management:
+    external: true

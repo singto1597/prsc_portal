@@ -1,0 +1,786 @@
+import asyncpg
+import json
+from typing import Optional
+from datetime import datetime, timedelta, timezone
+
+from core.exceptions import NotFoundError, ForbiddenError, ValidationError
+from core.config import settings
+
+# 🔼 ลำดับการ Escalate (พีระมิด)
+# room (หัวหน้าห้อง+รอง) → level (ประธานระดับ) → council (สภานักเรียน)
+LEVEL_ORDER = ["room", "level", "council"]
+NEXT_LEVEL = {"room": "level", "level": "council"}
+
+# ตำแหน่งที่รับเรื่องได้ในแต่ละระดับ (role key → ระดับ)
+ROLE_LEVEL = {
+    "class_president": "room",
+    "vice_academic": "room",
+    "vice_discipline": "room",
+    "vice_activity": "room",
+    "vice_reception": "room",
+    "level_president": "level",
+    "council_member": "council",
+    "council_president": "council",
+}
+
+
+def _parse_permissions(raw) -> list:
+    if not raw:
+        return []
+    if isinstance(raw, str):
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            return []
+    return list(raw)
+
+
+def _parse_json(raw, default=None):
+    if raw is None:
+        return default if default is not None else []
+    if isinstance(raw, (list, dict)):
+        return raw
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return default if default is not None else []
+
+
+# ============================================================
+# 🔍 ความสามารถในการมองเห็น (Pyramid Visibility)
+# ============================================================
+async def user_level(pool, user_id: int, room_id: Optional[int] = None) -> str:
+    """
+    คืนระดับสูงสุดที่ user สังกัด (room / level / council)
+    - ถ้าระบุ room_id → ดูเฉพาะในห้องนั้น
+    - ถ้าไม่ระบุ → ดูทุกตำแหน่งที่ user เป็น (คืนระดับสูงสุด)
+    """
+    async with pool.acquire() as conn:
+        if room_id is not None:
+            row = await conn.fetchrow(
+                """
+                SELECT class_role FROM students
+                WHERE user_id = $1 AND room_id = $2 AND deleted_at IS NULL AND status = 'active'
+                """,
+                user_id, room_id
+            )
+            role = row["class_role"] if row else None
+        else:
+            rows = await conn.fetch(
+                """
+                SELECT class_role FROM students
+                WHERE user_id = $1 AND deleted_at IS NULL AND status = 'active'
+                """,
+                user_id
+            )
+            roles = [r["class_role"] for r in rows]
+
+            # SUPER_ADMIN มองเห็นทุกอย่าง
+            if settings.SUPER_ADMIN_ID and int(user_id) == int(settings.SUPER_ADMIN_ID):
+                return "council"
+
+            # หาระดับสูงสุดจากทุกตำแหน่ง (ใช้ LEVEL_RANK รองรับ 'student')
+            levels = [ROLE_LEVEL.get(r, "student") for r in roles]
+            best = "student"
+            for lv in levels:
+                if LEVEL_RANK.get(lv, 0) > LEVEL_RANK.get(best, 0):
+                    best = lv
+            return best
+
+    if not role:
+        return "student"
+    return ROLE_LEVEL.get(role, "student")
+
+
+# ระดับ 'student' (นักเรียนธรรมดา) อยู่ต่ำกว่าทุกอย่าง
+LEVEL_RANK = {"student": 0, "room": 1, "level": 2, "council": 3}
+
+
+def can_see(level: str, issue_level: str, reporter_id: int, user_id: int, is_anonymous: bool) -> bool:
+    """
+    กฎการมองเห็น (พีระมิด):
+    - ระดับที่สูงกว่า มองเห็นเรื่องของระดับล่างลงมา (มองลงได้)
+    - ผู้แจ้งเห็นเรื่องของตัวเองเสมอ (ติดตามสถานะได้ แม้แจ้งแบบ anonymous)
+    - anonymity แค่ซ่อนชื่อจากคนอื่น (ระบบรู้ผู้แจ้ง แต่คนอื่นเห็นเป็น "ไม่ระบุชื่อ")
+    """
+    # ระดับสูงกว่ามองลงได้ทุกเรื่อง
+    if LEVEL_RANK.get(level, 0) >= LEVEL_RANK.get(issue_level, 1):
+        return True
+    # ผู้แจ้งเห็นเรื่องของตัวเองเสมอ (ติดตามสถานะ)
+    if reporter_id == user_id:
+        return True
+    return False
+
+
+# ============================================================
+# 📝 CRUD ปัญหา
+# ============================================================
+async def create_issue(
+    pool: asyncpg.Pool,
+    user_id: int,
+    topic_type: str,
+    category: str,
+    title: str,
+    description: str,
+    is_anonymous: bool = False,
+    room_id: Optional[int] = None,
+    start_level: str = "room",
+) -> int:
+    """
+    สร้างปัญหาใหม่
+    - เริ่มต้นที่ระดับ room (หัวหน้าห้อง + รอง) โดยค่า default
+    - ถ้าผู้แจ้งเป็นระดับสูง (หัวหน้าห้อง/ประธานระดับ/สภา) สามารถเลือก start_level
+      ให้เรื่องไปเริ่มที่ระดับสูงขึ้นได้เลย (เช่น ประธานสภาอยากให้เริ่มที่ council)
+    """
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            # ตรวจ start_level ถูกต้อง
+            if start_level not in LEVEL_ORDER:
+                raise ValidationError(f"ระดับเริ่มต้นไม่ถูกต้อง: {start_level}")
+
+            # ถ้าไม่ระบุห้อง → หาห้องของ user
+            if not room_id:
+                room_id = await conn.fetchval(
+                    """
+                    SELECT room_id FROM students
+                    WHERE user_id = $1 AND deleted_at IS NULL AND status = 'active'
+                    ORDER BY id LIMIT 1
+                    """,
+                    user_id
+                )
+                if not room_id:
+                    raise ValidationError("ไม่พบห้องของคุณ — กรุณาติดต่อผู้ดูแล")
+
+            # ตรวจว่าห้องมีจริง
+            room = await conn.fetchrow(
+                "SELECT id, room_name FROM rooms WHERE id = $1 AND deleted_at IS NULL",
+                room_id
+            )
+            if not room:
+                raise NotFoundError("ไม่พบห้องเรียน")
+
+            # 🛡️ ผู้แจ้งต้องมีสิทธิ์ในระดับที่เลือกเริ่มต้น (ไม่งั้นนักเรียนธรรมดาส่งขึ้นสภาได้)
+            if start_level != "room":
+                my_level = await user_level(pool, user_id, room_id=room_id)
+                if LEVEL_RANK.get(my_level, 0) < LEVEL_RANK.get(start_level, 1):
+                    raise ForbiddenError(f"คุณมีสิทธิ์แค่ระดับ {my_level} — ไม่สามารถเริ่มที่ระดับ {start_level} ได้")
+
+            reporter_name = None
+            if not is_anonymous:
+                reporter_name = await conn.fetchval(
+                    """
+                    SELECT CONCAT_WS(' ', prefix, first_name, last_name)
+                    FROM students
+                    WHERE user_id = $1 AND room_id = $2 AND deleted_at IS NULL
+                    """,
+                    user_id, room_id
+                )
+
+            issue_id = await conn.fetchval(
+                """
+                INSERT INTO issues
+                    (room_id, topic_type, category, title, description,
+                     reporter_id, reporter_room_id, reporter_name,
+                     current_level, current_assignee_id, status,
+                     is_anonymous)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NULL, 'pending', $10)
+                RETURNING id
+                """,
+                room_id, topic_type, category, title, description,
+                user_id, room_id, reporter_name,
+                start_level,
+                is_anonymous
+            )
+
+            # บันทึก status history (บอกว่าออกที่ระดับไหน)
+            note = f"สร้างเรื่องใหม่ (เริ่มต้นที่ระดับ {start_level})"
+            await conn.execute(
+                """
+                INSERT INTO issue_status_history (issue_id, status, changed_by, note)
+                VALUES ($1, 'pending', $2, $3)
+                """,
+                issue_id, user_id, note
+            )
+
+            # ถ้า start_level สูงกว่า room → บันทึก escalation เป็นประวัติด้วย
+            if start_level != "room":
+                await conn.execute(
+                    """
+                    INSERT INTO issue_escalations (issue_id, from_level, to_level, from_assignee_id, reason)
+                    VALUES ($1, 'room', $2, $3, 'ผู้แจ้งเลือกเริ่มต้นที่ระดับนี้โดยตรง')
+                    """,
+                    issue_id, start_level, user_id
+                )
+
+            return issue_id
+
+
+async def get_issue(pool: asyncpg.Pool, user_id: int, issue_id: int) -> Optional[dict]:
+    """ดึงปัญหาตาม id (ตรวจ visibility)"""
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            SELECT
+                i.*,
+                r.room_name,
+                reporter_r.room_name AS reporter_room,
+                u.full_name AS assignee_name
+            FROM issues i
+            JOIN rooms r ON r.id = i.room_id
+            LEFT JOIN rooms reporter_r ON reporter_r.id = i.reporter_room_id
+            LEFT JOIN users u ON u.id = i.current_assignee_id
+            WHERE i.id = $1 AND i.deleted_at IS NULL
+            """,
+            issue_id
+        )
+        if not row:
+            raise NotFoundError("ไม่พบเรื่องนี้")
+
+        # ตรวจ visibility (พีระมิด + อดีตผู้รับ/ผู้เกี่ยวข้อง)
+        level = await user_level(pool, user_id)
+        involved = await _is_involved(conn, user_id, row)
+        if not (can_see(level, row["current_level"], row["reporter_id"], user_id, row["is_anonymous"]) or involved):
+            raise ForbiddenError("คุณไม่มีสิทธิ์ดูเรื่องนี้")
+
+        # ดึงรายละเอียดเสริม
+        steps = await conn.fetch(
+            "SELECT * FROM issue_steps WHERE issue_id = $1 ORDER BY step_order",
+            issue_id
+        )
+        countdown = await conn.fetchrow(
+            "SELECT * FROM issue_countdowns WHERE issue_id = $1 ORDER BY id DESC LIMIT 1",
+            issue_id
+        )
+        escalations = await conn.fetch(
+            """
+            SELECT e.*, fu.full_name AS from_name, tu.full_name AS to_name
+            FROM issue_escalations e
+            LEFT JOIN users fu ON fu.id = e.from_assignee_id
+            LEFT JOIN users tu ON tu.id = e.to_assignee_id
+            WHERE e.issue_id = $1 ORDER BY e.created_at
+            """,
+            issue_id
+        )
+        history = await conn.fetch(
+            "SELECT * FROM issue_status_history WHERE issue_id = $1 ORDER BY created_at",
+            issue_id
+        )
+
+        result = _issue_to_dict(row, with_details=True)
+        result["steps"] = [_step_to_dict(s) for s in steps]
+        result["countdown"] = _countdown_to_dict(countdown) if countdown else None
+        result["escalations"] = [_esc_to_dict(e) for e in escalations]
+        result["status_history"] = [_history_to_dict(h) for h in history]
+        return result
+
+
+async def list_issues(
+    pool: asyncpg.Pool,
+    user_id: int,
+    *,
+    only_mine: bool = False,
+    received: bool = False,
+    status_filter: Optional[str] = None,
+    category: Optional[str] = None,
+    level_filter: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> list:
+    """
+    รายการปัญหา — filter visibility ตามระดับผู้ใช้
+
+    received=True: แสดงทุกเรื่องที่ผู้ใช้มองเห็นได้ (พีระมิด — ระดับสูงมองลงเห็นทุกระดับล่าง)
+    level_filter: จำกัดให้ดูเฉพาะระดับที่เลือก (room/level/council)
+    """
+    level = await user_level(pool, user_id)
+
+    async with pool.acquire() as conn:
+        # เช็คว่า user อยู่ในห้องไหนบ้าง
+        rooms = await conn.fetch(
+            "SELECT room_id FROM students WHERE user_id = $1 AND deleted_at IS NULL AND status = 'active'",
+            user_id
+        )
+        room_ids = [r["room_id"] for r in rooms]
+
+        where = ["i.deleted_at IS NULL"]
+        params = []
+
+        # ---- ประยุกต์ use-case ----
+        if only_mine:
+            # เรื่องที่ฉันแจ้งเท่านั้น (ไม่ต้องสร้าง visible_cond — กัน param เกิน)
+            params.append(user_id)
+            where.append(f"i.reporter_id = ${len(params)}")
+        else:
+            # received หรือ default → สร้างเงื่อนไข "มองเห็นได้" (พีระมิดมองลง + เรื่องที่เกี่ยวข้อง)
+            if level == "student":
+                # นักเรียนเห็นเรื่องของตัวเอง (รวม anonymous — ติดตามสถานะได้)
+                params.append(user_id)
+                visible_cond = f"i.reporter_id = ${len(params)}"
+            else:
+                # ระดับสูงกว่ามองลงได้ทุกระดับต่ำกว่า (พีระมิด)
+                level_num = LEVEL_RANK.get(level, 1)  # 1=room, 2=level, 3=council
+                params.append(level_num)
+                pyramid_cond = (
+                    f"CASE i.current_level WHEN 'room' THEN 1 WHEN 'level' THEN 2 WHEN 'council' THEN 3 ELSE 0 END <= ${len(params)}"
+                )
+                # ห้องของ user (สำหรับเรื่องในระดับ room)
+                if room_ids and level == "room":
+                    params.append(tuple(room_ids))
+                    pyramid_cond += f" AND i.room_id = ANY(${len(params)})"
+
+                # + เรื่องที่ user เกี่ยวข้อง (เคยรับ/อยู่ในห้องผู้แจ้ง) แม้ถูก escalate ขึ้นไปแล้ว
+                params.append(user_id)
+                involved_cond = (
+                    f"i.reporter_id = ${len(params)}"
+                    f" OR i.current_assignee_id = ${len(params)}"
+                    f" OR EXISTS (SELECT 1 FROM issue_escalations e WHERE e.issue_id = i.id AND e.from_assignee_id = ${len(params)})"
+                    f" OR EXISTS (SELECT 1 FROM issue_countdowns cd WHERE cd.issue_id = i.id AND cd.assignee_id = ${len(params)})"
+                )
+                visible_cond = f"({pyramid_cond} OR ({involved_cond}))"
+
+            where.append(visible_cond)
+
+        # ---- ตัวกรอง ----
+        if status_filter:
+            params.append(status_filter)
+            where.append(f"i.status = ${len(params)}")
+        if category:
+            params.append(category)
+            where.append(f"i.category = ${len(params)}")
+        if level_filter:
+            # กรองตามระดับปัจจุบันของเรื่อง (ถ้าระบุ) — ต้องอยู่ในระดับที่มองเห็นเท่านั้น
+            if level_filter not in LEVEL_ORDER:
+                raise ValueError(f"ระดับไม่ถูกต้อง: {level_filter}")
+            params.append(level_filter)
+            where.append(f"i.current_level = ${len(params)}")
+
+        params.append(limit)
+        params.append(offset)
+        sql = f"""
+            SELECT
+                i.id, i.room_id, i.topic_type, i.category, i.title, i.description,
+                i.image_url, i.reporter_id, i.reporter_name, i.current_level,
+                i.current_assignee_id, i.current_assignee_role, i.status, i.priority,
+                i.is_anonymous, i.resolved_at, i.created_at, i.updated_at,
+                r.room_name,
+                reporter_r.room_name AS reporter_room,
+                u.full_name AS assignee_name
+            FROM issues i
+            JOIN rooms r ON r.id = i.room_id
+            LEFT JOIN rooms reporter_r ON reporter_r.id = i.reporter_room_id
+            LEFT JOIN users u ON u.id = i.current_assignee_id
+            WHERE {' AND '.join(where)}
+            ORDER BY i.created_at DESC
+            LIMIT ${len(params)-1} OFFSET ${len(params)}
+        """
+        rows = await conn.fetch(sql, *params)
+
+    return [_issue_to_dict(r) for r in rows]
+
+
+def _issue_to_dict(row, with_details=False) -> dict:
+    """แปลงแถว issues → dict ตาม IssueOut shape"""
+    d = {
+        "id": row["id"],
+        "room_id": row["room_id"],
+        "room_name": row.get("room_name"),
+        "topic_type": row["topic_type"],
+        "category": row["category"],
+        "title": row["title"],
+        "description": row["description"],
+        "image_url": row["image_url"],
+        "reporter_id": row["reporter_id"],
+        "reporter_name": row["reporter_name"] if not row["is_anonymous"] else None,
+        "reporter_room": row.get("reporter_room") if not row["is_anonymous"] else None,
+        "current_level": row["current_level"],
+        "current_assignee_id": row["current_assignee_id"],
+        "current_assignee_role": row["current_assignee_role"],
+        "current_assignee_name": row.get("assignee_name"),
+        "status": row["status"],
+        "priority": row["priority"],
+        "is_anonymous": row["is_anonymous"],
+        "resolved_at": row["resolved_at"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
+    if with_details:
+        d["steps"] = []
+        d["countdown"] = None
+        d["escalations"] = []
+        d["status_history"] = []
+    return d
+
+
+# ============================================================
+# 👤 รับเรื่อง + Countdown
+# ============================================================
+async def accept_issue(pool: asyncpg.Pool, user_id: int, issue_id: int, estimated_days: int) -> None:
+    """รับเรื่อง + ตั้ง countdown (วันใช้แก้ปัญหา)"""
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            issue = await conn.fetchrow(
+                "SELECT * FROM issues WHERE id = $1 AND deleted_at IS NULL",
+                issue_id
+            )
+            if not issue:
+                raise NotFoundError("ไม่พบเรื่องนี้")
+
+            # ตรวจว่าสังกัดระดับเดียวกับ current_level
+            # - สำหรับระดับ room: ต้องเป็นสมาชิกห้องนั้น (หัวหน้าห้อง/รอง)
+            # - สำหรับระดับ level/council: สังกัดระดับชั้น/สภา มองข้ามห้องได้
+            in_room_role = await _user_role_in(conn, user_id, issue["room_id"])
+            if in_room_role:
+                level = ROLE_LEVEL.get(in_room_role, "student")
+            else:
+                # ไม่ใช่สมาชิกห้องนั้น — ดูระดับสูงสุดจากทุกตำแหน่ง (รองรับสภา/ประธานระดับ)
+                level = await user_level(pool, user_id, room_id=None)
+
+            if level != issue["current_level"]:
+                raise ForbiddenError("เรื่องนี้ไม่อยู่ในระดับของคุณ")
+
+            # ตรวจว่ายังไม่มีคนรับ
+            if issue["current_assignee_id"]:
+                raise ValidationError("เรื่องนี้มีผู้รับอยู่แล้ว")
+
+            now = datetime.now(timezone.utc)
+            deadline = now + timedelta(days=estimated_days)
+
+            await conn.execute(
+                """
+                UPDATE issues
+                SET current_assignee_id = $1, status = 'in_progress', updated_at = NOW()
+                WHERE id = $2
+                """,
+                user_id, issue_id
+            )
+            # role ของผู้รับ
+            role = await _user_role_in(conn, user_id, issue["room_id"])
+            await conn.execute(
+                "UPDATE issues SET current_assignee_role = $1 WHERE id = $2",
+                role, issue_id
+            )
+
+            await conn.execute(
+                """
+                INSERT INTO issue_countdowns (issue_id, assignee_id, estimated_days, deadline)
+                VALUES ($1, $2, $3, $4)
+                """,
+                issue_id, user_id, estimated_days, deadline
+            )
+            await conn.execute(
+                """
+                INSERT INTO issue_status_history (issue_id, status, changed_by, note)
+                VALUES ($1, 'in_progress', $2, $3)
+                """,
+                issue_id, user_id, f"รับเรื่อง (ตั้งเวลา {estimated_days} วัน)"
+            )
+
+
+async def update_countdown(pool: asyncpg.Pool, user_id: int, issue_id: int, estimated_days: int) -> None:
+    """แก้ไข countdown (ยืดเวลา)"""
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            cd = await conn.fetchrow(
+                "SELECT id FROM issue_countdowns WHERE issue_id = $1 AND assignee_id = $2 ORDER BY id DESC LIMIT 1",
+                issue_id, user_id
+            )
+            if not cd:
+                raise NotFoundError("ไม่พบ countdown ของเรื่องนี้")
+
+            now = datetime.now(timezone.utc)
+            deadline = now + timedelta(days=estimated_days)
+            await conn.execute(
+                """
+                UPDATE issue_countdowns
+                SET estimated_days = $1, deadline = $2
+                WHERE id = $3
+                """,
+                estimated_days, deadline, cd["id"]
+            )
+
+
+# ============================================================
+# 🪜 ขั้นตอนการดำเนินงาน (Steps)
+# ============================================================
+async def add_step(pool: asyncpg.Pool, user_id: int, issue_id: int, step_title: str, step_detail: Optional[str] = None) -> int:
+    """เพิ่มขั้นตอนการดำเนินงาน"""
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            await _ensure_assignee(conn, user_id, issue_id)
+            step_order = await conn.fetchval(
+                "SELECT COALESCE(MAX(step_order), 0) + 1 FROM issue_steps WHERE issue_id = $1",
+                issue_id
+            )
+            return await conn.fetchval(
+                """
+                INSERT INTO issue_steps (issue_id, step_title, step_detail, step_order, created_by)
+                VALUES ($1, $2, $3, $4, $5)
+                RETURNING id
+                """,
+                issue_id, step_title, step_detail, step_order, user_id
+            )
+
+
+async def complete_step(pool: asyncpg.Pool, user_id: int, issue_id: int, step_id: int) -> None:
+    """ทำขั้นตอนสำเร็จ"""
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            await _ensure_assignee(conn, user_id, issue_id)
+            step = await conn.fetchrow(
+                "SELECT id FROM issue_steps WHERE id = $1 AND issue_id = $2",
+                step_id, issue_id
+            )
+            if not step:
+                raise NotFoundError("ไม่พบขั้นตอนนี้")
+
+            await conn.execute(
+                """
+                UPDATE issue_steps
+                SET is_completed = TRUE, completed_at = NOW()
+                WHERE id = $1
+                """,
+                step_id
+            )
+
+
+# ============================================================
+# 🚀 Escalate (ส่งต่อไประดับบน) + Resolve
+# ============================================================
+async def escalate_issue(pool: asyncpg.Pool, user_id: int, issue_id: int, reason: Optional[str] = None) -> None:
+    """ส่งต่อเรื่องไประดับบน (ถ้าเกินความสามารถ/ไม่ทันเวลา)"""
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            issue = await conn.fetchrow(
+                "SELECT * FROM issues WHERE id = $1 AND deleted_at IS NULL",
+                issue_id
+            )
+            if not issue:
+                raise NotFoundError("ไม่พบเรื่องนี้")
+
+            # ต้องเป็นผู้รับปัจจุบัน หรือ admin
+            if issue["current_assignee_id"] != user_id:
+                is_admin = await _is_admin(conn, user_id)
+                if not is_admin:
+                    raise ForbiddenError("เฉพาะผู้รับเรื่องหรือ admin ที่จะส่งต่อได้")
+
+            next_level = NEXT_LEVEL.get(issue["current_level"])
+            if not next_level:
+                raise ValidationError("เรื่องนี้อยู่ระดับสูงสุดแล้ว (สภานักเรียน) — ส่งต่อไม่ได้")
+
+            from_assignee = issue["current_assignee_id"]
+            await conn.execute(
+                """
+                INSERT INTO issue_escalations (issue_id, from_level, to_level, from_assignee_id, reason)
+                VALUES ($1, $2, $3, $4, $5)
+                """,
+                issue_id, issue["current_level"], next_level, from_assignee, reason
+            )
+            await conn.execute(
+                """
+                UPDATE issues
+                SET current_level = $1, current_assignee_id = NULL, current_assignee_role = NULL,
+                    status = 'escalated', updated_at = NOW()
+                WHERE id = $2
+                """,
+                next_level, issue_id
+            )
+            await conn.execute(
+                """
+                INSERT INTO issue_status_history (issue_id, status, changed_by, note)
+                VALUES ($1, 'escalated', $2, $3)
+                """,
+                issue_id, user_id, f"ส่งต่อไปยังระดับ {next_level}" + (f": {reason}" if reason else "")
+            )
+
+
+async def resolve_issue(pool: asyncpg.Pool, user_id: int, issue_id: int, note: Optional[str] = None) -> None:
+    """ปิดเรื่อง (แก้ไขเสร็จ)"""
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            issue = await conn.fetchrow(
+                "SELECT * FROM issues WHERE id = $1 AND deleted_at IS NULL",
+                issue_id
+            )
+            if not issue:
+                raise NotFoundError("ไม่พบเรื่องนี้")
+
+            # ผู้รับปัจจุบัน หรือ admin
+            if issue["current_assignee_id"] != user_id:
+                is_admin = await _is_admin(conn, user_id)
+                if not is_admin:
+                    raise ForbiddenError("เฉพาะผู้รับเรื่องหรือ admin ที่จะปิดเรื่องได้")
+
+            await conn.execute(
+                """
+                UPDATE issues
+                SET status = 'resolved', resolved_at = NOW(), updated_at = NOW()
+                WHERE id = $1
+                """,
+                issue_id
+            )
+            await conn.execute(
+                """
+                INSERT INTO issue_status_history (issue_id, status, changed_by, note)
+                VALUES ($1, 'resolved', $2, $3)
+                """,
+                issue_id, user_id, note or "แก้ไขเสร็จสิ้น"
+            )
+
+
+async def cancel_issue(pool: asyncpg.Pool, user_id: int, issue_id: int, reason: Optional[str] = None) -> None:
+    """ยกเลิกเรื่อง (เฉพาะผู้แจ้ง หรือ admin) — กันส่งผิด/ไม่ต้องการแล้ว"""
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            issue = await conn.fetchrow(
+                "SELECT * FROM issues WHERE id = $1 AND deleted_at IS NULL",
+                issue_id
+            )
+            if not issue:
+                raise NotFoundError("ไม่พบเรื่องนี้")
+
+            # ตรวจว่าเป็นผู้แจ้ง หรือ admin
+            is_admin = await _is_admin(conn, user_id)
+            if issue["reporter_id"] != user_id and not is_admin:
+                raise ForbiddenError("เฉพาะผู้แจ้งเรื่องนี้เท่านั้นที่ยกเลิกได้")
+
+            # ถ้าเรื่องเสร็จแล้ว/ปิดแล้ว ยกเลิกไม่ได้
+            if issue["status"] in ("resolved",):
+                raise ValidationError("เรื่องนี้ปิดไปแล้ว — ยกเลิกไม่ได้")
+
+            await conn.execute(
+                """
+                UPDATE issues
+                SET status = 'cancelled', updated_at = NOW()
+                WHERE id = $1
+                """,
+                issue_id
+            )
+            await conn.execute(
+                """
+                INSERT INTO issue_status_history (issue_id, status, changed_by, note)
+                VALUES ($1, 'cancelled', $2, $3)
+                """,
+                issue_id, user_id, reason or "ผู้แจ้งยกเลิกเรื่อง"
+            )
+
+
+# ============================================================
+# 🧩 Helpers
+# ============================================================
+async def _user_role_in(conn, user_id: int, room_id: int) -> Optional[str]:
+    """หาตำแหน่งของ user ในห้อง"""
+    return await conn.fetchval(
+        """
+        SELECT class_role FROM students
+        WHERE user_id = $1 AND room_id = $2 AND deleted_at IS NULL AND status = 'active'
+        """,
+        user_id, room_id
+    )
+
+
+async def _is_involved(conn, user_id: int, issue_row) -> bool:
+    """
+    เช็คว่า user เกี่ยวข้องกับเรื่องนี้ไหม (เพื่อดูได้แม้ระดับต่ำกว่าปัจจุบัน):
+    - เคยเป็นผู้รับ (จาก escalations.from_assignee_id หรือ countdown assignee)
+    - อยู่ในห้องเดียวกับผู้แจ้ง (สมาชิกห้องนั้น เห็นเรื่องที่ออกจากห้องตัวเอง)
+    """
+    issue_id = issue_row["id"]
+
+    # 1. เคยเป็นผู้รับมาก่อน (escalations / countdowns)
+    prev = await conn.fetchval(
+        """
+        SELECT 1 FROM issue_escalations
+        WHERE issue_id = $1 AND from_assignee_id = $2
+        UNION ALL
+        SELECT 1 FROM issue_countdowns
+        WHERE issue_id = $1 AND assignee_id = $2
+        LIMIT 1
+        """,
+        issue_id, user_id
+    )
+    if prev:
+        return True
+
+    # 2. อยู่ในห้องเดียวกับผู้แจ้ง (สำหรับเรื่องที่ยังระดับ room — สมาชิกห้องเห็นเรื่องของห้องตัวเอง)
+    reporter_room = issue_row["reporter_room_id"] or issue_row["room_id"]
+    if reporter_room:
+        in_same_room = await conn.fetchval(
+            """
+            SELECT 1 FROM students
+            WHERE user_id = $1 AND room_id = $2 AND deleted_at IS NULL AND status = 'active'
+            """,
+            user_id, reporter_room
+        )
+        if in_same_room:
+            return True
+
+    return False
+
+
+async def _is_admin(conn, user_id: int) -> bool:
+    """เช็คว่า user เป็น admin (ในห้องใดก็ได้) หรือ Super Admin"""
+    if settings.SUPER_ADMIN_ID and int(user_id) == int(settings.SUPER_ADMIN_ID):
+        return True
+    row = await conn.fetchrow(
+        "SELECT is_admin FROM students WHERE user_id = $1 AND deleted_at IS NULL AND status = 'active'",
+        user_id
+    )
+    return bool(row and row["is_admin"])
+
+
+async def _ensure_assignee(conn, user_id: int, issue_id: int) -> None:
+    """ตรวจว่า user เป็นผู้รับเรื่องปัจจุบัน"""
+    issue = await conn.fetchrow(
+        "SELECT current_assignee_id FROM issues WHERE id = $1 AND deleted_at IS NULL",
+        issue_id
+    )
+    if not issue:
+        raise NotFoundError("ไม่พบเรื่องนี้")
+    if issue["current_assignee_id"] != user_id:
+        is_admin = await _is_admin(conn, user_id)
+        if not is_admin:
+            raise ForbiddenError("เฉพาะผู้รับเรื่องเท่านั้นที่จัดการขั้นตอนนี้ได้")
+
+
+# ============================================================
+# 🔄 แปลงผลลัพธ์
+# ============================================================
+def _step_to_dict(row) -> dict:
+    return {
+        "id": row["id"],
+        "step_title": row["step_title"],
+        "step_detail": row["step_detail"],
+        "step_order": row["step_order"],
+        "is_completed": row["is_completed"],
+        "completed_at": row["completed_at"],
+    }
+
+
+def _countdown_to_dict(row) -> dict:
+    now = datetime.now(timezone.utc)
+    return {
+        "id": row["id"],
+        "estimated_days": row["estimated_days"],
+        "started_at": row["started_at"],
+        "deadline": row["deadline"],
+        "is_overdue": bool(row["deadline"] < now),
+    }
+
+
+def _esc_to_dict(row) -> dict:
+    return {
+        "id": row["id"],
+        "from_level": row["from_level"],
+        "to_level": row["to_level"],
+        "reason": row["reason"],
+        "created_at": row["created_at"],
+    }
+
+
+def _history_to_dict(row) -> dict:
+    return {
+        "id": row["id"],
+        "status": row["status"],
+        "note": row["note"],
+        "created_at": row["created_at"],
+    }
