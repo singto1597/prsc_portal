@@ -25,13 +25,15 @@ export IMAGE_TAG=$(git rev-parse --short HEAD)
 echo "🏷️ ตรวจพบ Commit ล่าสุด: ${IMAGE_TAG}"
 
 # 3. เตรียมไฟล์ .env ให้ Frontend (Vite) ก่อน Build
-echo "📝 คัดลอก .env โยนให้ Frontend..."
-cp .env frontend/.env
+# echo "📝 คัดลอก .env โยนให้ Frontend..."
+# cp .env frontend/.env
 
 # 4. Build Image (ใช้เลข Commit เป็น Tag แทน latest)
 echo "🔨 กำลังสร้าง Docker Image เวอร์ชัน: ${IMAGE_TAG}..."
 docker build -t prsc-${ENV_NAME}-backend:${IMAGE_TAG} ./backend
-docker build -t prsc-${ENV_NAME}-frontend:${IMAGE_TAG} ./frontend
+docker build --no-cache \
+  --build-arg VITE_API_BASE_URL=${VITE_API_BASE_URL} \
+  -t prsc-${ENV_NAME}-frontend:${IMAGE_TAG} ./frontend
 
 # 5. Deploy อัปเดตระบบแบบ Zero Downtime
 echo "🚀 กำลังสลับสวิตช์ระบบ $ENV_NAME แบบ Zero Downtime (เวอร์ชัน ${IMAGE_TAG})..."

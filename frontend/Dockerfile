@@ -12,7 +12,8 @@ COPY package*.json ./
 
 # ติดตั้ง Dependencies ทั้งหมด
 RUN npm install
-
+ARG VITE_API_BASE_URL
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 # คัดลอก Source Code ทั้งหมดเข้าสู่ Container
 COPY . .
 
