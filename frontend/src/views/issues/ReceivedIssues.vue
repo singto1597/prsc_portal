@@ -199,7 +199,7 @@ function statusColor(s: string) {
       </select>
       <select v-model="statusFilter" @change="load"
         class="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
-        <option value="not_resolved">ยังไม่เสร็จ (ค่าเริ่มต้น)</option>
+        <option value="not_resolved">ยังไม่เสร็จ (รอรับ / กำลังทำ / ส่งต่อ)</option>
         <option value="">ทุกสถานะ (รวมเสร็จแล้ว)</option>
         <option value="pending">รอรับ</option>
         <option value="in_progress">กำลังดำเนินการ</option>
