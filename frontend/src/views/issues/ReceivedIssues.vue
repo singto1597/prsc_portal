@@ -2,7 +2,15 @@
 import { ref, onMounted, computed, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { listIssues } from '@/services/issue';
-import { MAIN_CATEGORY_LABELS, subcategoryLabel, STATUS_LABELS, LEVEL_LABELS, type Issue } from '@/types/issue';
+import {
+  MAIN_CATEGORIES,
+  MAIN_CATEGORY_LABELS,
+  subcategoryLabel,
+  STATUS_LABELS,
+  LEVEL_LABELS,
+  type Issue,
+  type MainCategory,
+} from '@/types/issue';
 import { useAuthStore } from '@/stores/auth';
 
 const authStore = useAuthStore();
@@ -14,32 +22,82 @@ const error = ref('');
 const statusFilter = ref('not_resolved');  // default: ซ่อนเรื่องที่เสร็จแล้ว (ดูเฉพาะยังไม่เสร็จ)
 const levelFilter = ref('');   // '' = ทุกระดับที่มองเห็น, room/level/council
 const mainCategoryFilter = ref('');  // '' = ทุกหมวด, suggestion/wellbeing/report
+const subcategoryFilter = ref('');   // '' = ทุกหมวดย่อย, academic/physical_health/...
 
 // สถานะ "ยังไม่เสร็จ" = pending + in_progress + escalated (ให้ server กรอง — กันหน้าว่างตอน 100 เรื่องแรกเสร็จหมด)
 const NOT_RESOLVED_STATUSES = 'pending,in_progress,escalated';
 
-// ตั้งค่าเริ่มต้นจาก URL (คลิก "ดูทั้งหมด" จาก Dashboard → มาเจอหมวดนั้นเลย)
-const initMainCat = route.query.main_category;
-if (typeof initMainCat === 'string' && initMainCat) {
-  mainCategoryFilter.value = initMainCat;
+// หาหมวดหลักของหมวดย่อย (แต่ละหมวดย่อยอยู่ใต้หมวดหลักเดียว)
+function mainOfCategory(cat: string): string {
+  for (const mc of Object.keys(MAIN_CATEGORIES) as MainCategory[]) {
+    if (MAIN_CATEGORIES[mc].subcategories[cat]) return mc;
+  }
+  return '';
 }
 
-// URL เป็น source of truth: แก้ URL เอง / back-forward → ปรับ filter ตาม URL
-watch(() => route.query.main_category, (val) => {
-  const v = typeof val === 'string' ? val : '';
-  if (v !== mainCategoryFilter.value) {
-    mainCategoryFilter.value = v;
-    load();
-  }
+// ตั้งค่าเริ่มต้นจาก URL (คลิกจาก Dashboard → มาเจอหมวด/หมวดย่อยนั้นเลย)
+const initMainCat = typeof route.query.main_category === 'string' ? route.query.main_category : '';
+const initCat = typeof route.query.category === 'string' ? route.query.category : '';
+
+// URL มีแค่ ?category= (ไม่มี main_category) → หาหมวดหลักให้เอง เพื่อให้ dropdown ตรงกัน
+const effectiveMain = initMainCat || mainOfCategory(initCat);
+if (effectiveMain) mainCategoryFilter.value = effectiveMain;
+
+// หมวดย่อยต้อง belong กับหมวดหลักที่เลือก → ถ้าไม่ (เช่น แก้ URL มือ) ให้ตัดทิ้ง เหมือนที่ watch ทำ
+if (initCat && mainOfCategory(initCat) === effectiveMain) {
+  subcategoryFilter.value = initCat;
+}
+
+// หมวดย่อยที่เลือกได้ (ตามหมวดหลักที่เลือกอยู่)
+const availableSubcategories = computed(() => {
+  if (!mainCategoryFilter.value) return [];
+  const info = MAIN_CATEGORIES[mainCategoryFilter.value as MainCategory];
+  if (!info) return [];
+  return Object.entries(info.subcategories).map(([value, label]) => ({ value, label }));
 });
+
+// URL เป็น source of truth: แก้ URL เอง / back-forward → ปรับ filter ตาม URL
+watch(
+  () => [route.query.main_category, route.query.category],
+  ([mc, cat]) => {
+    const mainV = typeof mc === 'string' ? mc : '';
+    const catV = typeof cat === 'string' ? cat : '';
+    const mainChanged = mainV !== mainCategoryFilter.value;
+    const catChanged = catV !== subcategoryFilter.value;
+    if (mainChanged || catChanged) {
+      // หมวดย่อยต้อง belong กับหมวดหลักที่เลือก → ถ้าไม่ (เช่น แก้ URL มือ) ให้ตัดทิ้ง
+      let validCat = '';
+      if (mainV && catV) {
+        validCat = mainOfCategory(catV) === mainV ? catV : '';
+      }
+      mainCategoryFilter.value = mainV;
+      subcategoryFilter.value = validCat;
+      load();
+    }
+  },
+);
 
 // เลือกหมวดจาก dropdown → เขียนกลับไปที่ URL (refresh/แชร์ URL แล้วได้ข้อมูลตรงกัน)
 function onMainCategoryChange() {
+  // เปลี่ยนหมวดหลัก → หมวดย่อยเดิมอยู่คนละหมวด → เคลียร์
+  subcategoryFilter.value = '';
   const query = { ...route.query };
   if (mainCategoryFilter.value) {
     query.main_category = mainCategoryFilter.value;
   } else {
     delete query.main_category;
+  }
+  delete query.category;
+  router.replace({ query });
+  load();
+}
+
+function onSubcategoryChange() {
+  const query = { ...route.query };
+  if (subcategoryFilter.value) {
+    query.category = subcategoryFilter.value;
+  } else {
+    delete query.category;
   }
   router.replace({ query });
   load();
@@ -91,6 +149,7 @@ async function load() {
       status: raw ? NOT_RESOLVED_STATUSES : (statusFilter.value || undefined),
       level: levelFilter.value || undefined,
       main_category: mainCategoryFilter.value || undefined,
+      category: subcategoryFilter.value || undefined,
     });
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'โหลดข้อมูลไม่สำเร็จ';
@@ -122,6 +181,14 @@ function statusColor(s: string) {
         class="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
         <option value="">ทุกหมวดหลัก</option>
         <option v-for="mc in mainCategoryOptions" :key="mc.value" :value="mc.value">{{ mc.label }}</option>
+      </select>
+      <select v-model="subcategoryFilter" @change="onSubcategoryChange"
+        :disabled="!mainCategoryFilter"
+        class="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white disabled:bg-gray-50 disabled:text-gray-400">
+        <option value="">
+          {{ mainCategoryFilter ? 'ทุกหมวดย่อย' : 'เลือกหมวดหลักก่อน' }}
+        </option>
+        <option v-for="sc in availableSubcategories" :key="sc.value" :value="sc.value">{{ sc.label }}</option>
       </select>
       <select v-model="levelFilter" @change="load"
         class="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">

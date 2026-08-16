@@ -40,6 +40,11 @@ def get_main_category_label(code: str) -> str:
     return _load_categories().get(code, {}).get("label", code)
 
 
+def get_main_category_description(code: str) -> str:
+    """คำอธิบายของหมวดหลัก (สำหรับ header/หน้า dashboard)"""
+    return _load_categories().get(code, {}).get("description", "")
+
+
 def get_subcategory_label(main_category: str, category: str) -> str:
     """label ภาษาไทยของหัวข้อย่อย"""
     main = _load_categories().get(main_category, {})

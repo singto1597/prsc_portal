@@ -210,6 +210,65 @@ async def test_dashboard_teacher_without_level_scope(client, db_pool, dashboard_
     assert all(c["total"] == 0 for c in body["main_categories"])
 
 
+@pytest.mark.asyncio
+async def test_dashboard_council_member_scope_fail_closed(client, db_pool, dashboard_world):
+    """
+    council_member (สภานักเรียน) มี VIEW_DASHBOARD แต่อยู่นอก SCOPE_ALL_ROLES / SCOPE_LEVEL_ROLES
+    → ต้อง fail-closed เป็น scope 'none' (ไม่เห็นตัวเลขทั้งโรงเรียน + ข้อมูลเข้าระบบ)
+    (เดิม scope 'pyramid' รั่วไปเป็น 'all' — เห็น total_issues ทั้งโรงเรียน + recent_logins)
+    """
+    world = dashboard_world
+
+    # ให้ระบบมีข้อมูล (1 เรื่องใน ม.4) — สภานักเรียนต้องไม่เห็น
+    assert _mk(client, world, title="เรื่องใน ม.4").status_code == 200
+
+    sid = f"CM{random.randint(1000, 9999)}"
+    council_member = await _register(db_pool, sid, "1234", "สภานักเรียน", sid, "", "council_member")
+
+    res = client.get("/api/dashboard/summary",
+                     headers={"Authorization": f"Bearer {council_member['token']}"})
+    assert res.status_code == 200, f"→ {res.status_code}: {res.text}"
+    body = res.json()
+    assert body["scope"] == "none", f"ต้อง fail-closed เป็น none แต่ได้ {body['scope']}"
+    assert body["scope_label"] is None
+    assert body["total_issues"] == 0
+    assert body["total_students"] == 0
+    assert body["total_rooms"] == 0
+    assert body["usage_count"] == 0, "ห้ามเห็นข้อมูลการเข้าระบบ (ข้อมูลส่วนบุคคลข้ามระดับ)"
+    assert body["recent_logins"] == []
+    assert all(c["total"] == 0 for c in body["main_categories"])
+
+
+@pytest.mark.asyncio
+async def test_dashboard_trend_excludes_unknown_main_category(client, db_pool, dashboard_world):
+    """
+    เรื่องที่มี main_category อยู่นอก config (เก่า/insert ตรง) ต้องไม่ถูกนับใน trend
+    — trend ต้องนับจาก key set เดียวกับ total_issues/by_status (บทเรียน: "Dashboard หลาย query รวมหมวดเดียว")
+    มิฉะนั้นกราฟขึ้นเรื่องที่ตัวเลขอื่นไม่นับ → ตัวเลขในหน้าจอไม่ตรงกัน
+    """
+    world = dashboard_world
+
+    # เรื่องปกติ 1 เรื่อง (ถูกนับทั้งใน total + trend)
+    assert _mk(client, world, title="เรื่องปกติ").status_code == 200
+
+    # insert ตรง: หมวดหลักเก่าที่ไม่อยู่ใน config (สร้างล่าสุด → อยู่ในช่วง 7 วัน)
+    # (API กรองหมวดไม่อนุญาตให้สร้างด้วยหมวดนอก config — สถานการณ์จริงคือข้อมูลเดิม/insert ตรง)
+    async with db_pool.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO issues (room_id, main_category, category, title, description)
+            VALUES ($1, 'legacy_main', 'legacy_cat', 'หมวดเก่า', 'ทดสอบ')
+            """,
+            world["room4_id"],
+        )
+
+    body = _dashboard(client, world, "admin").json()
+    # ไม่ถูกนับใน total
+    assert body["total_issues"] == 1, f"เรื่องหมวดเก่าต้องไม่ถูกนับ: {body['total_issues']}"
+    # ไม่ถูกนับใน trend (7 วันต้องตรงกับ total — นับจาก key set เดียวกัน)
+    assert sum(t["count"] for t in body["trend"]) == 1, f"trend ต้องไม่รวมหมวดเก่า: {body['trend']}"
+
+
 # === Section 2: กลุ่มตาม 3 หมวดหลัก + สถานะ + หมวดย่อย + เรื่องล่าสุด ===
 @pytest.mark.asyncio
 async def test_dashboard_main_categories_grouping(client, db_pool, dashboard_world):
@@ -257,9 +316,26 @@ async def test_dashboard_main_categories_grouping(client, db_pool, dashboard_wor
     assert sug_status["pending"] == 2
     assert sug_status["resolved"] == 1
     assert sug_status["in_progress"] == 0  # เติม 0 ให้ครบ
-    # top หมวดย่อย: academic 2 > discipline 1
-    assert [s["category"] for s in sug["top_subcategories"]] == ["academic", "discipline"]
-    assert sug["top_subcategories"][0]["label"] == "วิชาการ"
+    # หมวดย่อย: ครบ 5 หัวข้อ เรียง count มากไปน้อย (อันเยอะสุดอยู่บน) — หมวดที่ 0 เรื่องก็ยังโชว์
+    assert [s["category"] for s in sug["subcategories"]] == \
+        ["academic", "discipline", "reception", "activity", "democracy"]
+    assert sug["subcategories"][0]["label"] == "วิชาการ"
+    assert sug["subcategories"][0]["count"] == 2
+    sug_subs = {s["category"]: s for s in sug["subcategories"]}
+    # สถานะภายในหมวดย่อย (academic: 1 pending + 1 resolved)
+    acad_status = {s["status"]: s["count"] for s in sug_subs["academic"]["by_status"]}
+    assert acad_status["pending"] == 1
+    assert acad_status["resolved"] == 1
+    assert acad_status["in_progress"] == 0  # เติม 0 ให้ครบทุกสถานะ
+    # หมวดที่ไม่มีเรื่อง → count 0 (แสดงครบทุกหัวข้อตาม config)
+    assert sug_subs["reception"]["count"] == 0
+    # sum(subcategories) == total (ตัวเลขจาก key set เดียวกัน)
+    assert sum(s["count"] for s in sug["subcategories"]) == sug["total"] == 3
+    # description ของหมวดหลัก + หมวดย่อย ต้องไม่ว่าง
+    assert sug["description"]
+    assert sug_subs["academic"]["description"]
+    # งานเกินเวลาในหมวดนี้ = 0
+    assert sug["overdue"] == 0
     # เรื่องล่าสุดต้องมีทั้ง 3 เรื่อง
     sug_ids = {r["id"] for r in sug["recent_issues"]}
     assert len(sug["recent_issues"]) == 3
@@ -271,6 +347,12 @@ async def test_dashboard_main_categories_grouping(client, db_pool, dashboard_wor
     assert well["total"] == 1
     well_status = {s["status"]: s["count"] for s in well["by_status"]}
     assert well_status["escalated"] == 1
+    well_subs = {s["category"]: s for s in well["subcategories"]}
+    # mental_health 1 เรื่อง → ขึ้นก่อน physical_health 0 เรื่อง
+    assert [s["category"] for s in well["subcategories"]] == ["mental_health", "physical_health"]
+    assert well_subs["mental_health"]["count"] == 1
+    assert well_subs["physical_health"]["count"] == 0
+    assert well["description"]
     assert [r["id"] for r in well["recent_issues"]] == [i_well]
     assert well["recent_issues"][0]["status"] == "escalated"
 
@@ -282,8 +364,16 @@ async def test_dashboard_main_categories_grouping(client, db_pool, dashboard_wor
     assert rep_status["in_progress"] == 1
     assert rep_status["pending"] == 1
     assert rep_status["cancelled"] == 1
-    assert [s["category"] for s in rep["top_subcategories"]] == ["complaint", "grievance"]
-    assert rep["top_subcategories"][0]["label"] == "ร้องทุกข์"
+    rep_subs = {s["category"]: s for s in rep["subcategories"]}
+    assert [s["category"] for s in rep["subcategories"]] == ["complaint", "grievance"]
+    assert rep["subcategories"][0]["label"] == "ร้องทุกข์"
+    assert rep["subcategories"][0]["count"] == 2
+    # สถานะภายในหมวดย่อย (complaint: 1 in_progress + 1 cancelled)
+    comp_status = {s["status"]: s["count"] for s in rep_subs["complaint"]["by_status"]}
+    assert comp_status["in_progress"] == 1
+    assert comp_status["cancelled"] == 1
+    assert sum(s["count"] for s in rep["subcategories"]) == rep["total"] == 3
+    assert rep["overdue"] == 0
 
     # by_status รวมทั้งระบบ (เรียงตาม STATUS_ORDER เติม 0)
     all_status = {s["status"]: s["count"] for s in body["by_status"]}
@@ -362,9 +452,18 @@ async def test_dashboard_overdue_count(client, db_pool, dashboard_world):
 
     res = _dashboard(client, world, "admin")
     assert res.status_code == 200
-    assert res.json()["overdue"] == 1, (
-        f"ต้องมีแค่ 1 เรื่องเกินเวลา (เรื่อง C ยืดเวลาแล้ว ไม่นับ) แต่ได้ {res.json()['overdue']}"
+    body = res.json()
+    assert body["overdue"] == 1, (
+        f"ต้องมีแค่ 1 เรื่องเกินเวลา (เรื่อง C ยืดเวลาแล้ว ไม่นับ) แต่ได้ {body['overdue']}"
     )
+
+    # งานเกินเวลารายหมวด: เรื่องที่เกินคือ report (B) — suggestion/wellbeing ต้องเป็น 0
+    cats = {c["code"]: c for c in body["main_categories"]}
+    assert cats["report"]["overdue"] == 1
+    assert cats["suggestion"]["overdue"] == 0
+    assert cats["wellbeing"]["overdue"] == 0
+    # sum(รายหมวด) == overdue รวม (ตัวเลขชุดเดียวกัน)
+    assert sum(c["overdue"] for c in body["main_categories"]) == body["overdue"] == 1
 
     # Deep DB verify: นับ "countdown ล่าสุดของแต่ละเรื่องที่เกินกำหนด" — เขียนต่างจาก service query
     # (service ใช้ MAX(id) + EXISTS, ตรงนี้ใช้ correlated ORDER BY DESC LIMIT 1 — ตรวจอิสระ)
@@ -378,7 +477,7 @@ async def test_dashboard_overdue_count(client, db_pool, dashboard_world):
                    ORDER BY cd.id DESC LIMIT 1) < NOW()
             """
         )
-    assert res.json()["overdue"] == db_overdue == 1
+    assert body["overdue"] == db_overdue == 1
 
 
 # === Section 4: กรองเรื่องตามหมวดหลัก (ใช้กับปุ่ม "ดูทั้งหมด" จาก Dashboard) ===
@@ -429,3 +528,65 @@ async def test_issues_list_multi_status_filter(client, dashboard_world):
     assert {i["status"] for i in issues} == {"pending", "in_progress"}
     ids = {i["id"] for i in issues}
     assert i_a in ids and i_b in ids and i_c not in ids
+
+
+# === Section 6: หมวดย่อยที่ไม่อยู่ใน config → รวมเข้า "อื่นๆ" (ตัวเลขยังตรง) ===
+@pytest.mark.asyncio
+async def test_dashboard_subcategory_unknown_folded_into_other(client, db_pool, dashboard_world):
+    """
+    หมวดย่อยที่ไม่อยู่ใน config (เช่นหมวดเก่าหลัง migration / insert ตรง) → dashboard รวมเข้า "อื่นๆ"
+    ทำให้ sum(subcategories[].count) == total เสมอ (ไม่ทิ้งข้อมูล ไม่ให้ตัวเลขเพี้ยน)
+    """
+    world = dashboard_world
+
+    # สร้างเรื่องหมวดย่อยปกติ 1 เรื่อง แล้วแก้ category เป็นค่าที่ไม่อยู่ใน config ผ่าน DB ตรงๆ
+    # (API บังคับให้ตรง config — เลยต้อง bypass ผ่าน SQL)
+    r = _mk(client, world, main_category="suggestion", category="academic", title="วิชาการ")
+    assert r.status_code == 200
+    async with db_pool.acquire() as conn:
+        await conn.execute("UPDATE issues SET category = 'old_legacy' WHERE id = $1", r.json()["id"])
+
+    res = _dashboard(client, world, "admin")
+    assert res.status_code == 200
+    body = res.json()
+    sug = next(c for c in body["main_categories"] if c["code"] == "suggestion")
+
+    assert sug["total"] == 1
+    assert sum(s["count"] for s in sug["subcategories"]) == sug["total"] == 1
+    # เรื่องที่ category ไม่อยู่ใน config → ไปอยู่ "อื่นๆ" ท้ายสุด
+    assert sug["subcategories"][-1]["category"] == "_other"
+    assert sug["subcategories"][-1]["label"] == "อื่นๆ"
+    assert sug["subcategories"][-1]["count"] == 1
+    # หมวดย่อยปกติใน config ยังเป็น 0
+    normal = [s for s in sug["subcategories"] if s["category"] != "_other"]
+    assert all(s["count"] == 0 for s in normal)
+
+
+# === Section 7: กรองหมวดย่อย (ใช้กับลิงก์จาก Dashboard → หน้าเรื่องที่รับ) ===
+@pytest.mark.asyncio
+async def test_issues_list_subcategory_filter(client, dashboard_world):
+    """GET /api/issues?main_category=suggestion&category=academic → เฉพาะเรื่องหมวดย่อยนั้น"""
+    world = dashboard_world
+
+    assert _mk(client, world, main_category="suggestion", category="academic", title="วิชาการ").status_code == 200
+    assert _mk(client, world, main_category="suggestion", category="discipline", title="วินัย").status_code == 200
+    assert _mk(client, world, main_category="report", category="complaint", title="ร้องทุกข์").status_code == 200
+
+    token = world["admin"]["token"]
+    # กรองหมวดหลัก + หมวดย่อย
+    res = client.get("/api/issues?main_category=suggestion&category=academic",
+                     headers={"Authorization": f"Bearer {token}"})
+    assert res.status_code == 200
+    issues = res.json()
+    assert len(issues) == 1
+    assert issues[0]["category"] == "academic"
+    assert issues[0]["main_category"] == "suggestion"
+    assert issues[0]["title"] == "วิชาการ"
+
+    # กรองแค่หมวดย่อย โดยไม่มีหมวดหลัก
+    res = client.get("/api/issues?category=complaint",
+                     headers={"Authorization": f"Bearer {token}"})
+    assert res.status_code == 200
+    issues = res.json()
+    assert len(issues) == 1
+    assert issues[0]["category"] == "complaint"
