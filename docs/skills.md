@@ -219,3 +219,38 @@
 - **Root Cause:** service รับแค่ `limit`/`job_id` ไม่รู้ scope ของผู้เรียก
 - **Correct Pattern/Solution:** Router เรียก `get_access_scope` แล้วส่ง `access_scope`/`access_level` ไปให้ service: list → `WHERE allowed_level = $2` (level), `[]` (none); start → `ForbiddenError` ถ้า `scope=='none'` หรือ `job["allowed_level"] != access_level`; กฎทุกเลเยอร์: **สิทธิ์ของ user มาจาก DB (`get_access_scope`) ไม่ใช่จาก payload**
 - **Date Added:** 2026-08-17
+
+### 🛡️ Template ที่มีแถวตัวอย่าง = ช่องสร้าง account จริง — ต้อง guard ที่ชั้น import ไม่ใช่แค่เตือนในข้อความ
+- **Context/Problem:** `build_template_xlsx_bytes` ใส่แถวตัวอย่าง (00001, 00002) ลง Sheet ข้อมูล — ครูดาวน์โหลด Template แล้วอัปโหลดทั้งไฟล์ (ไม่ลบแถวตัวอย่าง) → worker สร้าง user/student จริง + room อัตโนมัติ (ม.4/1, ม.4/2) โดย password เดาได้ = เลขรหัส (00001/00001) — review ยืนยันว่าถึงได้ (MEDIUM)
+- **Root Cause:** `_process_single_row` ตรวจแค่ `student_id` ไม่ว่าง → แถว placeholder ผ่าน validation ทั้งหมด; ข้อความเตือน "ลบออกก่อนอัปโหลด" ไม่มีผลบังคับ
+- **Correct Pattern/Solution:** กันที่ชั้น import: `_process_single_row` ปฏิเสธแถวที่ `student_id.startswith("000")` (คืน per-row error "รหัสขึ้นต้น 000 = แถวตัวอย่าง") — ครอบคลุมทั้ง Template ที่ดาวน์โหลดและไฟล์ที่เขียนมือ; ข้อความใน UI/คำแนะนำให้บอกว่า "ระบบข้ามแถว 000xx อัตโนมัติ" (ไม่ใช่แค่เตือนให้ลบ); **กฎ: สิ่งที่อยู่ในไฟล์ตัวอย่างต้อง import ผ่านไม่ได้เสมอ (defense in depth — อย่าพึ่งคำเตือน)**
+- **Date Added:** 2026-08-17
+
+### 🛡️ SweetAlert2 `html` = innerHTML — user data ต้อง escape (self-XSS)
+- **Context/Problem:** `Swal.fire({ html: `ไฟล์ <b>${job.file_name}</b> ...` })` — `file_name` เป็นชื่อไฟล์จาก user ที่ backend สะท้อนกลับ verbatim (ไม่ sanitize) → ไฟล์ชื่อ `<img src=x onerror=...>.xlsx` (ถูกกฎหมายใน Linux/Mac) รัน script ตอนโชว์ dialog — review ยืนยัน (LOW, self-XSS เฉพาะคนอัปโหลด)
+- **Root Cause:** SweetAlert2 แทรก `html` ผ่าน innerHTML/DOMParser โดยไม่ escape; Vue `{{ }}` escape เอง แต่ `html:` option ไม่
+- **Correct Pattern/Solution:** มี helper `escapeHtml(value)` (replace `& < > " '`) ใช้ทุกจุดที่แทรก user data ลง `html:`; ถ้าไม่ต้องใช้ layout → ใช้ `text:` (Swal escape ให้); ใช้ `?? c` คืนค่าเดิมเมื่อ Record lookup ไม่เจอ — **กฎ: user input ทุกค่าที่เข้าออก backend (ชื่อไฟล์, ชื่อนักเรียน...) อย่า interpolate ลง html โดยไม่ escape**
+- **Date Added:** 2026-08-17
+
+### 🛠️ `URL.revokeObjectURL` หลัง `link.click()` ทันที — race กับ download async ของ browser
+- **Context/Problem:** `handleDownloadTemplate` สร้าง blob URL → `link.click()` → revoke ทันที — browser ดาวน์โหลดแบบ async ถ้า revoke ก่อนจับ reference จะได้ไฟล์ 0 bytes/aborted (Firefox documented bug 1810828; FileSaver.js เลื่อน revoke ~40s) — review พบ
+- **Root Cause:** revoke หลัง click ยังเร็วเกิน — `click()` เป็นแค่ "เริ่มต้น" กระบวนการดาวน์โหลด
+- **Correct Pattern/Solution:** revoke แบบ defer: `setTimeout(() => URL.revokeObjectURL(url), 1000)` (คลิกยังอยู่ใน user gesture ทันที, revoke ทีหลัง); ถ้าต้องการชัวร์ ตรวจ `blob.size` ก่อนสร้าง URL — **กฎ: revoke blob URL ต้องหน่วงเสมอ ถ้าใช้แล้วทิ้ง**
+- **Date Added:** 2026-08-17
+
+### 🛠️ Legacy `.xls` (BIFF/OLE) — openpyxl อ่านไม่ได้ ต้องจำกัด `.xlsx` ทั้ง frontend + backend
+- **Context/Problem:** UI ยอมรับ `.xls` (`accept=".xlsx,.xls"`, regex `\.(xlsx|xls)$`) → user เลือกไฟล์ .xls จริง ผ่าน gate → backend `endswith((".xlsx",".xls"))` ผ่าน → `openpyxl.load_workbook` อ่าน BIFF ไม่ได้ → 400 "อ่านไฟล์ Excel ไม่สำเร็จ" ทั้งที่ UI โฆษณาว่ารองรับ — review พบ
+- **Root Cause:** เปิดช่อง `.xls` ไว้หลายจุด (frontend regex + accept + backend router) แต่ parser รองรับแค่ OOXML zip (.xlsx/.xlsm)
+- **Correct Pattern/Solution:** จำกัด `.xlsx` อย่างเดียวทุกจุดที่จับ ext: regex `/\.xlsx$/i`, `accept=".xlsx"`, backend `endswith(".xlsx")` — **กฎ: อย่าให้ UI โฆษณารูปแบบที่ pipeline อ่านไม่ได้; เช็ค ext เป็นแนวเดียวกันทุกเลเยอร์**
+- **Date Added:** 2026-08-17
+
+### 🛠️ Short-polling กลืน error — progress bar ค้างเงียบ + empty state หลอก ต้องมี loadError + กัน poll วน
+- **Context/Problem:** poll interval มี `catch {}` ว่าง → network หลุด: bar ค้างที่ 60% ไม่มีข้อความ (runningJobs ยังไม่ว่าง → poll วนไม่มีวันหยุด); `refreshJobs` ก่อนหน้ากลืน error → โชว์ "ยังไม่มีไฟล์ในคิว" ทั้งที่มีไฟล์จริง (ครูเห็นแล้วอัปโหลดซ้ำ = duplicate job) — review ยืนยัน (MEDIUM)
+- **Root Cause:** ทุก catch เงียบ ไม่แยก "ไม่มีข้อมูล" กับ "อ่านข้อมูลไม่ได้"; ไม่นับความล้มเหลวต่อเนื่องของ poll
+- **Correct Pattern/Solution:**
+  1. แยก state: `loadError` (refresh/โหลดครั้งแรกพลาด) vs `isPollError` (poll ติดกันเกิน `POLL_FAIL_LIMIT=3`)
+  2. `refreshJobs` สำเร็จ → เคลียร์ error + `pollFailStreak=0`; ไม่มีงานวิ่ง → `stopPolling()`; พลาด → `loadError=true` (เก็บรายการเดิมไว้ ไม่ลบ)
+  3. `pollOnce()` แยกเป็น function — สำเร็จ reset streak; พลาด `streak++` แล้ว `isPollError=true` ถ้าเกินลิมิต (**ไม่หยุด poll** — พอ network กลับมา update เอง, แบนเนอร์หายเอง)
+  4. Template: `v-else-if="loadError"` → error panel + ปุ่ม "ลองใหม่" (แทน empty state); empty state ต้องโชว์เฉพาะเมื่อ fetch สำเร็จจริงๆ
+  - **กฎ: UI ที่มี state "ว่าง" ต้องแยกจาก state "อ่านไม่ได้" เสมอ; loop poll ต้องมีใน-flight guard + นับ failure**
+- **Date Added:** 2026-08-17

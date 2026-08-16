@@ -8,7 +8,7 @@ Endpoints:
 - POST /api/start-import-job/{id}     → ยิง job_id เข้า Redis (ARQ) ให้ worker เริ่มงาน
 - GET  /api/import-jobs               → รายการงานทั้งหมด + progress
 """
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, Response
 import asyncpg
 
 from core.config import settings
@@ -34,6 +34,30 @@ async def _require_manage_students(pool: asyncpg.Pool, user_id: int) -> dict:
     return scope
 
 
+@router.get("/import-student-template")
+async def download_import_template(
+    user_ctx: dict = Depends(get_current_user),
+    pool: asyncpg.Pool = Depends(get_db_pool),
+):
+    """
+    ดาวน์โหลดตัวอย่างไฟล์ Excel (.xlsx) ที่ระบบอ่านได้
+    - หัวคอลัมน์มาจาก KNOWN_COLUMNS (แหล่งเดียวกับตัวตรวจ — กัน format drift)
+    - ไม่แตะฐานข้อมูล → เร็ว/ไม่เสี่ยง; ต้องมีสิทธิ์ MANAGE_STUDENTS เท่านั้น (ตรงกับหน้า import)
+    """
+    uid = user_ctx.get("user_id")
+    if not uid:
+        raise HTTPException(status_code=401, detail="ต้องเข้าสู่ระบบ")
+
+    await _require_manage_students(pool, uid)
+
+    content = import_service.build_template_xlsx_bytes()
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="student_import_template.xlsx"'},
+    )
+
+
 @router.post("/upload-student-excel", response_model=ImportJobOut)
 async def upload_student_excel(
     file: UploadFile = File(...),
@@ -51,7 +75,8 @@ async def upload_student_excel(
     if not uid:
         raise HTTPException(status_code=401, detail="ต้องเข้าสู่ระบบ")
 
-    if not file.filename or not file.filename.lower().endswith((".xlsx", ".xls")):
+    # เฉพาะ .xlsx เท่านั้น — openpyxl อ่าน legacy .xls (BIFF/OLE) ไม่ได้
+    if not file.filename or not file.filename.lower().endswith(".xlsx"):
         raise HTTPException(status_code=400, detail="กรุณาอัปโหลดไฟล์ .xlsx")
 
     scope = await _require_manage_students(pool, uid)

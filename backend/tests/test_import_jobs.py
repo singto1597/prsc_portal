@@ -9,6 +9,7 @@ import random
 import pytest
 import pytest_asyncio
 import asyncpg
+import openpyxl
 from openpyxl import Workbook
 from unittest.mock import patch, AsyncMock
 
@@ -383,6 +384,39 @@ async def test_worker_handles_bad_rows_but_imports_good_ones(client, db_pool, ad
             "SELECT count(*) FROM students WHERE student_id IN ('47001', '47003')"
         )
         assert students == 2
+
+
+@pytest.mark.asyncio
+async def test_worker_skips_template_sample_rows(client, db_pool, admin_user):
+    """🛡️ แถวตัวอย่างจาก Template (รหัสขึ้นต้น 000) ต้องถูกข้าม — อัปโหลด Template ทั้งไฟล์ ไม่สร้าง account ปลอม"""
+    _, username, password = admin_user
+    token = login_token(client, username, password)
+    rows = [
+        ["00001", "ม.4/1", 1, "นาย", "สมชาย", "ใจดี", "", ""],          # แถวตัวอย่าง 000xx
+        ["47001", "ม.4/1", 1, "นาย", "คนจริง", "ใจดี", "", ""],
+        ["00002", "ม.4/2", 1, "นางสาว", "สมหญิง", "รักเรียน", "", "หัวหน้าห้อง"],  # แถวตัวอย่าง 000xx
+    ]
+    job_id = await upload_and_get_job(client, token, rows)
+
+    result = await import_service.process_import_job(db_pool, job_id)
+    assert result["status"] == "COMPLETED"
+    assert result["imported"] == 1
+    assert result["skipped"] == 2
+
+    # 🔍 Deep DB: ต้องไม่มี user/student ที่รหัสขึ้นต้น 000 (00001/00002) ถูกสร้าง
+    async with db_pool.acquire() as conn:
+        users = await conn.fetchval(
+            "SELECT count(*) FROM users WHERE username IN ('00001', '00002')"
+        )
+        students = await conn.fetchval(
+            "SELECT count(*) FROM students WHERE student_id IN ('00001', '00002')"
+        )
+        assert users == 0, "แถวตัวอย่าง (000xx) ต้องไม่ถูกสร้างเป็น user"
+        assert students == 0, "แถวตัวอย่าง (000xx) ต้องไม่ถูกสร้างเป็น student"
+        error_logs = json.loads(
+            await conn.fetchval("SELECT error_logs FROM student_import_jobs WHERE id = $1", job_id)
+        )
+        assert any("000" in e for e in error_logs)
 
 
 @pytest.mark.asyncio
@@ -777,3 +811,106 @@ async def test_reimport_admin_school_wide_no_duplicate(client, db_pool, admin_us
         students = await conn.fetchval("SELECT count(*) FROM students WHERE student_id = '47001'")
         assert users == 1, "user ต้องไม่สร้างซ้ำ"
         assert students == 1, "student ต้องไม่สร้างซ้ำ"
+
+
+# === Section 9: Template download (ไฟล์ตัวอย่างสำหรับ user) ===
+
+@pytest.mark.asyncio
+async def test_download_template_returns_valid_xlsx(client, admin_user):
+    """GET /import-student-template → 200 + ไฟล์ .xlsx ที่เปิดได้ + หัวคอลัมน์ตรง KNOWN_COLUMNS"""
+    _, username, password = admin_user
+    token = login_token(client, username, password)
+
+    res = client.get("/api/import-student-template", headers={"Authorization": f"Bearer {token}"})
+    assert res.status_code == 200, res.text
+    assert res.headers["content-type"].startswith(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    # body เป็นไฟล์ zip (.xlsx) — ตรวจ magic bytes PK
+    assert res.content[:2] == b"PK"
+
+    # เปิดด้วย openpyxl ได้ + หัวคอลัมน์ต้องตรง KNOWN_COLUMNS (แหล่งเดียวกับ validator — กัน drift)
+    wb = openpyxl.load_workbook(io.BytesIO(res.content))
+    ws = wb["ข้อมูล"]
+    headers = [c.value for c in ws[1] if c.value is not None]
+    assert headers == import_service.KNOWN_COLUMNS
+    # ตัวอย่าง 2 แถว (00001, 00002) อยู่จริง — เพื่อให้ user เห็นรูปแบบข้อมูล
+    assert ws["A2"].value == "00001"
+    assert ws["B3"].value == "ม.4/2"
+
+
+@pytest.mark.asyncio
+async def test_download_template_requires_auth(client):
+    """ไม่มี token → 401"""
+    res = client.get("/api/import-student-template")
+    assert res.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_download_template_forbidden_for_student(client, student_user):
+    """นักเรียนธรรมดา (ไม่มี MANAGE_STUDENTS) → 403"""
+    _, username, password = student_user
+    token = login_token(client, username, password)
+    res = client.get("/api/import-student-template", headers={"Authorization": f"Bearer {token}"})
+    assert res.status_code == 403
+
+
+# === Section 10: Audit log งานเสร็จ/ล้ม (bug fix — audit ต้องถูกเขียนใน transaction) ===
+
+@pytest.mark.asyncio
+async def test_worker_writes_complete_audit_in_transaction(client, db_pool, admin_user):
+    """
+    🛡️ worker จบงาน COMPLETED ต้องเขียน audit COMPLETE_IMPORT_JOB ใน transaction เดียว
+    (เดิม audit ไปอยู่ใน except ของการลบไฟล์ → ตอนจบปกติไม่ถูกเขียน)
+    """
+    _, username, password = admin_user
+    token = login_token(client, username, password)
+    job_id = await upload_and_get_job(
+        client, token, [["47001", "ม.4/1", 1, "นาย", "สมชาย", "ใจดี", "", ""]]
+    )
+
+    result = await import_service.process_import_job(db_pool, job_id)
+    assert result["status"] == "COMPLETED"
+
+    # 🔍 Deep DB: ต้องมี audit COMPLETE_IMPORT_JOB + ไฟล์ถูกลบจาก storage
+    async with db_pool.acquire() as conn:
+        audit = await conn.fetchval(
+            "SELECT count(*) FROM audit_logs WHERE action = 'COMPLETE_IMPORT_JOB' AND entity_id = $1",
+            str(job_id),
+        )
+        assert audit == 1, "ต้องมี audit COMPLETE_IMPORT_JOB อย่างน้อย 1 รายการ"
+
+    async with db_pool.acquire() as conn:
+        path = await conn.fetchval("SELECT file_path FROM student_import_jobs WHERE id = $1", job_id)
+    assert not os.path.exists(path), "ไฟล์ storage ต้องถูกลบเมื่อจบงาน COMPLETED"
+
+
+@pytest.mark.asyncio
+async def test_worker_writes_failed_audit_in_transaction(client, db_pool, admin_user):
+    """
+    🛡️ worker จบงาน FAILED ต้องเขียน audit FAIL_IMPORT_JOB ใน transaction เดียว
+    (เดิม audit ถูกข้ามทั้งสองกรณี — กัน regression ทั้ง COMPLETED + FAILED)
+    """
+    _, username, password = admin_user
+    token = login_token(client, username, password)
+    job_id = await upload_and_get_job(
+        client, token, [["47001", "ม.4/1", 1, "นาย", "สมชาย", "ใจดี", "", ""]]
+    )
+
+    # บังคับให้ล้ม: ลบไฟล์จาก storage แล้วเรียก process (เหมือน worker เจอไฟล์หาย)
+    async with db_pool.acquire() as conn:
+        path = await conn.fetchval("SELECT file_path FROM student_import_jobs WHERE id = $1", job_id)
+    os.remove(path)
+
+    result = await import_service.process_import_job(db_pool, job_id)
+    assert result["status"] == "FAILED"
+
+    # 🔍 Deep DB: ต้องมี audit FAIL_IMPORT_JOB + status='error' (ใน transaction เดียวกับสถานะ)
+    async with db_pool.acquire() as conn:
+        audit = await conn.fetchrow(
+            "SELECT * FROM audit_logs WHERE action = 'FAIL_IMPORT_JOB' AND entity_id = $1",
+            str(job_id),
+        )
+        assert audit is not None, "เมื่องาน FAILED ต้องมี audit FAIL_IMPORT_JOB"
+        assert audit["status"] == "error"
+        assert audit["error_detail"] is not None
