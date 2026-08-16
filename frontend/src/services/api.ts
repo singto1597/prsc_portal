@@ -27,7 +27,7 @@ let isRedirectingToLogin = false;
 
 api.interceptors.response.use(
   (response) => response.data,
-  (error) => {
+  async (error) => {
     if (error.response) {
       if (error.response.status === 401) {
         // เคลียร์ Session ทั้งหมด (ไม่ใช่แค่ token) เพื่อป้องกัน redirect วนลูป
@@ -41,6 +41,18 @@ api.interceptors.response.use(
       }
 
       let detail = error.response.data?.detail || 'เกิดข้อผิดพลาดจาก API';
+
+      // 🔍 ตอน responseType:'blob' (เช่น ดาวน์โหลดไฟล์) body ของ error เป็น Blob ไม่ใช่ JSON
+      // → ต้องแกะ JSON จาก Blob เอง ไม่งั้น user เห็นข้อความรวมๆ แทนข้อความจริงจาก backend
+      if (error.response.data instanceof Blob) {
+        try {
+          const text = await error.response.data.text();
+          const parsed = JSON.parse(text) as { detail?: unknown };
+          if (parsed?.detail) detail = parsed.detail;
+        } catch {
+          /* body ไม่ใช่ JSON — ใช้ข้อความ default ต่อไป */
+        }
+      }
 
       // ปลดล็อก Pydantic 422 Error ให้อ่านรู้เรื่อง!
       if (Array.isArray(detail)) {

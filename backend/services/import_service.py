@@ -19,6 +19,9 @@ from typing import Optional, Tuple, List
 
 import asyncpg
 import openpyxl
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
 
 from core.config import settings
 from core.exceptions import (
@@ -126,6 +129,74 @@ def load_workbook_rows(file_bytes: bytes) -> Tuple[List, dict]:
         data_rows.append(r)
 
     return data_rows, col_index
+
+
+# ============================================================
+# 📥 Template — ไฟล์ตัวอย่างสำหรับให้ผู้ใช้ดาวน์โหลด/ดูรูปแบบ
+# ============================================================
+def build_template_xlsx_bytes() -> bytes:
+    """
+    สร้างไฟล์ตัวอย่าง .xlsx ให้ครู/แอดมินดาวน์โหลดดูรูปแบบที่ระบบรองรับ
+
+    - หัวคอลัมน์มาจาก KNOWN_COLUMNS — แหล่งเดียวกับ `validate_columns` (กัน format drift)
+    - มีแถวตัวอย่าง 2 แถว (รหัสขึ้นต้น 000 — เห็นชัดว่าไม่ใช่รหัสนักเรียนจริง)
+      เพื่อให้เห็น "ข้อมูลควรเป็นยังไง"; และถึงแม้ user อัปโหลดตัวอย่างเข้าโดยไม่ลบแถว
+      `_process_single_row` จะข้ามแถวที่รหัสขึ้นต้น 000 (กันสร้าง account ปลอม) เสมอ
+    - Sheet 'คำแนะนำ' อธิบายกฎรูปแบบเป็นภาษาไทย
+    """
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "ข้อมูล"
+
+    # หัวตาราง — ต้องตรง KNOWN_COLUMNS เป๊ะ (ระบบตรวจแบบเคร่งครัด)
+    ws.append(KNOWN_COLUMNS)
+
+    # แถวตัวอย่าง (000xx — ไม่ใช่รหัสนักเรียนจริง)
+    ws.append(["00001", "ม.4/1", 1, "นาย", "สมชาย", "ใจดี", "ชาย", ""])
+    ws.append(["00002", "ม.4/2", 1, "นางสาว", "สมหญิง", "รักเรียน", "หญิง", "หัวหน้าห้อง"])
+
+    # ✨ ตกแต่งหัวตารางให้เด่น (แดงแบรนด์ + ตัวขาว) — ผู้ใช้เห็นได้ทันทีว่าคอลัมน์ไหนต้องมี
+    header_fill = PatternFill(start_color="DC2626", end_color="DC2626", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF")
+    for cell in ws[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center")
+
+    # กำหนดความกว้างคอลัมน์ให้พอดีกับชื่อหัวตาราง
+    for idx in range(1, len(KNOWN_COLUMNS) + 1):
+        ws.column_dimensions[get_column_letter(idx)].width = max(16, len(KNOWN_COLUMNS[idx - 1]) * 2 + 4)
+
+    # 📖 Sheet คำแนะนำ (ภาษาไทย)
+    ws2 = wb.create_sheet("คำแนะนำ")
+    tips = [
+        "📌 รูปแบบไฟล์ที่ระบบอ่านได้ — หัวคอลัมน์ต้องตรงเป๊ะกับ Sheet 'ข้อมูล' เท่านั้น",
+        "",
+        "1. คอลัมน์ที่ต้องมี (จำเป็น): รหัสนักเรียน | ห้องเรียน | เลขที่",
+        "   • ห้ามลบ / เปลี่ยนชื่อ / เพิ่มคอลัมน์ที่ไม่ใช่รูปแบบ — ระบบจะปฏิเสธไฟล์ (คอลัมน์ต้องเป๊ะ)",
+        "   • คอลัมน์เสริม (เว้นได้): คำนำหน้า | ชื่อเล่น | ตำแหน่งในห้องเรียน — ชื่อ/นามสกุล เว้นได้อย่างละหนึ่ง แต่ห้ามเว้นทั้งสองคอลัมน์",
+        "",
+        "2. ตัวอย่างข้อมูลที่ถูกต้อง:",
+        "   • รหัสนักเรียน: เลขประจำตัวนักเรียน เช่น 47001 (ใช้เป็น username + รหัสผ่านเริ่มต้น)",
+        "   • ห้องเรียน: เช่น ม.4/1 (ระบบสร้างห้องอัตโนมัติถ้ายังไม่มี)",
+        "   • เลขที่: ตัวเลข เช่น 1, 2, 3 ...",
+        "   • ตำแหน่งในห้องเรียน: เว้นว่าง = นักเรียนธรรมดา; ระบุได้ เช่น หัวหน้าห้อง, รองวิชาการ,",
+        "     รองวินัย, รองกิจกรรม, รองปฏิคม, ประธานระดับ, สภานักเรียน, ประธานสภา, ครู, ครูสภา, แอดมิน",
+        "",
+        "3. รหัสผ่านเริ่มต้นของนักเรียนที่นำเข้า = เลขรหัสนักเรียน (เช่น รหัส 47001 → เข้าสู่ระบบด้วย 47001/47001)",
+        "",
+        "4. ⚠️ แถวตัวอย่าง (00001, 00002) ใน Sheet 'ข้อมูล' เป็นเพียงตัวอย่าง — ลบออกก่อนอัปโหลด",
+        "   (หรือก๊อปเฉพาะหัวตารางไปสร้างไฟล์ใหม่)",
+        "",
+        "5. ไฟล์ต้องเป็น .xlsx เท่านั้น",
+    ]
+    for t in tips:
+        ws2.append([t])
+    ws2.column_dimensions["A"].width = 110
+
+    bio = io.BytesIO()
+    wb.save(bio)
+    return bio.getvalue()
 
 
 # ============================================================
@@ -406,6 +477,11 @@ async def _process_single_row(
 
         if not student_id:
             return False, "ไม่มีรหัสนักเรียน"
+        # 🛡️ กันแถวตัวอย่างจาก Template (000xx) หลุดเข้ามาเป็น account จริง —
+        # ผู้ใช้ที่ดาวน์โหลด Template แล้วอัปโหลดทั้งไฟล์ (ลืมลบแถวตัวอย่าง) ต้องไม่สร้าง
+        # user/student ปลอมที่มี password เดาได้ (00001/00001) เป็นต้น
+        if student_id.startswith("000"):
+            return False, "รหัสขึ้นต้น 000 = แถวตัวอย่างจาก Template — ลบแถวตัวอย่างออกก่อนอัปโหลด"
         if not first_name and not last_name:
             return False, "ไม่มีชื่อ-นามสกุล"
 
@@ -623,13 +699,8 @@ async def _set_job_result(
                     job_id, total, imported, skipped, json.dumps(error_logs, ensure_ascii=False),
                 )
 
-    # งานเสร็จแล้ว → ลบไฟล์ออกจาก storage (ประหยัดพื้นที่; FAILED เก็บไว้ให้ลองใหม่)
-    if status == IMPORT_STATUS_COMPLETED and job.get("file_path"):
-        try:
-            os.remove(job["file_path"])
-        except OSError as e:
-            logger.warning(f"⚠️ ลบไฟล์ storage ไม่สำเร็จ: {job['file_path']} ({e})")
-
+            # 🛡️ Audit log — ต้องอยู่ใน transaction เดียวกับการเปลี่ยนสถานะ (กฎทุก create/update/delete)
+            # (เดิมเขียนผิดไปอยู่ใต้ except ของการลบไฟล์ → audit ไม่ถูกเขียนตอนจบงานปกติ)
             await AuditLogger("import_service").log(
                 conn=conn,
                 action="COMPLETE_IMPORT_JOB" if status == IMPORT_STATUS_COMPLETED else "FAIL_IMPORT_JOB",
@@ -644,6 +715,14 @@ async def _set_job_result(
                 old_values={"status": old_status},
                 new_values={"status": status, **({"error_message": error_message} if error_message else {})},
             )
+
+    # งานเสร็จแล้ว → ลบไฟล์ออกจาก storage (นอก transaction — ไม่กระทบสถานะงาน)
+    # FAILED เก็บไฟล์ไว้ให้ลองใหม่ (start_import_job ล้าง error และสร้าง queue ใหม่)
+    if status == IMPORT_STATUS_COMPLETED and job.get("file_path"):
+        try:
+            os.remove(job["file_path"])
+        except OSError as e:
+            logger.warning(f"⚠️ ลบไฟล์ storage ไม่สำเร็จ: {job['file_path']} ({e})")
 
 
 async def process_import_job(pool: asyncpg.Pool, job_id: int) -> dict:

@@ -40,6 +40,11 @@ export async function listImportJobs(): Promise<ImportJob[]> {
   return (await api.get('/api/import-jobs')) as ImportJob[];
 }
 
+export async function downloadImportTemplate(): Promise<Blob> {
+  // responseType:'blob' สำคัญ — ไฟล์ .xlsx เป็น binary ถ้าไม่ตั้งจะกลายเป็น text ที่เสียหาย
+  return (await api.get('/api/import-student-template', { responseType: 'blob' })) as Blob;
+}
+
 export async function updateStudent(
   studentId: number,
   data: { class_role?: string; status?: string; is_admin?: boolean; staff_level?: string | null },
