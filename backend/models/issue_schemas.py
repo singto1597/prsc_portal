@@ -1,12 +1,16 @@
 from typing import Optional, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
+
+from core.categories import all_main_category_codes, is_valid_category
 
 
 # ===================== สร้างปัญหา =====================
 class IssueCreateRequest(BaseModel):
-    topic_type: str = Field(..., description="living / problem / suggestion")
-    category: str = Field(..., description="academic / discipline / activity / reception / sanitation / other")
+    # หมวดหลัก: suggestion (เสนอความคิดเห็น) / wellbeing (สุขภาวะทางกายและใจ) / report (แจ้งเหตุ)
+    main_category: str = Field(..., description="หมวดหลัก: suggestion / wellbeing / report")
+    # หมวดย่อยในหมวดหลัก (ตาม config/categories.json)
+    category: str = Field(..., description="หมวดย่อยของหมวดหลัก")
     title: str = Field(..., min_length=3, max_length=200)
     description: str = Field(..., min_length=3)
     is_anonymous: bool = False
@@ -15,6 +19,21 @@ class IssueCreateRequest(BaseModel):
     # ระดับเริ่มต้นของเรื่อง (room/level/council) — default room
     # เฉพาะผู้มีระดับสูงขึ้นจึงเลือกได้
     start_level: str = "room"
+
+    @field_validator("main_category")
+    @classmethod
+    def _validate_main_category(cls, v: str) -> str:
+        if v not in all_main_category_codes():
+            raise ValueError(f"หมวดหลักไม่ถูกต้อง: {v} (ต้องเป็น {', '.join(all_main_category_codes())})")
+        return v
+
+    @field_validator("category")
+    @classmethod
+    def _validate_category(cls, v: str, info) -> str:
+        main_cat = info.data.get("main_category")
+        if main_cat and not is_valid_category(main_cat, v):
+            raise ValueError(f"หมวดย่อย '{v}' ไม่ได้อยู่ในหมวดหลัก '{main_cat}'")
+        return v
 
 
 class StepCreateRequest(BaseModel):
@@ -67,7 +86,7 @@ class IssueOut(BaseModel):
     id: int
     room_id: Optional[int] = None
     room_name: Optional[str] = None
-    topic_type: str
+    main_category: str
     category: str
     title: str
     description: str

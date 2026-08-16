@@ -3,7 +3,7 @@ import { ref, onMounted, computed } from 'vue';
 import { useRoute } from 'vue-router';
 import Swal from 'sweetalert2';
 import { getIssue, acceptIssue, addStep, completeStep, escalateIssue, resolveIssue, updateCountdown, cancelIssue } from '@/services/issue';
-import { TOPIC_LABELS, CATEGORY_LABELS, STATUS_LABELS, LEVEL_LABELS, type Issue } from '@/types/issue';
+import { MAIN_CATEGORY_LABELS, subcategoryLabel, STATUS_LABELS, LEVEL_LABELS, type Issue } from '@/types/issue';
 import { useAuthStore } from '@/stores/auth';
 
 const route = useRoute();
@@ -244,10 +244,10 @@ function countdownLabel(days: number): string {
         <div>
           <div class="flex gap-2 mb-2">
             <span class="px-2.5 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">
-              {{ TOPIC_LABELS[issue.topic_type] }}
+              {{ MAIN_CATEGORY_LABELS[issue.main_category] }}
             </span>
             <span class="px-2.5 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full">
-              {{ CATEGORY_LABELS[issue.category] }}
+              {{ subcategoryLabel(issue.main_category, issue.category) }}
             </span>
             <span class="px-2.5 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
               {{ LEVEL_LABELS[issue.current_level] }}

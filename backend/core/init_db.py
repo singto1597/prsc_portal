@@ -58,21 +58,23 @@ async def init_db(pool: asyncpg.Pool):
                 );
                 """)
 
-                # --- 3. ตารางนักศึกษา (students) — มีตำแหน่งในห้องเรียน ---
-                # ตำแหน่ง (class_role) เช่น 'class_president', 'vice_academic', ... 'student'
+                # --- 3. ตารางนักศึกษา/สมาชิก (students) — มีตำแหน่งในห้องเรียน ---
+                # ตำแหน่ง (class_role) เช่น 'class_president', 'vice_academic', ... 'student', 'teacher', 'teacher_council', 'admin'
                 # ระดับ (level) ที่ตำแหน่งทำงาน เช่น 'room' (ห้อง) / 'level' (ประธานระดับ) / 'council' (สภา)
+                # staff_level: เฉพาะ ครูทั่วไป (teacher) — ระดับชั้นที่รับผิดชอบ เช่น 'ม.4' (เห็น/จัดการได้แค่ระดับนี้)
                 await conn.execute("""
                 CREATE TABLE IF NOT EXISTS students (
                     id SERIAL PRIMARY KEY,
                     room_id INTEGER REFERENCES rooms(id) ON DELETE CASCADE,
                     user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
-                    student_id VARCHAR(10),          -- รหัสนักเรียน (เลขประจำตัว)
-                    student_no INTEGER NOT NULL,     -- เลขที่ในห้อง
+                    student_id VARCHAR(10),          -- รหัสนักเรียน/รหัสบุคลากร (เลขประจำตัว)
+                    student_no INTEGER,              -- เลขที่ในห้อง (ครู/แอดมิน ไม่มี → NULL)
                     prefix TEXT,
                     first_name TEXT,
                     last_name TEXT,
                     nickname TEXT,
                     class_role TEXT DEFAULT 'student',  -- ตำแหน่ง (แมปกับ config/roles.json)
+                    staff_level TEXT,                -- ระดับชั้นที่ครูทั่วไปรับผิดชอบ เช่น 'ม.4'
                     is_admin BOOLEAN DEFAULT FALSE,
                     permissions JSONB DEFAULT '[]'::jsonb,
                     status TEXT DEFAULT 'active',
@@ -83,16 +85,19 @@ async def init_db(pool: asyncpg.Pool):
                 """)
 
                 # --- 4. ตารางปัญหา/ความคิดเห็น (issues) — หัวใจหลักของระบบ ---
-                # topic_type: 'living' แจ้งสภาพความเป็นอยู่ / 'problem' แจ้งปัญหา / 'suggestion' ข้อเสนอแนะ
-                # category: หมวดหมู่ย่อย — 'academic' วิชาการ / 'discipline' วินัย / 'activity' กิจกรรม / 'reception' ปฏิคม / 'sanitation' สุขาภิบาล / 'other' อื่นๆ
+                # main_category: หมวดหลัก — 'suggestion' เสนอความคิดเห็น / 'wellbeing' สุขภาวะทางกายและใจ / 'report' แจ้งเหตุ
+                # category: หมวดย่อยในหมวดหลัก — แมปกับ config/categories.json
+                #   suggestion → academic / reception / activity / discipline / democracy
+                #   wellbeing  → physical_health / mental_health
+                #   report     → complaint / grievance
                 # current_level: ตอนนี้เรื่องอยู่ที่ระดับไหน (room / level / council)
-                # status: 'pending' (ยังไม่มีใครรับ) / 'in_progress' / 'resolved' / 'escalated'
+                # status: 'pending' (ยังไม่มีใครรับ) / 'in_progress' / 'resolved' / 'escalated' / 'cancelled'
                 await conn.execute("""
                 CREATE TABLE IF NOT EXISTS issues (
                     id SERIAL PRIMARY KEY,
                     room_id INTEGER REFERENCES rooms(id) ON DELETE CASCADE,
-                    topic_type TEXT NOT NULL,            -- living / problem / suggestion
-                    category TEXT NOT NULL,              -- academic / discipline / activity / reception / sanitation / other
+                    main_category TEXT NOT NULL DEFAULT 'suggestion',  -- หมวดหลัก (suggestion / wellbeing / report)
+                    category TEXT NOT NULL,              -- หมวดย่อย (ตาม config/categories.json)
                     title TEXT NOT NULL,
                     description TEXT NOT NULL,
                     image_url TEXT,
@@ -102,7 +107,7 @@ async def init_db(pool: asyncpg.Pool):
                     current_level TEXT DEFAULT 'room',   -- ระดับปัจจุบัน: room / level / council
                     current_assignee_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
                     current_assignee_role TEXT,          -- บทบาทผู้รับปัจจุบัน (class_president, vice_academic, ...)
-                    status TEXT DEFAULT 'pending',       -- pending / in_progress / resolved / escalated
+                    status TEXT DEFAULT 'pending',       -- pending / in_progress / resolved / escalated / cancelled
                     priority TEXT DEFAULT 'normal',      -- low / normal / high / urgent
                     is_anonymous BOOLEAN DEFAULT FALSE,
                     resolved_at TIMESTAMP WITH TIME ZONE,
@@ -201,7 +206,7 @@ async def init_db(pool: asyncpg.Pool):
                     CREATE INDEX IF NOT EXISTS idx_issues_room_status ON issues(room_id, status);
                     CREATE INDEX IF NOT EXISTS idx_issues_reporter ON issues(reporter_id);
                     CREATE INDEX IF NOT EXISTS idx_issues_level ON issues(current_level);
-                    CREATE INDEX IF NOT EXISTS idx_issues_topic ON issues(topic_type);
+                    CREATE INDEX IF NOT EXISTS idx_issues_main_category ON issues(main_category);
                     CREATE INDEX IF NOT EXISTS idx_issues_category ON issues(category);
                     CREATE INDEX IF NOT EXISTS idx_issue_escalations_issue ON issue_escalations(issue_id);
                     CREATE INDEX IF NOT EXISTS idx_issue_steps_issue ON issue_steps(issue_id);
@@ -210,13 +215,24 @@ async def init_db(pool: asyncpg.Pool):
                     CREATE INDEX IF NOT EXISTS idx_students_room_no_active
                         ON students(room_id, student_no)
                         WHERE deleted_at IS NULL;
+                    CREATE INDEX IF NOT EXISTS idx_students_role_active
+                        ON students(class_role)
+                        WHERE deleted_at IS NULL;
                 """)
-
-                logger.info("✅ PRSC Portal Database Tables & Indexes Initialized Successfully!")
 
     except Exception as e:
         logger.error(f"❌ Failed to initialize Database: {e}")
         raise e
+
+    # 🚀 รัน migration files (อัปเกรด schema ของ DB เดิม + กันรันซ้ำผ่าน schema_migrations)
+    try:
+        from core.migrations import run_migrations
+        await run_migrations(pool)
+    except Exception as e:
+        logger.error(f"❌ Failed to run migrations: {e}")
+        raise e
+
+    logger.info("✅ PRSC Portal Database Tables & Indexes Initialized Successfully!")
 
 async def run_setup():
     logger.info("🚀 Starting Manual Database Setup...")

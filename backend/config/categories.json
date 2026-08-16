@@ -1,0 +1,44 @@
+{
+  "_comment": "หมวดหมู่การรับแจ้งเรื่อง PRSC Portal — 3 หมวดหลัก แต่ละหมวดมีหัวข้อย่อย (subcategory). main_category + category ถูกเก็บในตาราง issues",
+  "main_categories": {
+    "suggestion": {
+      "label": "เสนอความคิดเห็น",
+      "subcategories": {
+        "academic": "วิชาการ",
+        "reception": "ปฏิคม",
+        "activity": "กิจกรรม",
+        "discipline": "วินัย",
+        "democracy": "ประชาธิปไตย"
+      },
+      "subcategory_details": {
+        "academic": "เกี่ยวกับการเรียนการสอน การสอบ สื่อ แหล่งการเรียนรู้",
+        "reception": "เกี่ยวกับสิ่งแวดล้อม กายภาพ ความสะอาด พื้นที่ สิ่งอำนวยความสะดวก",
+        "activity": "เกี่ยวกับกิจกรรม กีฬา นันทนาการ การมีส่วนร่วม",
+        "discipline": "เกี่ยวกับระเบียบ ข้อตกลง พฤติกรรม การอยู่ร่วมกัน",
+        "democracy": "เกี่ยวกับสิทธิ หน้าที่ การเลือกตั้ง รับฟังความคิดเห็น ประชุมลงมติ"
+      }
+    },
+    "wellbeing": {
+      "label": "สุขภาวะทางกายและใจ",
+      "subcategories": {
+        "physical_health": "สุขภาวะทางกาย",
+        "mental_health": "สุขภาวะทางใจ"
+      },
+      "subcategory_details": {
+        "physical_health": "สุขภาพกาย เจ็บป่วย ความเป็นอยู่",
+        "mental_health": "ความเครียด กังวล อารมณ์ ความสัมพันธ์"
+      }
+    },
+    "report": {
+      "label": "แจ้งเหตุ",
+      "subcategories": {
+        "complaint": "ร้องทุกข์",
+        "grievance": "ร้องเรียน"
+      },
+      "subcategory_details": {
+        "complaint": "แจ้งปัญหา ความเดือดร้อนที่ต้องการการช่วยเหลือ/แก้ไข",
+        "grievance": "แจ้งเรื่องที่ต้องการให้ตรวจสอบ หรือดำเนินการตามระบบ"
+      }
+    }
+  }
+}

@@ -4,7 +4,7 @@ import openpyxl
 from typing import Optional
 
 from core.exceptions import NotFoundError, ValidationError, ConflictError
-from core.rbac import get_role_permissions
+from core.rbac import get_role_permissions, get_role_is_admin
 from services import auth_service
 from core.config import settings
 
@@ -19,6 +19,11 @@ ROLE_MAP = {
     "รองกิจกรรม": "vice_activity",
     "รองปฏิคม": "vice_reception",
     "รอง": "vice_reception",  # fallback
+    "ครูสภา": "teacher_council",
+    "ครู": "teacher",
+    "ครูทั่วไป": "teacher",
+    "แอดมิน": "admin",
+    "ผู้ดูแลระบบ": "admin",
     "นักเรียน": "student",
     "": "student",
 }
@@ -57,10 +62,18 @@ async def create_room(pool: asyncpg.Pool, room_code: str, room_name: str, level:
             )
 
 
-async def list_students(pool: asyncpg.Pool, room_id: Optional[int] = None, search: Optional[str] = None, limit: int = 500) -> list:
+async def list_students(pool: asyncpg.Pool, room_id: Optional[int] = None, search: Optional[str] = None, level: Optional[str] = None, limit: int = 500) -> list:
+    """
+    รายชื่อนักเรียน/สมาชิก
+    - level: กรองเฉพาะระดับชั้น (เช่น 'ม.4') — ใช้กับ ครูทั่วไป (teacher) ที่เห็นได้แค่ระดับตัวเอง
+    - room_id: กรองเฉพาะห้อง
+    """
     async with pool.acquire() as conn:
         where = ["s.deleted_at IS NULL"]
         params = []
+        if level:
+            params.append(level)
+            where.append(f"r.level = ${len(params)}")
         if room_id:
             params.append(room_id)
             where.append(f"s.room_id = ${len(params)}")
@@ -73,8 +86,8 @@ async def list_students(pool: asyncpg.Pool, room_id: Optional[int] = None, searc
             SELECT
                 s.id, s.room_id, s.student_id, s.student_no,
                 s.prefix, s.first_name, s.last_name, s.nickname,
-                s.class_role, s.is_admin, s.permissions, s.status,
-                r.room_code, r.room_name
+                s.class_role, s.staff_level, s.is_admin, s.permissions, s.status,
+                r.room_code, r.room_name, r.level
             FROM students s
             JOIN rooms r ON r.id = s.room_id
             WHERE {' AND '.join(where)}
@@ -105,17 +118,24 @@ def _student_to_dict(row) -> dict:
         "last_name": row["last_name"],
         "nickname": row["nickname"],
         "class_role": row["class_role"],
+        "staff_level": row.get("staff_level"),
         "is_admin": row["is_admin"],
         "permissions": perms,
         "status": row["status"],
     }
 
 
-async def update_student(pool: asyncpg.Pool, student_id: int, *, class_role: Optional[str] = None, status: Optional[str] = None, is_admin: Optional[bool] = None) -> None:
+async def update_student(pool: asyncpg.Pool, student_id: int, *, class_role: Optional[str] = None, status: Optional[str] = None, is_admin: Optional[bool] = None, staff_level: Optional[str] = None, actor_user_id: Optional[int] = None, client_source: str = "web") -> None:
+    """
+    แก้ไขนักเรียน/สมาชิก
+    - เมื่อเปลี่ยน class_role → permissions + is_admin จะถูก recompute จาก config/roles.json เสมอ
+    - ครูทั่วไป (teacher) ต้องมี staff_level (ระดับชั้นที่ดูแล) — ถ้าไม่ระบุ ดึงจากระดับชั้นของห้อง
+    - บันทึก audit_logs ใน transaction เดียวกัน
+    """
     async with pool.acquire() as conn:
         async with conn.transaction():
             current = await conn.fetchrow(
-                "SELECT id, class_role, status, is_admin FROM students WHERE id = $1 AND deleted_at IS NULL",
+                "SELECT id, room_id, class_role, status, is_admin, staff_level FROM students WHERE id = $1 AND deleted_at IS NULL",
                 student_id
             )
             if not current:
@@ -124,14 +144,52 @@ async def update_student(pool: asyncpg.Pool, student_id: int, *, class_role: Opt
             new_role = class_role if class_role is not None else current["class_role"]
             new_status = status if status is not None else current["status"]
             new_admin = is_admin if is_admin is not None else current["is_admin"]
+            new_staff_level = staff_level if staff_level is not None else current["staff_level"]
+
+            # เมื่อ role เปลี่ยน → permissions + is_admin ตาม config/roles.json เสมอ
+            role_perms = get_role_permissions(new_role)
+            if is_admin is None:
+                new_admin = get_role_is_admin(new_role)
+
+            # ครูทั่วไปต้องรู้ระดับชั้นที่ดูแล (ถ้าไม่ระบุ → ใช้ระดับชั้นของห้องตัวเอง)
+            if new_role == "teacher" and not new_staff_level:
+                new_staff_level = await conn.fetchval(
+                    "SELECT level FROM rooms WHERE id = $1", current["room_id"]
+                )
 
             await conn.execute(
                 """
                 UPDATE students
-                SET class_role = $1, status = $2, is_admin = $3, updated_at = NOW()
-                WHERE id = $4
+                SET class_role = $1, status = $2, is_admin = $3, staff_level = $4,
+                    permissions = $5, updated_at = NOW()
+                WHERE id = $6
                 """,
-                new_role, new_status, new_admin, student_id
+                new_role, new_status, new_admin, new_staff_level,
+                json.dumps(role_perms), student_id
+            )
+
+            # 🛡️ Audit log (กฎ: ทุก UPDATE ต้องบันทึกใน transaction เดียวกัน)
+            from core.logger import AuditLogger
+            await AuditLogger("student_service").log(
+                conn=conn,
+                action="UPDATE_STUDENT",
+                actor_identifier=str(actor_user_id) if actor_user_id else "system",
+                client_source=client_source,
+                user_id=actor_user_id,
+                entity_type="student",
+                entity_id=student_id,
+                old_values={
+                    "class_role": current["class_role"],
+                    "status": current["status"],
+                    "is_admin": current["is_admin"],
+                    "staff_level": current["staff_level"],
+                },
+                new_values={
+                    "class_role": new_role,
+                    "status": new_status,
+                    "is_admin": new_admin,
+                    "staff_level": new_staff_level,
+                },
             )
 
 
@@ -145,12 +203,12 @@ async def get_my_profile(pool: asyncpg.Pool, user_id: int) -> dict:
             """
             SELECT
                 s.id, s.student_id, s.student_no, s.prefix, s.first_name, s.last_name,
-                s.nickname, s.class_role, s.status, s.room_id,
+                s.nickname, s.class_role, s.staff_level, s.status, s.room_id,
                 r.room_code, r.room_name, r.level,
                 u.username, u.full_name, u.phone_number, u.email
             FROM students s
             JOIN users u ON u.id = s.user_id
-            JOIN rooms r ON r.id = s.room_id
+            LEFT JOIN rooms r ON r.id = s.room_id
             WHERE s.user_id = $1 AND s.deleted_at IS NULL AND s.status = 'active'
             ORDER BY s.id LIMIT 1
             """,
@@ -231,8 +289,15 @@ ALL_COLUMNS = [
 REQUIRED_COLUMNS = {"รหัสนักเรียน", "ห้องเรียน", "เลขที่"}
 
 
-async def import_students_from_excel(pool: asyncpg.Pool, file_bytes: bytes, default_password: str = "1234") -> dict:
-    """อ่านไฟล์ Excel (.xlsx) และสร้าง users + students พร้อม room"""
+async def import_students_from_excel(pool: asyncpg.Pool, file_bytes: bytes, default_password: str = "1234", allowed_level: Optional[str] = None, actor_user_id: Optional[int] = None, client_source: str = "web") -> dict:
+    """
+    อ่านไฟล์ Excel (.xlsx) และสร้าง users + students พร้อม room
+
+    - allowed_level: ถ้ากำหนด (ครูทั่วไปนำเข้า) จะข้ามแถวที่ห้องอยู่นอกระดับชั้นนี้
+    - ครูสภา/แอดมิน: ไม่ผูกห้องเฉพาะ (school-wide) — ระบุห้องได้แต่ไม่บังคับ
+    - ครูทั่วไป (teacher): staff_level = ระดับชั้นของห้องในแถวนั้น
+    - is_admin ตาม config/roles.json เสมอ
+    """
     try:
         wb = openpyxl.load_workbook(io := __import__("io").BytesIO(file_bytes), data_only=True)
     except Exception as e:
@@ -286,6 +351,7 @@ async def import_students_from_excel(pool: asyncpg.Pool, file_bytes: bytes, defa
                     role_label = str(get(r, "ตำแหน่งในห้องเรียน") or "").strip()
                     class_role = map_role_label(role_label)
                     role_perms = get_role_permissions(class_role)
+                    role_is_admin = get_role_is_admin(class_role)
 
                     if not student_id:
                         skipped += 1
@@ -297,27 +363,47 @@ async def import_students_from_excel(pool: asyncpg.Pool, file_bytes: bytes, defa
                         continue
 
                     # 🌟 1. ระบบจัดการ Room (เช็คจาก Cache ก่อนเสมอ)
-                    if room_code in room_cache:
-                        room_id = room_cache[room_code]
-                    else:
-                        room_id = await conn.fetchval(
-                            "SELECT id FROM rooms WHERE room_code = $1 AND deleted_at IS NULL", room_code
-                        )
-                        if not room_id:
-                            level = room_code.split("/")[0] if "/" in room_code else None
-                            room_name = room_code
-                            room_id = await conn.fetchval(
-                                """
-                                INSERT INTO rooms (room_code, room_name, level, room_number)
-                                VALUES ($1, $2, $3, NULL)
-                                RETURNING id
-                                """,
-                                room_code, room_name, level
+                    #    admin/ครูสภา ไม่ผูกห้องเฉพาะ (school-wide) — ระบุห้องได้แต่ไม่บังคับ
+                    school_wide = class_role in ("admin", "teacher_council")
+                    room_id = None
+                    room_level = None
+                    if room_code:
+                        if room_code in room_cache:
+                            room_id = room_cache[room_code]
+                            room_level = await conn.fetchval(
+                                "SELECT level FROM rooms WHERE id = $1", room_id
                             )
-                        room_cache[room_code] = room_id # บันทึกลงสมุดจด
+                        else:
+                            room_id = await conn.fetchval(
+                                "SELECT id FROM rooms WHERE room_code = $1 AND deleted_at IS NULL", room_code
+                            )
+                            if not room_id:
+                                level = room_code.split("/")[0] if "/" in room_code else room_code
+                                room_name = room_code
+                                room_id = await conn.fetchval(
+                                    """
+                                    INSERT INTO rooms (room_code, room_name, level, room_number)
+                                    VALUES ($1, $2, $3, NULL)
+                                    RETURNING id
+                                    """,
+                                    room_code, room_name, level
+                                )
+                            room_level = await conn.fetchval(
+                                "SELECT level FROM rooms WHERE id = $1", room_id
+                            )
+                            room_cache[room_code] = room_id  # บันทึกลงสมุดจด
+
+                    # 🛡️ scope: ครูทั่วไปนำเข้าได้เฉพาะระดับชั้นตัวเอง
+                    if allowed_level and not school_wide and room_level != allowed_level:
+                        skipped += 1
+                        errors.append(f"แถว {total}: ระดับชั้น {room_level or '-'} ไม่ตรงกับสิทธิ์ของคุณ ({allowed_level})")
+                        continue
+
+                    # ครูทั่วไป → staff_level = ระดับชั้นของห้องในแถวนั้น
+                    staff_level = room_level if class_role == "teacher" else None
 
                     username = student_id
-                    
+
                     # 🌟 2. ระบบจัดการ User (เช็คจาก Cache ก่อนเสมอ)
                     if username in user_cache:
                         user = user_cache[username]
@@ -338,43 +424,69 @@ async def import_students_from_excel(pool: asyncpg.Pool, file_bytes: bytes, defa
                             )
                         user_cache[username] = user # บันทึกลงสมุดจด
 
-                    # 3. สร้าง/อัปเดตข้อมูลนักเรียน
-                    student = await conn.fetchval(
-                        """
-                        SELECT id FROM students
-                        WHERE room_id = $1 AND student_id = $2 AND deleted_at IS NULL
-                        """,
-                        room_id, student_id
-                    )
-                    
+                    # 3. สร้าง/อัปเดตข้อมูลนักเรียน (room_id อาจเป็น None สำหรับ admin/ครูสภา)
+                    if room_id is not None:
+                        student = await conn.fetchval(
+                            """
+                            SELECT id FROM students
+                            WHERE room_id = $1 AND student_id = $2 AND deleted_at IS NULL
+                            """,
+                            room_id, student_id
+                        )
+                    else:
+                        student = await conn.fetchval(
+                            """
+                            SELECT id FROM students
+                            WHERE room_id IS NULL AND student_id = $1 AND deleted_at IS NULL
+                            """,
+                            student_id
+                        )
+
                     if student:
                         await conn.execute(
                             """
                             UPDATE students
                             SET user_id = $1, student_no = $2, prefix = $3,
                                 first_name = $4, last_name = $5, nickname = $6,
-                                class_role = $7, permissions = $8, updated_at = NOW()
-                            WHERE id = $9
+                                class_role = $7, staff_level = $8, is_admin = $9,
+                                permissions = $10, updated_at = NOW()
+                            WHERE id = $11
                             """,
-                            user, student_no, prefix, first_name, last_name, nickname, class_role,
-                            json.dumps(role_perms), student
+                            user, student_no, prefix, first_name, last_name, nickname,
+                            class_role, staff_level, role_is_admin, json.dumps(role_perms), student
                         )
                     else:
                         await conn.execute(
                             """
                             INSERT INTO students
                                 (room_id, user_id, student_id, student_no, prefix,
-                                 first_name, last_name, nickname, class_role, permissions)
-                            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                                 first_name, last_name, nickname, class_role, staff_level,
+                                 is_admin, permissions)
+                            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
                             """,
-                            room_id, user, student_id, student_no, prefix, first_name, last_name, nickname,
-                            class_role, json.dumps(role_perms)
+                            room_id, user, student_id, student_no, prefix, first_name, last_name,
+                            nickname, class_role, staff_level, role_is_admin, json.dumps(role_perms)
                         )
 
                     imported += 1
                 except (ValueError, TypeError) as e:
                     skipped += 1
                     errors.append(f"แถว {total}: ข้อมูลผิดรูปแบบ ({e})")
+
+            # 🛡️ Audit log (กฎ: ทุก create/update ต้องบันทึกใน transaction เดียวกัน)
+            from core.logger import AuditLogger
+            await AuditLogger("student_service").log(
+                conn=conn,
+                action="IMPORT_STUDENTS",
+                actor_identifier=str(actor_user_id) if actor_user_id else "system",
+                client_source=client_source,
+                user_id=actor_user_id,
+                entity_type="student_batch",
+                entity_id=None,
+                status="success" if not errors else "partial",
+                error_detail=None if not errors else "; ".join(errors[:20]),
+                new_values={"total_rows": total, "imported": imported, "skipped": skipped},
+            )
 
     return {
         "total_rows": total,

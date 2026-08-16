@@ -40,7 +40,7 @@ export async function importStudents(file: File, default_password = '1234'): Pro
 
 export async function updateStudent(
   studentId: number,
-  data: { class_role?: string; status?: string; is_admin?: boolean },
+  data: { class_role?: string; status?: string; is_admin?: boolean; staff_level?: string | null },
 ): Promise<void> {
   await api.patch(`/api/students/${studentId}`, data);
 }

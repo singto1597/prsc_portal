@@ -43,7 +43,7 @@ async def create_issue(
     uid = _ensure_user(user_ctx)
     try:
         issue_id = await issue_service.create_issue(
-            pool, uid, req.topic_type, req.category, req.title,
+            pool, uid, req.main_category, req.category, req.title,
             req.description, req.is_anonymous, req.room_id,
             req.start_level,
         )

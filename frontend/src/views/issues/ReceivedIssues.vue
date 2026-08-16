@@ -2,7 +2,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { RouterLink } from 'vue-router';
 import { listIssues } from '@/services/issue';
-import { TOPIC_LABELS, CATEGORY_LABELS, STATUS_LABELS, LEVEL_LABELS, type Issue } from '@/types/issue';
+import { MAIN_CATEGORY_LABELS, subcategoryLabel, STATUS_LABELS, LEVEL_LABELS, type Issue } from '@/types/issue';
 import { useAuthStore } from '@/stores/auth';
 
 const authStore = useAuthStore();
@@ -124,8 +124,8 @@ function statusColor(s: string) {
         <div class="flex items-start justify-between gap-3">
           <div class="flex-1 min-w-0">
             <div class="flex flex-wrap gap-2 mb-1.5">
-              <span class="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">{{ TOPIC_LABELS[i.topic_type] }}</span>
-              <span class="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full">{{ CATEGORY_LABELS[i.category] }}</span>
+              <span class="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">{{ MAIN_CATEGORY_LABELS[i.main_category] }}</span>
+              <span class="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full">{{ subcategoryLabel(i.main_category, i.category) }}</span>
               <span class="px-2 py-0.5 rounded-full text-xs"
                 :class="{
                   'bg-emerald-100 text-emerald-700': i.current_level === 'room',

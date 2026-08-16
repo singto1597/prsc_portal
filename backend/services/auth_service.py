@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from jose import jwt
 
 from core.config import settings
-from core.rbac import get_role_permissions
+from core.rbac import get_role_permissions, get_role_is_admin
 from core.exceptions import ForbiddenError, NotFoundError, ValidationError, ConflictError
 
 
@@ -93,16 +93,17 @@ async def get_user_roles(pool: asyncpg.Pool, user_id: int) -> list:
                 s.room_id,
                 s.student_no,
                 s.class_role,
+                s.staff_level,
                 s.is_admin,
                 s.permissions,
                 r.room_name,
                 r.level
             FROM students s
-            JOIN rooms r ON r.id = s.room_id
+            LEFT JOIN rooms r ON r.id = s.room_id
             WHERE s.user_id = $1
               AND s.deleted_at IS NULL
               AND s.status = 'active'
-              AND r.deleted_at IS NULL
+              AND (r.id IS NULL OR r.deleted_at IS NULL)
             ORDER BY s.id
             """,
             user_id
@@ -123,6 +124,7 @@ async def get_user_roles(pool: asyncpg.Pool, user_id: int) -> list:
             "room_name": row["room_name"],
             "student_no": row["student_no"],
             "level": row["level"],
+            "staff_level": row["staff_level"],
             "is_admin": row["is_admin"],
             "permissions": perms,
         })
@@ -145,18 +147,24 @@ async def register_user(
     - ถ้ายังไม่มี student → สร้าง student ใหม่ (กับ room)
     """
     hashed = hash_password(password)
-    # permissions ตามตำแหน่ง (จาก config/roles.json)
+    # permissions + is_admin ตามตำแหน่ง (จาก config/roles.json)
     role_perms = get_role_permissions(class_role)
+    role_is_admin = get_role_is_admin(class_role)
 
     async with pool.acquire() as conn:
         async with conn.transaction():
-            # 1. หา room ตาม room_code
-            room = await conn.fetchrow(
-                "SELECT id FROM rooms WHERE room_code = $1 AND deleted_at IS NULL",
-                room_code
-            )
-            if not room:
-                raise NotFoundError(f"ไม่พบห้องเรียน {room_code}")
+            # 1. หา room ตาม room_code (admin/ครูสภา อาจไม่ระบุห้อง → ไม่ผูกห้อง)
+            room = None
+            if room_code:
+                room = await conn.fetchrow(
+                    "SELECT id, level FROM rooms WHERE room_code = $1 AND deleted_at IS NULL",
+                    room_code
+                )
+                if not room:
+                    raise NotFoundError(f"ไม่พบห้องเรียน {room_code}")
+
+            # ครูทั่วไป → staff_level = ระดับชั้นของห้อง
+            staff_level = room["level"] if class_role == "teacher" and room else None
 
             # 2. สร้าง user (หรือหาเดิม)
             user = await conn.fetchrow(
@@ -176,31 +184,45 @@ async def register_user(
                 )
 
             # 3. หา/สร้าง student (ผูกกับ user_id)
-            student = await conn.fetchrow(
-                """
-                SELECT id FROM students
-                WHERE room_id = $1 AND student_id = $2 AND deleted_at IS NULL
-                """,
-                room["id"], student_id
-            )
+            room_id = room["id"] if room else None
+            if room_id is not None:
+                student = await conn.fetchrow(
+                    """
+                    SELECT id FROM students
+                    WHERE room_id = $1 AND student_id = $2 AND deleted_at IS NULL
+                    """,
+                    room_id, student_id
+                )
+            else:
+                student = await conn.fetchrow(
+                    """
+                    SELECT id FROM students
+                    WHERE room_id IS NULL AND student_id = $1 AND deleted_at IS NULL
+                    """,
+                    student_id
+                )
             if student:
-                # อัปเดต user_id + ตำแหน่ง + permissions
+                # อัปเดต user_id + ตำแหน่ง + permissions + staff_level + is_admin
                 await conn.execute(
                     """
                     UPDATE students
-                    SET user_id = $1, class_role = $2, permissions = $3
-                    WHERE id = $4
+                    SET user_id = $1, class_role = $2, permissions = $3,
+                        staff_level = $4, is_admin = $5
+                    WHERE id = $6
                     """,
-                    user_id, class_role, json.dumps(role_perms), student["id"]
+                    user_id, class_role, json.dumps(role_perms),
+                    staff_level, role_is_admin, student["id"]
                 )
             else:
                 await conn.execute(
                     """
                     INSERT INTO students
-                        (room_id, user_id, student_id, student_no, first_name, last_name, class_role, permissions)
-                    VALUES ($1, $2, $3, $4, '', '', $5, $6)
+                        (room_id, user_id, student_id, student_no, first_name, last_name,
+                         class_role, staff_level, is_admin, permissions)
+                    VALUES ($1, $2, $3, $4, '', '', $5, $6, $7, $8)
                     """,
-                    room["id"], user_id, student_id, student_no, class_role, json.dumps(role_perms)
+                    room_id, user_id, student_id, student_no,
+                    class_role, staff_level, role_is_admin, json.dumps(role_perms)
                 )
 
             return user_id
@@ -226,6 +248,9 @@ def make_user_out(user_record, roles: list) -> dict:
                 "room_name": r["room_name"],
                 "student_no": r["student_no"],
                 "level": r["level"],
+                "staff_level": r.get("staff_level"),
+                "is_admin": r.get("is_admin", False),
+                "permissions": r.get("permissions", []),
             }
             for r in roles
         ],

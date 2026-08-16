@@ -5,14 +5,15 @@ import api from './api';
 export interface MyProfile {
   id: number;
   student_id: string;
-  student_no: number;
+  student_no: number | null;   // ครู/แอดมิน ไม่มีเลขที่ → null
   prefix: string | null;
   first_name: string | null;
   last_name: string | null;
   nickname: string | null;
   class_role: string;
+  staff_level: string | null;  // (ครูทั่วไป) ระดับชั้นที่รับผิดชอบ เช่น ม.4
   status: string;
-  room_id: number;
+  room_id: number | null;      // admin/ครูสภา (school-wide) → null
   room_code: string | null;
   room_name: string | null;
   level: string | null;

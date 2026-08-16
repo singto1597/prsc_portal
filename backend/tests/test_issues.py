@@ -38,13 +38,13 @@ async def issue_world(db_pool):
     return users
 
 
-def _create_issue(client, users, *, topic="problem", category="discipline", title="เรื่องทดสอบ",
-                  desc="รายละเอียด", anonymous=False, room_id=None):
+def _create_issue(client, users, *, main_category="report", category="complaint", title="เรื่องทดสอบ",
+                  desc="รายละเอียด", anonymous=False, room_id=None, token=None):
     return client.post("/api/issues", json={
-        "topic_type": topic, "category": category, "title": title,
+        "main_category": main_category, "category": category, "title": title,
         "description": desc, "is_anonymous": anonymous,
         "room_id": room_id or users["student"]["room_id"],
-    }, headers={"Authorization": f"Bearer {users['student']['token']}"})
+    }, headers={"Authorization": f"Bearer {token or users['student']['token']}"})
 
 
 # === Section 1: Full flow (create → accept → step → escalate → resolve) ===
@@ -104,7 +104,7 @@ async def test_pyramid_visibility(client, issue_world):
     student, council = users["student"], users["council"]
 
     # นักเรียนสร้างเรื่อง (anonymous)
-    res = _create_issue(client, users, topic="problem", category="sanitation",
+    res = _create_issue(client, users, main_category="report", category="complaint",
                         title="ห้องน้ำพัง", desc="ห้องน้ำชั้น 2 พัง", anonymous=True)
     assert res.status_code == 200
     issue_id = res.json()["id"]
@@ -168,3 +168,115 @@ async def test_former_assignee_sees_escalated(client, issue_world):
     res = client.get(f"/api/issues/{issue_id}", headers={"Authorization": f"Bearer {head['token']}"})
     assert res.status_code == 200
     assert res.json()["current_level"] == "level"
+
+
+# === Section 4: หมวดหมู่ใหม่ (main_category + category) ===
+@pytest.mark.asyncio
+async def test_category_validation(client, issue_world):
+    """หมวดหลัก/หมวดย่อยต้องตรงกับ config/categories.json"""
+    users = issue_world
+
+    # หมวดหลักไม่มีในระบบ → 422
+    res = _create_issue(client, users, main_category="invalid_cat", category="complaint")
+    assert res.status_code == 422
+
+    # หมวดย่อยไม่ตรงกับหมวดหลัก (complaint ไม่ใช่หมวดย่อยของ suggestion) → 422
+    res = _create_issue(client, users, main_category="suggestion", category="complaint")
+    assert res.status_code == 422
+
+    # หมวดย่อยถูกต้อง → 200
+    for main_cat, cat in [
+        ("suggestion", "academic"),
+        ("suggestion", "discipline"),
+        ("wellbeing", "mental_health"),
+        ("wellbeing", "physical_health"),
+        ("report", "complaint"),
+        ("report", "grievance"),
+    ]:
+        res = _create_issue(client, users, main_category=main_cat, category=cat)
+        assert res.status_code == 200, f"{main_cat}/{cat} → {res.status_code}: {res.text}"
+        assert res.json()["main_category"] == main_cat
+        assert res.json()["category"] == cat
+
+
+# === Section 5: ครูทั่วไป (teacher) scope เฉพาะระดับชั้น + ครูสภา/แอดมิน เห็นทุกอย่าง ===
+@pytest.mark.asyncio
+async def test_teacher_scope_and_staff_full_access(client, db_pool):
+    """ครู ม.4 เห็น/จัดการได้เฉพาะเรื่องระดับ ม.4 แต่ ครูสภา/แอดมิน เห็นทุกเรื่อง"""
+    room_4 = f"ม.4/{random.randint(100, 200)}"
+    room_5 = f"ม.5/{random.randint(100, 200)}"
+    async with db_pool.acquire() as conn:
+        room4_id = await conn.fetchval(
+            "INSERT INTO rooms (room_code, room_name, level) VALUES ($1,$2,'ม.4') RETURNING id",
+            room_4, room_4
+        )
+        room5_id = await conn.fetchval(
+            "INSERT INTO rooms (room_code, room_name, level) VALUES ($1,$2,'ม.5') RETURNING id",
+            room_5, room_5
+        )
+
+    def _sid(prefix):
+        return f"{prefix}{random.randint(1000, 9999)}"
+
+    sid4 = _sid("S4")
+    sid5 = _sid("S5")
+    tid = _sid("TC")
+    tcid = _sid("SC")
+    adid = _sid("AD")
+
+    uid4 = await auth_service.register_user(db_pool, sid4, "1234", "เด็ก ม.4", sid4, room_4, 1, "student")
+    uid5 = await auth_service.register_user(db_pool, sid5, "1234", "เด็ก ม.5", sid5, room_5, 1, "student")
+    # ครูทั่วไปสมัครในห้อง ม.4 → staff_level = ม.4
+    teacher_uid = await auth_service.register_user(db_pool, tid, "1234", "ครู ม.4", tid, room_4, 1, "teacher")
+    # ครูสภา / แอดมิน: school-wide (ไม่ผูกห้อง)
+    tc_uid = await auth_service.register_user(db_pool, tcid, "1234", "ครูสภา", tcid, "", 0, "teacher_council")
+    admin_uid = await auth_service.register_user(db_pool, adid, "1234", "แอดมิน", adid, "", 0, "admin")
+
+    def _tok(uid):
+        return auth_service.create_access_token(uid)
+
+    users = {
+        "s4": {"user_id": uid4, "token": _tok(uid4), "room_id": room4_id},
+        "s5": {"user_id": uid5, "token": _tok(uid5), "room_id": room5_id},
+        "teacher": {"user_id": teacher_uid, "token": _tok(teacher_uid)},
+        "teacher_council": {"user_id": tc_uid, "token": _tok(tc_uid)},
+        "admin": {"user_id": admin_uid, "token": _tok(admin_uid)},
+    }
+
+    # เรื่องใน ม.4 และ ม.5
+    res = _create_issue(client, users, title="เรื่อง ม.4", room_id=room4_id, token=users["s4"]["token"])
+    assert res.status_code == 200
+    issue_4 = res.json()["id"]
+    res = _create_issue(client, users, title="เรื่อง ม.5", room_id=room5_id, token=users["s5"]["token"])
+    assert res.status_code == 200
+    issue_5 = res.json()["id"]
+
+    # --- ครู ม.4 ---
+    # เห็นเรื่อง ม.4
+    res = client.get(f"/api/issues/{issue_4}", headers={"Authorization": f"Bearer {users['teacher']['token']}"})
+    assert res.status_code == 200
+    # ไม่เห็นเรื่อง ม.5
+    res = client.get(f"/api/issues/{issue_5}", headers={"Authorization": f"Bearer {users['teacher']['token']}"})
+    assert res.status_code == 403
+    # list เห็นเฉพาะเรื่อง ม.4
+    res = client.get("/api/issues", headers={"Authorization": f"Bearer {users['teacher']['token']}"})
+    assert res.status_code == 200
+    ids = [i["id"] for i in res.json()]
+    assert issue_4 in ids and issue_5 not in ids
+    # รับเรื่อง ม.4 ได้ แต่รับเรื่อง ม.5 ไม่ได้
+    res = client.post(f"/api/issues/{issue_4}/accept", json={"estimated_days": 2},
+                      headers={"Authorization": f"Bearer {users['teacher']['token']}"})
+    assert res.status_code == 200
+    res = client.post(f"/api/issues/{issue_5}/accept", json={"estimated_days": 2},
+                      headers={"Authorization": f"Bearer {users['teacher']['token']}"})
+    assert res.status_code == 403
+
+    # --- ครูสภา / แอดมิน: เห็นทุกเรื่อง + รับได้ (มี is_admin) ---
+    for who in ("teacher_council", "admin"):
+        tok = users[who]["token"]
+        for iid in (issue_4, issue_5):
+            res = client.get(f"/api/issues/{iid}", headers={"Authorization": f"Bearer {tok}"})
+            assert res.status_code == 200, f"{who} ดูเรื่อง {iid} → {res.status_code}"
+        res = client.get("/api/issues", headers={"Authorization": f"Bearer {tok}"})
+        ids = [i["id"] for i in res.json()]
+        assert issue_4 in ids and issue_5 in ids, f"{who} ต้องเห็นทั้ง 2 เรื่อง"

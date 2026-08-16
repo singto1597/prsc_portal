@@ -21,11 +21,14 @@ class ChangePasswordRequest(BaseModel):
 
 # ===================== Response =====================
 class UserRoleInfo(BaseModel):
-    role: Optional[str] = None          # ตำแหน่ง เช่น class_president, vice_academic
+    role: Optional[str] = None          # ตำแหน่ง เช่น class_president, vice_academic, teacher, teacher_council, admin
     room_id: Optional[int] = None
     room_name: Optional[str] = None
     student_no: Optional[int] = None
     level: Optional[str] = None         # ระดับชั้น เช่น ม.4
+    staff_level: Optional[str] = None   # (ครูทั่วไป) ระดับชั้นที่รับผิดชอบ เช่น 'ม.4'
+    is_admin: bool = False              # role นี้เป็น admin หรือไม่
+    permissions: List[str] = []         # permissions ของ role นี้
 
 
 class UserOut(BaseModel):

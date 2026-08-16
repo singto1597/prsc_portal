@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 import asyncpg
 
 from core.dependencies import get_db_pool, get_current_user
-from core.rbac import require_permission_anywhere
+from core.rbac import require_permission_anywhere, get_access_scope
 from core.exceptions import NotFoundError, ForbiddenError, ValidationError
 from models.student_schemas import (
     StudentOut, StudentUpdateRequest, ImportResult, RoomOut,
@@ -75,14 +75,16 @@ async def list_students(
     if not user_ctx.get("user_id"):
         raise HTTPException(status_code=401, detail="ต้องเข้าสู่ระบบ")
 
-    # ตรวจสิทธิ์ (Super Admin / is_admin ผ่าน)
+    # ตรวจสิทธิ์ (Super Admin / is_admin ผ่าน) + หา scope (ครูทั่วไปเห็นได้เฉพาะระดับชั้นตัวเอง)
     async with pool.acquire() as conn:
         try:
             await require_permission_anywhere(conn, user_ctx["user_id"], "MANAGE_STUDENTS")
         except ForbiddenError as e:
             raise HTTPException(status_code=403, detail=str(e))
+        scope = await get_access_scope(conn, user_ctx["user_id"])
 
-    students = await student_service.list_students(pool, room_id=room_id, search=search)
+    level = scope.get("level") if scope["scope"] == "level" else None
+    students = await student_service.list_students(pool, room_id=room_id, search=search, level=level)
     return [StudentOut(**s) for s in students]
 
 
@@ -102,16 +104,24 @@ async def import_students(
     if not file.filename or not file.filename.endswith((".xlsx", ".xls")):
         raise HTTPException(status_code=400, detail="กรุณาอัปโหลดไฟล์ .xlsx")
 
-    # ตรวจสิทธิ์
+    # ตรวจสิทธิ์ + scope (ครูทั่วไปนำเข้าได้เฉพาะระดับชั้นตัวเอง)
     async with pool.acquire() as conn:
         try:
             await require_permission_anywhere(conn, user_ctx["user_id"], "MANAGE_STUDENTS")
         except ForbiddenError as e:
             raise HTTPException(status_code=403, detail=str(e))
+        scope = await get_access_scope(conn, user_ctx["user_id"])
 
+    allowed_level = scope.get("level") if scope["scope"] == "level" else None
     content = await file.read()
     try:
-        result = await student_service.import_students_from_excel(pool, content, default_password=default_password)
+        result = await student_service.import_students_from_excel(
+            pool, content,
+            default_password=default_password,
+            allowed_level=allowed_level,
+            actor_user_id=user_ctx["user_id"],
+            client_source="web",
+        )
     except ValidationError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -134,6 +144,21 @@ async def update_student(
             await require_permission_anywhere(conn, user_ctx["user_id"], "MANAGE_STUDENTS")
         except ForbiddenError as e:
             raise HTTPException(status_code=403, detail=str(e))
+        scope = await get_access_scope(conn, user_ctx["user_id"])
+        # 🛡️ ครูทั่วไปแก้ได้เฉพาะนักเรียนในระดับชั้นตัวเอง
+        if scope["scope"] == "level":
+            target_level = await conn.fetchval(
+                """
+                SELECT r.level FROM students s
+                JOIN rooms r ON r.id = s.room_id
+                WHERE s.id = $1 AND s.deleted_at IS NULL
+                """,
+                student_id
+            )
+            if not target_level:
+                raise HTTPException(status_code=404, detail="ไม่พบนักเรียน")
+            if target_level != scope["level"]:
+                raise HTTPException(status_code=403, detail=f"คุณดูแลได้เฉพาะระดับ {scope['level']}")
 
     try:
         await student_service.update_student(
@@ -141,6 +166,9 @@ async def update_student(
             class_role=req.class_role,
             status=req.status,
             is_admin=req.is_admin,
+            staff_level=req.staff_level,
+            actor_user_id=user_ctx["user_id"],
+            client_source="web",
         )
     except NotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
