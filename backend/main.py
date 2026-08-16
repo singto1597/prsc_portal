@@ -11,6 +11,7 @@ from routers import auth_router
 from routers import issue_router
 from routers import dashboard_router
 from routers import student_router
+from routers import import_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -70,6 +71,7 @@ app.include_router(auth_router.router, prefix="/api")
 app.include_router(issue_router.router, prefix="/api")
 app.include_router(dashboard_router.router, prefix="/api")
 app.include_router(student_router.router, prefix="/api")
+app.include_router(import_router.router, prefix="/api")
 
 
 @app.get("/health", tags=["Health"])

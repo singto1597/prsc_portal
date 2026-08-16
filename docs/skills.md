@@ -165,3 +165,57 @@
 - **Context/Problem:** `total_issues`/`pending/...` คำนวณจาก `by_status_all` ที่รวมทุก row ที่ query คืนมา แต่ `main_categories[].total` + `recent_issues` + `top_subcategories` รวมจากเฉพาะ `category_codes` ใน config → ถ้ามี row ที่ `main_category` อยู่นอก config (หมวดเก่าที่ถูกลบ, ตัด space ผิด, insert ตรง) ตัวเลข top-level กับรายหมวดไม่ตรงกัน (sum ของ pending+... != total)
 - **Correct Pattern/Solution:** สร้าง aggregate ทั้งหมดจาก key set เดียวกัน — `total_by_main` และ `by_status_all` ต้อง loop เฉพาะ `category_codes` (`by_main_status.get(mc, {})`) เหมือนกับที่หมวดย่อย/เรื่องล่าสุดทำ; หรือเพิ่ม CHECK constraint ที่ `issues.main_category`
 - **Date Added:** 2026-08-16
+
+### 🛠️ `str(None)` ใน Python = `"None"` (truthy!) — ตอนแปลงค่าเซลล์ว่างจาก Excel ต้อง `or ""` เสมอ
+- **Context/Problem:** `student_id = str(_get(row, idx, "รหัสนักเรียน")).strip()` — ถ้าเซลล์ว่าง `_get` คืน `None` → `str(None)` = `"None"` ซึ่ง truthy → `if not student_id` ไม่เด้ง → import แถวที่ไม่มีรหัสนักเรียนเข้าไปเป็น user ชื่อ "None" (test จับได้: imported=3 ทั้งที่ควรเป็น 2)
+- **Root Cause:** ลืมว่า `str(None)` ไม่ได้คืน string ว่าง; pattern `str(x or "")` ใช้กันในไฟล์เดียวกัน (first_name/nickname) แต่ 2 จุด (student_id, room_code) ใช้ `str(x)` ตรงๆ
+- **Correct Pattern/Solution:** ใช้ `str(_get(...) or "").strip()` ทุกจุดที่แปลงค่าที่อาจเป็น `None`; และ error ต่อ row ต้องมีชื่อคอลัมน์ (เช่น "เลขที่ต้องเป็นตัวเลข (ได้ค่า: 'abc')") — ไม่ใช่แค่ `ข้อมูลผิดรูปแบบ/ซ้ำ (...)` ที่ไม่บอกว่า field ไหน
+- **Date Added:** 2026-08-16
+
+### 🛠️ asyncpg คืน `jsonb` เป็น **string** — ต้อง `json.loads` ก่อน `list()`
+- **Context/Problem:** response ของ `GET /import-jobs` โชว์ `"error_logs":["[","]"]` — `error_logs` เป็นคอลัมน์ `JSONB NOT NULL DEFAULT '[]'::jsonb` แต่ asyncpg คืนค่าเป็น string `"[]"` (ไม่ใช่ list) → `list("[]")` แยกเป็น `['[', ']']`
+- **Root Cause:** asyncpg ไม่ parse `jsonb` เป็น Python object ให้อัตโนมัติ (ต้องลง codec เอง); test ที่อ่านเองใช้ `json.loads(job["error_logs"])` เป็นสัญญาณว่า column นี้คืน string
+- **Correct Pattern/Solution:** เมื่อจะ `list()` ค่า JSONB ที่ asyncpg คืนมา ให้เช็คก่อน: `if isinstance(raw, str): raw = json.loads(raw)` (wrap try/except → `[]`); แล้วค่อย `list(raw or [])` — ใช้ได้ทั้ง DB จริง (string) และ mock (list)
+- **Date Added:** 2026-08-16
+
+### 🛠️ Fixture ที่เรียก `register_user` จะสร้าง user + student row ด้วย — นับ count ต้อง scope ด้วย ID
+- **Context/Problem:** test `reimport` assert `users == 1` หลัง import แต่ได้ 2 — `admin_user` fixture เรียก `register_user` ซึ่งสร้างทั้ง user และ student ของ admin → count รวม fixture เข้าไปด้วย
+- **Root Cause:** เข้าใจว่า fixture สร้างแค่ "สิทธิ์" แต่จริงๆ สร้าง record จริงในตาราง; test ที่ assert `count(*)` รวม row ของ fixture
+- **Correct Pattern/Solution:** assert แบบ scope เฉพาะเป้าหมายเสมอ เช่น `SELECT count(*) FROM users WHERE username = '47001'` / `WHERE student_id IN (...)`, หรือ `JOIN rooms` ให้กรอง row ที่ `room_id IS NULL` ออก (กรณี fixture ระดับโรงเรียน); ระวัง `VARCHAR(10)` ของ `students.student_id` ด้วย — `f"ID{username}"` เกิน 10 ตัว → `StringDataRightTruncationError`
+- **Date Added:** 2026-08-16
+
+### 🛠️ Frontend `as` cast — inline `(await api.get()) as X` ผ่าน type-check แต่ `const res = await ...; res as X` เด้ง TS2352
+- **Context/Problem:** `npm run type-check` ฟ้อง `TS2352: Conversion of type 'AxiosResponse<...>' to type 'Room[]'` เฉพาะที่เขียน `const res = await api.get(...); return res as Room[]` — แต่ `issue.ts` ที่เขียน `(await api.get(...)) as Issue[]` inline ผ่าน และ test probe (inline) ก็ผ่าน
+- **Root Cause:** `services/api.ts` เป็น axios instance ธรรมดา (type ยังเป็น `Promise<AxiosResponse>`) มี interceptor ปลด `response.data` ตอน runtime เท่านั้น; TS เปรียบเทียบ `AxiosResponse` กับ array type ต่างกันตามตำแหน่งการ cast (empirical — โปรเจคนี้ inline cast ผ่านเสมอ)
+- **Correct Pattern/Solution:** cast inline ทันทีใน expression: `return (await api.get('/api/rooms')) as Room[];` — อย่า assign ตัวแปรคั่นก่อน cast; `as unknown as X` ก็ใช้ได้เสมอแต่ไม่สวย; ถ้าสงสัยว่าไฟล์อื่นพังไหมให้รัน `npx vue-tsc --noEmit -p tsconfig.app.json` (--build มี incremental cache — ลบ `node_modules/.tmp/tsconfig.app.tsbuildinfo` ก่อนถ้าต้องการ ground truth)
+- **Date Added:** 2026-08-16
+
+### 🛠️ ARQ + asyncpg — สถานะ QUEUED อย่า allow restart (กันยิงคิวซ้ำ) + ฝาก recovery ไว้ที่ worker startup
+- **Context/Problem:** `RESTARTABLE_STATUS` เริ่มแรกมี QUEUED → กด "เริ่มงาน" 2 ครั้งบน job QUEUED ได้ 200 (enqueue ซ้ำ) — test `start twice → 409` จับได้
+- **Root Cause:** ตั้งใจให้ restart ได้กรณี Redis หาย แต่เผลอเปิดช่อง double-enqueue race (worker อาจ claim ไปแล้ว)
+- **Correct Pattern/Solution:** `RESTARTABLE_STATUS = {PENDING, FAILED}` เท่านั้น; กรณี job ค้างใน QUEUED ที่ Redis หาย ให้ `recover_stuck_jobs` (worker startup) ครอบ `status IN ('PROCESSING','QUEUED')` + `updated_at < NOW() - INTERVAL '35 minutes'` → reset QUEUED + re-enqueue; claim idempotent ด้วย `FOR UPDATE` + status check ทำให้ re-enqueue ซ้ำปลอดภัย
+- **Date Added:** 2026-08-16
+
+### 🛡️ Privilege escalation — อย่าอนุมานสิทธิ์จากค่าใน Excel ที่ uploader ส่งมา
+- **Context/Problem:** worker นำเข้านักเรียนจาก Excel กำหนด `school_wide = class_role in ("admin", "teacher_council")` จาก cell "ตำแหน่งในห้องเรียน" ที่ uploader เขียนเอง → ครูระดับชั้น (allowed_level='ม.4') ส่งแถวที่มีตำแหน่ง "แอดมิน"/"ประธานสภา" → worker สร้างบัญชี is_admin=true ที่ควบคุมทั้งโรงเรียนได้ (privilege escalation) — review พบเป็น HIGH
+- **Root Cause:** scope ของ uploader (มาจาก DB: `get_access_scope`) กับ role ในแถว Excel (มาจาก input ที่ปลอมแปลงได้) ถูกผสมกัน — ใช้ค่าที่ผู้ใช้ควบคุมเป็นตัวให้สิทธิ์
+- **Correct Pattern/Solution:** สิทธิ์ต้องมาจากผู้ควบคุมข้อมูลเสมอ: (1) Router ตรวจ `scope == 'none'` → 403 (ครูที่ยังไม่มีระดับชั้น "นำเข้าทั้งโรงเรียน"); (2) `default_password` รับเฉพาะ `{"", "1234"}` เท่านั้น; (3) ใน `_process_single_row` ถ้า `allowed_level is not None` (uploader ระดับชั้น) → ปฏิเสธ role ใน `SCHOOL_WIDE_ROLES = {"admin","teacher_council","council_president","council_member"}`; สรุปง่าย: **allowed_level is None ⟺ uploader เป็น school-wide** (หลัง reject scope='none') — ใช้ค่าจาก DB ไม่ใช่จากไฟล์
+- **Date Added:** 2026-08-17
+
+### 🛠️ Batch insert พังกลางคัน (rollback) — snapshot ตัวนับก่อนลอง + เคลียร์ cache ที่มี phantom ID
+- **Context/Problem:** worker ทยอย insert เป็น batch (1 transaction/chunk) แต่มี fallback ทีละแถวเมื่อ `asyncpg.PostgresError` → ตัวนับ `imported/skipped/errors` เพิ่มใน try ก่อน transaction commit → เมื่อ batch rollback ตัวนับยังค้าง (นับซ้ำ: imported=3 ทั้งที่จริง 2) + `ctx.room_cache`/`user_cache` เก็บ room/user id ที่ rollback ไปแล้ว (phantom ID) → fallback + batch ถัดไป insert ผิดที่ — review พบเป็น HIGH (double-count)
+- **Root Cause:** ตัวนับเป็น side-effect ระหว่าง transaction ไม่ใช่ผลหลัง commit; cache ไม่รู้ว่า transaction ล้ม
+- **Correct Pattern/Solution:** ก่อน `try` ให้ `snapshot = (imported, skipped, len(errors))` → ใน `except PostgresError` คืนค่า snapshot (คืน `imported, skipped` + `del errors[snapshot_len:]`) + `ctx.room_cache.clear()`/`ctx.user_cache.clear()` → แล้วค่อย fallback ทีละแถว; test จับได้โดยส่งแถวที่ทำให้ batch พัง (เช่น `room_code` ยาวเกิน VARCHAR(10) → `StringDataRightTruncationError`) แทรกกลาง chunk แล้ว assert imported ไม่นับซ้ำ
+- **Date Added:** 2026-08-17
+
+### 🛠️ Upsert student ให้ atomic ด้วย `ON CONFLICT` — แต่ partial unique index ไม่ชน NULL
+- **Context/Problem:** SELECT-แล้ว-INSERT/UPDATE student ไม่อะตอมิก (2 งานชนกันสร้างแถวซ้ำ) → review แนะนำ partial unique index `(room_id, student_id) WHERE deleted_at IS NULL` + `INSERT ... ON CONFLICT (room_id, student_id) WHERE deleted_at IS NULL DO UPDATE` — แต่ Postgres **unique index ไม่ถือว่า NULL เท่ากัน** → แถว school-wide (room_id NULL) จะไม่ conflict และ reimport สร้างซ้ำ
+- **Root Cause:** partial unique index บนคอลัมน์ที่อาจเป็น NULL → NULL แต่ละค่าเป็น "ต่างกัน" ในดัชนี
+- **Correct Pattern/Solution:** แยก 2 กรณีใน `_process_single_row`: ถ้า `room_id is not None` → `ON CONFLICT ... DO UPDATE`; ถ้า `room_id IS NULL` (school-wide) → คง SELECT-แล้ว-INSERT/UPDATE เดิม (หรือใช้ index แบบ `NULLS NOT DISTINCT` ถ้า PG15+ — แต่กรณีนี้แยก path ง่ายกว่า); เพิ่ม index ใน `init_db` + migration 003 (idempotent: `CREATE UNIQUE INDEX IF NOT EXISTS`); test: reimport แอดมิน (room NULL) 2 รอบ → user/student ต้อง 1 ตัว
+- **Date Added:** 2026-08-17
+
+### 🛠️ Scope filter ตอน list/start — อย่าโชว์/เริ่มงานของคนอื่นให้ครูระดับชั้น
+- **Context/Problem:** `GET /import-jobs` และ `POST /start-import-job` ตรวจแค่ MANAGE_STUDENTS ไม่กรองตาม access scope → ครู ม.4 เห็นงาน import ทั้งโรงเรียนของแอดมิน และ start งานที่ไม่ได้เป็นระดับตัวเองได้
+- **Root Cause:** service รับแค่ `limit`/`job_id` ไม่รู้ scope ของผู้เรียก
+- **Correct Pattern/Solution:** Router เรียก `get_access_scope` แล้วส่ง `access_scope`/`access_level` ไปให้ service: list → `WHERE allowed_level = $2` (level), `[]` (none); start → `ForbiddenError` ถ้า `scope=='none'` หรือ `job["allowed_level"] != access_level`; กฎทุกเลเยอร์: **สิทธิ์ของ user มาจาก DB (`get_access_scope`) ไม่ใช่จาก payload**
+- **Date Added:** 2026-08-17

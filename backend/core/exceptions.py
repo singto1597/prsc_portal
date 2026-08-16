@@ -13,3 +13,7 @@ class ValidationError(Exception):
 class ConflictError(Exception):
     """Raised when an operation conflicts with existing data (e.g. duplicate)."""
     pass
+
+class ServiceUnavailableError(Exception):
+    """Raised when a dependency (e.g. Redis queue) is temporarily unavailable."""
+    pass
