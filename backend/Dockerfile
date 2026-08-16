@@ -23,8 +23,11 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
 # สร้าง User แบบ Non-root เพื่อความปลอดภัยในระดับ Production
+# /data/imports = โฟลเดอร์เก็บไฟล์ Excel ที่อัปโหลด (mount เป็น named volume ใน compose)
+#   → ต้องเป็นเจ้าของโดย appuser ตั้งแต่แรก เพื่อให้ volume ใหม่ที่สร้าง inherits ownership ถูกต้อง
 RUN adduser --disabled-password --gecos "" appuser && \
-    chown -R appuser /app
+    chown -R appuser /app && \
+    mkdir -p /data/imports && chown -R appuser:appuser /data
 USER appuser
 
 # คัดลอก Source Code ทั้งหมดเข้าสู่ Container

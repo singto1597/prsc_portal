@@ -25,3 +25,28 @@ export interface Room {
   level?: string | null;
   room_number?: number | null;
 }
+
+// งาน Import นักเรียนจาก Excel แบบ Queue (backend: student_import_jobs)
+export type ImportJobStatus =
+  | 'PENDING'      // อัปโหลดแล้ว ยังไม่สั่งเริ่ม
+  | 'QUEUED'       // ยิงเข้า Redis แล้ว รอ worker
+  | 'PROCESSING'   // worker กำลังนำเข้า
+  | 'COMPLETED'    // เสร็จสิ้น
+  | 'FAILED';      // ล้มเหลว
+
+export interface ImportJob {
+  id: number;
+  file_name: string;
+  status: ImportJobStatus;
+  total_rows: number;
+  processed_rows: number;
+  imported_count: number;
+  skipped_count: number;
+  error_logs: string[];
+  error_message: string | null;
+  progress_percent: number;   // 0-100 (backend คำนวณให้แล้ว)
+  created_by: number | null;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+}

@@ -1,41 +1,43 @@
 import api from './api';
-import type { Student, Room } from '@/types/student';
+import type { Student, Room, ImportJob } from '@/types/student';
 
 // Student API
 
 export async function listRooms(): Promise<Room[]> {
-  const res: any = await api.get('/api/rooms');
-  return res;
+  return (await api.get('/api/rooms')) as Room[];
 }
 
 export async function listStudents(params?: { room_id?: number; search?: string }): Promise<Student[]> {
-  const res: any = await api.get('/api/students', { params });
-  return res;
+  return (await api.get('/api/students', { params })) as Student[];
 }
 
-export async function importStudents(file: File, default_password = '1234'): Promise<{
-  total_rows: number;
-  imported: number;
-  skipped: number;
-  errors: string[];
-}> {
+// ===================== Import นักเรียนจาก Excel (Queue) =====================
+// Flow: upload (PENDING) → start (QUEUED → worker ประมวลผล) → poll progress
+
+export async function uploadStudentExcel(file: File, defaultPassword = '1234'): Promise<ImportJob> {
   // 1. สร้างกล่อง Form สำหรับใส่ไฟล์เท่านั้น
   const form = new FormData();
   form.append('file', file);
 
   // 2. ยิง API โดยแยกของ 2 อย่างให้ถูกต้องตามที่ Backend ต้องการ
-  const res: any = await api.post('/api/students/import', form, {
+  return (await api.post('/api/upload-student-excel', form, {
     // แนบไฟล์ไปใน Body พร้อมบังคับ Header
     headers: {
       'Content-Type': 'multipart/form-data',
     },
     // แนบ default_password ไปใน URL Query
     params: {
-      default_password: default_password,
+      default_password: defaultPassword,
     },
-  });
-  
-  return res;
+  })) as ImportJob;
+}
+
+export async function startImportJob(jobId: number): Promise<ImportJob> {
+  return (await api.post(`/api/start-import-job/${jobId}`)) as ImportJob;
+}
+
+export async function listImportJobs(): Promise<ImportJob[]> {
+  return (await api.get('/api/import-jobs')) as ImportJob[];
 }
 
 export async function updateStudent(

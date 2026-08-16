@@ -11,12 +11,16 @@ import pytest
 import asyncpg
 import asyncio
 import uuid
+import tempfile
 from urllib.parse import urlparse
 from fastapi.testclient import TestClient
 
 from core.config import settings
 from main import app
 from core.init_db import init_db
+
+# 📁 โฟลเดอร์เก็บไฟล์ Excel สำหรับเทส (แทน /data/imports ของ Docker)
+settings.IMPORT_STORAGE_DIR = tempfile.mkdtemp(prefix="prsc_import_test_")
 
 
 @pytest_asyncio.fixture(scope="session")
@@ -81,7 +85,7 @@ async def clean_database(db_pool):
         await conn.execute("""
             TRUNCATE TABLE users, rooms, students, issues,
                 issue_steps, issue_escalations, issue_countdowns,
-                issue_status_history, audit_logs
+                issue_status_history, audit_logs, student_import_jobs
             CASCADE
         """)
     yield

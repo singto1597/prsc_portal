@@ -67,11 +67,3 @@ class UpdateProfileRequest(BaseModel):
     nickname: Optional[str] = None
     phone_number: Optional[str] = None
     email: Optional[str] = None
-
-
-# ===================== Import Excel =====================
-class ImportResult(BaseModel):
-    total_rows: int
-    imported: int
-    skipped: int
-    errors: List[str] = []

@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 import asyncpg
 
 from core.dependencies import get_db_pool, get_current_user
 from core.rbac import require_permission_anywhere, get_access_scope
-from core.exceptions import NotFoundError, ForbiddenError, ValidationError
+from core.exceptions import NotFoundError, ForbiddenError
 from models.student_schemas import (
-    StudentOut, StudentUpdateRequest, ImportResult, RoomOut,
+    StudentOut, StudentUpdateRequest, RoomOut,
     MyProfileOut, UpdateProfileRequest,
 )
 from services import student_service
@@ -86,46 +86,6 @@ async def list_students(
     level = scope.get("level") if scope["scope"] == "level" else None
     students = await student_service.list_students(pool, room_id=room_id, search=search, level=level)
     return [StudentOut(**s) for s in students]
-
-
-@router.post("/students/import", response_model=ImportResult)
-async def import_students(
-    file: UploadFile = File(...),
-    default_password: str = Query("1234"),
-    user_ctx: dict = Depends(get_current_user),
-    pool: asyncpg.Pool = Depends(get_db_pool),
-):
-    """นำเข้านักเรียนจากไฟล์ Excel (.xlsx)
-    คอลัมน์: รหัสนักเรียน | ห้องเรียน | เลขที่ | คำนำหน้า | ชื่อ | นามสกุล | ชื่อเล่น | ตำแหน่งในห้องเรียน
-    """
-    if not user_ctx.get("user_id"):
-        raise HTTPException(status_code=401, detail="ต้องเข้าสู่ระบบ")
-
-    if not file.filename or not file.filename.endswith((".xlsx", ".xls")):
-        raise HTTPException(status_code=400, detail="กรุณาอัปโหลดไฟล์ .xlsx")
-
-    # ตรวจสิทธิ์ + scope (ครูทั่วไปนำเข้าได้เฉพาะระดับชั้นตัวเอง)
-    async with pool.acquire() as conn:
-        try:
-            await require_permission_anywhere(conn, user_ctx["user_id"], "MANAGE_STUDENTS")
-        except ForbiddenError as e:
-            raise HTTPException(status_code=403, detail=str(e))
-        scope = await get_access_scope(conn, user_ctx["user_id"])
-
-    allowed_level = scope.get("level") if scope["scope"] == "level" else None
-    content = await file.read()
-    try:
-        result = await student_service.import_students_from_excel(
-            pool, content,
-            default_password=default_password,
-            allowed_level=allowed_level,
-            actor_user_id=user_ctx["user_id"],
-            client_source="web",
-        )
-    except ValidationError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    return ImportResult(**result)
 
 
 @router.patch("/students/{student_id}", response_model=dict)

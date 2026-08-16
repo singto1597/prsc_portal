@@ -198,10 +198,43 @@ async def init_db(pool: asyncpg.Pool):
                 );
                 """)
 
-                # --- 9. ตารางรองรับ dashboard ---
+                # --- 9. ตารางคิวงาน Import นักเรียนจาก Excel (Queue: ARQ Worker) ---
+                # status: 'PENDING' (อัปโหลดแล้ว ยังไม่สั่งเริ่ม) / 'QUEUED' (ยิงเข้า Redis แล้ว)
+                #         'PROCESSING' (worker กำลังทำงาน) / 'COMPLETED' / 'FAILED'
+                # error_logs: JSONB array ของข้อผิดพลาดรายแถว (ข้ามไปแต่ไม่ล้มทั้งไฟล์)
+                # file_path: path จริงบน storage (ไม่ expose ผ่าน API) ; file_name: ชื่อไฟล์เดิมสำหรับแสดงผล
+                await conn.execute("""
+                CREATE TABLE IF NOT EXISTS student_import_jobs (
+                    id SERIAL PRIMARY KEY,
+                    file_name TEXT NOT NULL,              -- ชื่อไฟล์เดิมที่ผู้ใช้เห็น (แสดงผลใน UI)
+                    file_path TEXT NOT NULL,              -- path เก็บไฟล์บน storage (internal)
+                    status TEXT NOT NULL DEFAULT 'PENDING',
+                    total_rows INTEGER NOT NULL DEFAULT 0,
+                    processed_rows INTEGER NOT NULL DEFAULT 0,
+                    imported_count INTEGER NOT NULL DEFAULT 0,
+                    skipped_count INTEGER NOT NULL DEFAULT 0,
+                    error_logs JSONB NOT NULL DEFAULT '[]'::jsonb,
+                    error_message TEXT,                   -- ข้อความ error ระดับ job (เช่น อ่านไฟล์ไม่ได้)
+                    default_password TEXT,                -- รหัสเริ่มต้น (default = เลขรหัสนักเรียน)
+                    allowed_level TEXT,                   -- ครูทั่วไปนำเข้าได้เฉพาะระดับชั้นนี้
+                    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    started_at TIMESTAMP WITH TIME ZONE,
+                    completed_at TIMESTAMP WITH TIME ZONE,
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                );
+                """)
+                await conn.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_student_import_jobs_status
+                        ON student_import_jobs(status);
+                    CREATE INDEX IF NOT EXISTS idx_student_import_jobs_created_at
+                        ON student_import_jobs(created_at);
+                """)
+
+                # --- 10. ตารางรองรับ dashboard ---
                 # (การนับสถิติสามารถ query ตรงจาก issues ได้ แต่ให้มี view/ตารางสรุปไว้ก่อน)
 
-                # --- 10. Index เพื่อความเร็ว ---
+                # --- 11. Index เพื่อความเร็ว ---
                 await conn.execute("""
                     CREATE INDEX IF NOT EXISTS idx_issues_room_status ON issues(room_id, status);
                     CREATE INDEX IF NOT EXISTS idx_issues_reporter ON issues(reporter_id);
@@ -217,6 +250,10 @@ async def init_db(pool: asyncpg.Pool):
                         WHERE deleted_at IS NULL;
                     CREATE INDEX IF NOT EXISTS idx_students_role_active
                         ON students(class_role)
+                        WHERE deleted_at IS NULL;
+                    -- กันสร้าง student ซ้ำ (room, เลขประจำตัว) — import แบบ ON CONFLICT ใช้ index นี้
+                    CREATE UNIQUE INDEX IF NOT EXISTS uq_students_room_student_active
+                        ON students(room_id, student_id)
                         WHERE deleted_at IS NULL;
                 """)
 
