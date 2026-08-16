@@ -8,12 +8,6 @@ export interface StatusStat {
   count: number;
 }
 
-export interface CategoryStat {
-  category: string;
-  label: string;
-  count: number;
-}
-
 export interface TrendPoint {
   date: string;
   count: number;
@@ -31,12 +25,22 @@ export interface RecentIssue {
   created_at: string;
 }
 
+export interface SubcategoryDashboard {
+  category: string;
+  label: string;
+  description: string;
+  count: number;
+  by_status: StatusStat[];
+}
+
 export interface MainCategoryDashboard {
   code: string;
   label: string;
+  description: string;
   total: number;
+  overdue: number;
   by_status: StatusStat[];
-  top_subcategories: CategoryStat[];
+  subcategories: SubcategoryDashboard[];
   recent_issues: RecentIssue[];
 }
 

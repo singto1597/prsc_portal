@@ -1,7 +1,11 @@
 import asyncpg
 from datetime import datetime, timedelta, timezone
 
-from core.categories import get_main_categories, get_subcategory_label
+from core.categories import (
+    get_main_categories,
+    get_main_category_description,
+    get_subcategory_label,
+)
 from core.rbac import get_access_scope, require_permission_anywhere
 
 STATUS_LABELS = {
@@ -82,21 +86,20 @@ async def get_dashboard(pool: asyncpg.Pool, user_id: int) -> dict:
         for r in rows:
             by_main_status.setdefault(r["main_category"], {})[r["status"]] = r["cnt"]
 
-        # ── 5. หมวดย่อยยอดนิยม (หมวดหลัก × หมวดย่อย) — query เดียว ──
-        sub_rows = await conn.fetch(
+        # ── 5. หมวดย่อย × สถานะ (หมวดหลัก × หมวดย่อย × สถานะ) — query เดียว ──
+        cat_status_rows = await conn.fetch(
             f"""
-            SELECT i.main_category, i.category, COUNT(*) AS cnt
+            SELECT i.main_category, i.category, i.status, COUNT(*) AS cnt
             FROM issues i
             LEFT JOIN rooms r ON r.id = i.room_id
             WHERE i.deleted_at IS NULL{level_where}
-            GROUP BY i.main_category, i.category
-            ORDER BY i.main_category, cnt DESC, i.category
+            GROUP BY i.main_category, i.category, i.status
             """,
             *level_params
         )
-        by_main_sub: dict = {}
-        for r in sub_rows:
-            by_main_sub.setdefault(r["main_category"], []).append(r)
+        by_cat_status: dict = {}
+        for r in cat_status_rows:
+            by_cat_status.setdefault(r["main_category"], []).append(r)
 
         # ── 6. เรื่องล่าสุดต่อหมวดหลัก (5 เรื่อง) — window function 1 query ──
         recent_rows = await conn.fetch(
@@ -133,10 +136,12 @@ async def get_dashboard(pool: asyncpg.Pool, user_id: int) -> dict:
                 by_status_all[st] = by_status_all.get(st, 0) + cnt
         by_status = _status_stats(by_status_all)
 
-        # ── 8. งานเกินเวลา: กำลังดำเนินการ + countdown ล่าสุดเลยกำหนด ──
-        overdue = await conn.fetchval(
+        # ── 8. งานเกินเวลา (รายหมวดหลัก) — กำลังดำเนินการ + countdown ล่าสุดเลยกำหนด ──
+        # กลุ่มตาม main_category ให้ sum(overdue รายหมวด) == overdue รวมเสมอ
+        overdue_rows = await conn.fetch(
             f"""
-            SELECT COUNT(*) FROM issues i
+            SELECT i.main_category, COUNT(*) AS cnt
+            FROM issues i
             LEFT JOIN rooms r ON r.id = i.room_id
             WHERE i.deleted_at IS NULL{level_where}
               AND i.status = 'in_progress'
@@ -148,9 +153,12 @@ async def get_dashboard(pool: asyncpg.Pool, user_id: int) -> dict:
                         SELECT MAX(id) FROM issue_countdowns WHERE issue_id = i.id
                     )
               )
+            GROUP BY i.main_category
             """,
             *level_params
-        ) or 0
+        )
+        overdue_by_main = {r["main_category"]: r["cnt"] for r in overdue_rows}
+        overdue = sum(overdue_by_main.get(mc, 0) for mc in category_codes)
 
         # ── 9. จำนวนนักเรียน / ห้อง (ตาม scope) ──
         total_students, total_rooms = await _count_people(conn, scope)
@@ -169,15 +177,50 @@ async def get_dashboard(pool: asyncpg.Pool, user_id: int) -> dict:
         main_dashboards = []
         for code in category_codes:
             info = main_categories.get(code, {})
+            sub_labels = info.get("subcategories", {})        # {code: label}
+            sub_details = info.get("subcategory_details", {})  # {code: description}
 
-            # top หมวดย่อย (เรียงมากไปน้อย)
-            top_subcategories = [
+            # รวมตัวเลขรายหมวดย่อยจาก (หมวดย่อย × สถานะ) — ใช้ config เป็นแกน
+            # ให้ sum(subcategories[].count) == total เสมอ (บทเรียน: นับจาก key set เดียวกัน)
+            # หมวดย่อยที่ไม่อยู่ใน config (หมวดเก่า/insert ตรง) → รวมเข้า "อื่นๆ" (ไม่ทิ้งข้อมูล)
+            sub_counts: dict = {}
+            sub_status: dict = {}
+            other_count = 0
+            other_status: dict = {}
+            for r in by_cat_status.get(code, []):
+                c = r["category"]
+                if c in sub_labels:
+                    sub_counts[c] = sub_counts.get(c, 0) + r["cnt"]
+                    # ⚠️ อย่าห่อใส่ assignment เดียว: Python คำนวณ RHS ก่อน target
+                    # (sub_status[c] จะ KeyError ถ้ายังไม่มี key) — แยกเป็น 2 บรรทัด
+                    st = sub_status.setdefault(c, {})
+                    st[r["status"]] = st.get(r["status"], 0) + r["cnt"]
+                else:
+                    other_count += r["cnt"]
+                    other_status[r["status"]] = other_status.get(r["status"], 0) + r["cnt"]
+
+            # รายการหมวดย่อย (เรียง count มากไปน้อย — อันเยอะสุดอยู่บน; เสมอ → เรียงตาม config)
+            sub_items = [
+                {"category": c, "label": sub_labels[c],
+                 "description": sub_details.get(c, ""),
+                 "count": sub_counts.get(c, 0), "by_status": sub_status.get(c, {})}
+                for c in sub_labels
+            ]
+            sub_items.sort(key=lambda x: x["count"], reverse=True)
+            # "อื่นๆ" ต่อท้ายเสมอ (ไม่ไปแทรกกลาง leaderboard — เป็นหมวดตกค้าง ไม่ใช่หมวดจริง)
+            if other_count > 0:
+                sub_items.append({
+                    "category": "_other", "label": "อื่นๆ",
+                    "description": "หมวดย่อยที่ไม่อยู่ในระบบปัจจุบัน",
+                    "count": other_count, "by_status": other_status,
+                })
+            subcategories = [
                 {
-                    "category": r["category"],
-                    "label": get_subcategory_label(code, r["category"]),
-                    "count": r["cnt"],
+                    "category": it["category"], "label": it["label"],
+                    "description": it["description"], "count": it["count"],
+                    "by_status": _status_stats(it["by_status"]),
                 }
-                for r in by_main_sub.get(code, [])
+                for it in sub_items
             ]
 
             # เรื่องล่าสุดในหมวด (สำหรับคลิกเข้าไปติดตาม)
@@ -199,9 +242,11 @@ async def get_dashboard(pool: asyncpg.Pool, user_id: int) -> dict:
             main_dashboards.append({
                 "code": code,
                 "label": info.get("label", code),
+                "description": get_main_category_description(code),
                 "total": total_by_main.get(code, 0),
+                "overdue": overdue_by_main.get(code, 0),
                 "by_status": _status_stats(by_main_status.get(code, {})),
-                "top_subcategories": top_subcategories,
+                "subcategories": subcategories,
                 "recent_issues": recent_issues,
             })
 

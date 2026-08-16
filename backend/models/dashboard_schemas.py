@@ -3,17 +3,6 @@ from pydantic import BaseModel
 from datetime import datetime
 
 
-class CountStat(BaseModel):
-    label: str
-    count: int
-
-
-class CategoryStat(BaseModel):
-    category: str
-    label: str
-    count: int
-
-
 class StatusStat(BaseModel):
     status: str
     label: str
@@ -38,13 +27,24 @@ class RecentIssueOut(BaseModel):
     created_at: datetime
 
 
+class SubcategoryDashboard(BaseModel):
+    """สถิติรายหมวดย่อย — นับเรื่อง + สถานะภายในหมวดย่อย (เรียง count จากมากไปน้อย)"""
+    category: str
+    label: str
+    description: str = ""       # คำอธิบายหมวดย่อย (จาก config/categories.json)
+    count: int
+    by_status: List[StatusStat] = []
+
+
 class MainCategoryDashboard(BaseModel):
     """สถิติรายหมวดหลัก (suggestion / wellbeing / report)"""
     code: str
     label: str
+    description: str = ""       # คำอธิบายหมวดหลัก (จาก config/categories.json)
     total: int
+    overdue: int = 0            # งานในหมวดนี้ที่เกินกำหนดเวลา
     by_status: List[StatusStat] = []
-    top_subcategories: List[CategoryStat] = []
+    subcategories: List[SubcategoryDashboard] = []
     recent_issues: List[RecentIssueOut] = []
 
 
