@@ -4,7 +4,7 @@ import type { Issue } from '@/types/issue';
 // Issue API
 
 export interface CreateIssuePayload {
-  topic_type: string;
+  main_category: string;
   category: string;
   title: string;
   description: string;

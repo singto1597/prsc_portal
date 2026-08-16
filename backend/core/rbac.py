@@ -19,6 +19,11 @@ AVAILABLE_PERMISSIONS = [
     "MANAGE_SETTINGS",       # ตั้งค่าระบบ
 ]
 
+# 🎯 บทบาทที่เห็น/จัดการข้อมูลทั้งโรงเรียน (สิทธิ์เทียบเท่า is_admin)
+SCOPE_ALL_ROLES = {"admin", "teacher_council", "council_president"}
+# 🎯 บทบาทที่จำกัดเฉพาะระดับชั้น (เช่น ครู ม.4 ดูแลแค่ ม.4)
+SCOPE_LEVEL_ROLES = {"teacher"}
+
 async def require_member(conn: asyncpg.Connection, room_id: int, user_id: int):
     """เช็คว่า user เป็นสมาชิก active ของห้อง/ระดับนี้หรือไม่ (กัน cross-level data leak)."""
     if settings.SUPER_ADMIN_ID and int(user_id) == int(settings.SUPER_ADMIN_ID):
@@ -75,6 +80,9 @@ async def require_permission_anywhere(conn: asyncpg.Connection, user_id: int, re
     """
     Granular RBAC (ข้ามทุกห้อง): เช็คว่า user มีสิทธิ์ permission ในห้อง/ตำแหน่งใดก็ได้
     ใช้สำหรับสิทธิ์ระดับโรงเรียน เช่น MANAGE_STUDENTS, VIEW_DASHBOARD, MANAGE_SETTINGS
+
+    ⚠️ หมายเหตุ: ผ่านแล้วยังต้องเช็ค "ขอบเขตข้อมูล" (scope) ด้วย —
+    ครูทั่วไป (teacher) มี MANAGE_STUDENTS/VIEW_DASHBOARD เหมือนกัน แต่ถูกจำกัดเฉพาะระดับชั้น
     """
     # 1. Super Admin (God Mode ระดับ Server)
     if settings.SUPER_ADMIN_ID and int(user_id) == int(settings.SUPER_ADMIN_ID):
@@ -106,6 +114,49 @@ async def require_permission_anywhere(conn: asyncpg.Connection, user_id: int, re
     raise ForbiddenError(f"Access Denied: คุณไม่มีสิทธิ์ '{required_permission}'")
 
 
+async def get_access_scope(conn: asyncpg.Connection, user_id: int) -> dict:
+    """
+    🎯 วิเคราะห์ "ขอบเขตการเข้าถึงข้อมูล" ของ user (ใช้ประกอบ require_permission_anywhere)
+
+    คืนค่า: {"scope": str, "level": Optional[str], "is_admin": bool}
+      - scope='super'  : SUPER_ADMIN_ID — เห็นทุกอย่างทั้งระบบ
+      - scope='all'    : admin / ครูสภา (teacher_council) / ประธานสภา — เห็นทุกอย่าง
+      - scope='level'  : ครูทั่วไป (teacher) — เห็นเฉพาะระดับชั้น (staff_level เช่น 'ม.4')
+      - scope='pyramid': ปกติ — มองตามพีระมิด (ใช้กับเรื่อง/issue เท่านั้น)
+
+    ตัวอย่าง: ครู ม.4 → {"scope": "level", "level": "ม.4"}
+    """
+    # 1. Super Admin
+    if settings.SUPER_ADMIN_ID and int(user_id) == int(settings.SUPER_ADMIN_ID):
+        return {"scope": "super", "level": None, "is_admin": True}
+
+    # 2. ดึงทุก membership ที่ active
+    rows = await conn.fetch(
+        """
+        SELECT class_role, is_admin, staff_level, status
+        FROM students
+        WHERE user_id = $1 AND deleted_at IS NULL
+        """,
+        int(user_id)
+    )
+    if not rows:
+        return {"scope": "pyramid", "level": None, "is_admin": False}
+
+    is_admin = any(r["is_admin"] and r["status"] == "active" for r in rows)
+
+    for r in rows:
+        if r["status"] != "active":
+            continue
+        # scope 'all': is_admin หรือ role ที่เห็นทั้งโรงเรียน
+        if r["is_admin"] or r["class_role"] in SCOPE_ALL_ROLES:
+            return {"scope": "all", "level": None, "is_admin": True}
+        # scope 'level': ครูทั่วไป (ต้องมี staff_level ระบุระดับชั้น)
+        if r["class_role"] in SCOPE_LEVEL_ROLES and r["staff_level"]:
+            return {"scope": "level", "level": r["staff_level"], "is_admin": False}
+
+    return {"scope": "pyramid", "level": None, "is_admin": is_admin}
+
+
 def _parse_permissions(raw_perms) -> list:
     """แปลง permissions JSONB → list (รองรับทั้ง str และ list จาก asyncpg)"""
     if not raw_perms:
@@ -118,8 +169,36 @@ def _parse_permissions(raw_perms) -> list:
     return list(raw_perms)
 
 
-# 🧭 แคช permissions ตาม role (อ่านจาก config/roles.json ครั้งเดียว)
-_ROLE_PERMS_CACHE = None
+# 🧭 แคช roles (อ่านจาก config/roles.json ครั้งเดียว)
+_ROLE_CACHE = None
+
+
+def _load_roles() -> dict:
+    """โหลด config/roles.json (แคชครั้งแรก)"""
+    global _ROLE_CACHE
+    if _ROLE_CACHE is None:
+        roles_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "roles.json")
+        try:
+            with open(roles_path, encoding="utf-8") as f:
+                data = json.load(f)
+            _ROLE_CACHE = data.get("roles", {})
+        except Exception:
+            _ROLE_CACHE = {}
+    return _ROLE_CACHE
+
+
+def get_role_info(role: str) -> dict:
+    """
+    คืน dict ข้อมูล role ทั้งหมดจาก config/roles.json:
+      {"label": ..., "is_admin": bool, "permissions": [...]}
+    (ถ้า role ไม่มี → คืน dict ว่าง)
+    """
+    role_data = _load_roles().get(role, {})
+    return {
+        "label": role_data.get("label", role),
+        "is_admin": bool(role_data.get("is_admin", False)),
+        "permissions": list(role_data.get("permissions", [])),
+    }
 
 
 def get_role_permissions(role: str) -> list:
@@ -128,15 +207,9 @@ def get_role_permissions(role: str) -> list:
     ใช้ตอน register/import/seed เพื่อให้ students.permissions มีค่าตามตำแหน่งจริง
     (ทำให้ frontend รู้ว่าซ่อน/โชว์เมนูไหน)
     """
-    global _ROLE_PERMS_CACHE
-    if _ROLE_PERMS_CACHE is None:
-        roles_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "roles.json")
-        try:
-            with open(roles_path, encoding="utf-8") as f:
-                data = json.load(f)
-            _ROLE_PERMS_CACHE = data.get("roles", {})
-        except Exception:
-            _ROLE_PERMS_CACHE = {}
+    return get_role_info(role)["permissions"]
 
-    role_data = _ROLE_PERMS_CACHE.get(role, {})
-    return list(role_data.get("permissions", []))
+
+def get_role_is_admin(role: str) -> bool:
+    """คืนว่า role เป็น admin (is_admin) หรือไม่ — ใช้ตอน register/import ตั้งค่า students.is_admin"""
+    return get_role_info(role)["is_admin"]

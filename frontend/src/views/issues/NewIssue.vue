@@ -3,13 +3,13 @@ import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import Swal from 'sweetalert2';
 import { createIssue } from '@/services/issue';
-import { TOPIC_LABELS, CATEGORY_LABELS, LEVEL_LABELS, type TopicType, type Category } from '@/types/issue';
+import { MAIN_CATEGORIES, LEVEL_LABELS, type MainCategory, type Category } from '@/types/issue';
 import { useAuthStore } from '@/stores/auth';
 
 const router = useRouter();
 const authStore = useAuthStore();
 
-const topicType = ref<TopicType | ''>('');
+const mainCategory = ref<MainCategory | ''>('');
 const category = ref<Category | ''>('');
 const title = ref('');
 const description = ref('');
@@ -24,6 +24,7 @@ const myLevel = computed(() => {
     vice_activity: 'room', vice_reception: 'room',
     level_president: 'level',
     council_member: 'council', council_president: 'council',
+    teacher: 'council', teacher_council: 'council', admin: 'council',
   };
   let best = 'student';
   for (const r of authStore.roles) {
@@ -42,20 +43,15 @@ const selectableLevels = computed(() => {
   return all.filter((l) => rank[l as keyof typeof rank] <= myRank);
 });
 
-// หมวดหมู่ตามหัวข้อ (ครู: "พอได้มาปุ๊บก็อาจจะให้กดเลือกอีกทีว่าเป็นหมวดหมู่ไหน")
-const CATEGORIES_BY_TOPIC: Record<TopicType, Category[]> = {
-  living: ['sanitation', 'reception', 'academic', 'other'],
-  problem: ['discipline', 'activity', 'sanitation', 'academic', 'reception', 'other'],
-  suggestion: ['activity', 'academic', 'discipline', 'reception', 'sanitation', 'other'],
-};
-
-const availableCategories = computed<Category[]>(() =>
-  topicType.value ? CATEGORIES_BY_TOPIC[topicType.value] : []
-);
+// หมวดหมู่ย่อยตามหมวดหลักที่เลือก (จาก MAIN_CATEGORIES — ตรงกับ backend config/categories.json)
+const availableCategories = computed<Category[]>(() => {
+  if (!mainCategory.value) return [];
+  return Object.keys(MAIN_CATEGORIES[mainCategory.value].subcategories) as Category[];
+});
 
 async function handleSubmit() {
-  if (!topicType.value) {
-    Swal.fire({ icon: 'warning', title: 'เลือกหัวข้อก่อน', text: 'กรุณาเลือกหัวข้อหลัก (สภาพความเป็นอยู่ / ปัญหา / ข้อเสนอแนะ)' });
+  if (!mainCategory.value) {
+    Swal.fire({ icon: 'warning', title: 'เลือกหมวดหลักก่อน', text: 'กรุณาเลือกหมวดหลัก (เสนอความคิดเห็น / สุขภาวะทางกายและใจ / แจ้งเหตุ)' });
     return;
   }
   if (!category.value) {
@@ -74,7 +70,7 @@ async function handleSubmit() {
   isLoading.value = true;
   try {
     const issue = await createIssue({
-      topic_type: topicType.value,
+      main_category: mainCategory.value,
       category: category.value,
       start_level: startLevel.value,
       title: title.value.trim(),
@@ -102,32 +98,32 @@ async function handleSubmit() {
     <h1 class="text-2xl font-bold text-gray-900 mb-1"><i class="bi bi-pencil-square mr-1"></i> แจ้งปัญหา / ความคิดเห็น</h1>
     <p class="text-gray-500 text-sm mb-6">เรื่องจะถูกส่งต่อไปยังหัวหน้าห้อง + รองฝ่าย เพื่อดำเนินการ</p>
 
-    <!-- Step 1: หัวข้อหลัก -->
+    <!-- Step 1: หมวดหลัก -->
     <div class="mb-6">
-      <label class="block text-sm font-medium text-gray-700 mb-2">1. เลือกหัวข้อหลัก</label>
+      <label class="block text-sm font-medium text-gray-700 mb-2">1. เลือกหมวดหลัก</label>
       <div class="grid grid-cols-3 gap-3">
         <button
-          v-for="(label, key) in TOPIC_LABELS"
+          v-for="(info, key) in MAIN_CATEGORIES"
           :key="key"
           type="button"
-          @click="topicType = key as TopicType; category = ''"
+          @click="mainCategory = key as MainCategory; category = ''"
           class="p-4 rounded-xl border-2 text-center transition"
-          :class="topicType === key
+          :class="mainCategory === key
             ? 'border-red-600 bg-red-50 text-red-700'
             : 'border-gray-200 hover:border-red-300'"
         >
           <div class="text-2xl mb-1">
-            <i v-if="key === 'living'" class="bi bi-house-heart"></i>
-            <i v-else-if="key === 'problem'" class="bi bi-exclamation-triangle"></i>
-            <i v-else class="bi bi-lightbulb"></i>
+            <i v-if="key === 'suggestion'" class="bi bi-lightbulb"></i>
+            <i v-else-if="key === 'wellbeing'" class="bi bi-heart-pulse"></i>
+            <i v-else class="bi bi-exclamation-triangle"></i>
           </div>
-          <div class="text-sm font-medium">{{ label }}</div>
+          <div class="text-sm font-medium">{{ info.label }}</div>
         </button>
       </div>
     </div>
 
     <!-- Step 2: หมวดหมู่ย่อย -->
-    <div v-if="topicType" class="mb-6">
+    <div v-if="mainCategory" class="mb-6">
       <label class="block text-sm font-medium text-gray-700 mb-2">2. เลือกหมวดหมู่</label>
       <div class="flex flex-wrap gap-2">
         <button
@@ -140,7 +136,7 @@ async function handleSubmit() {
             ? 'bg-red-600 text-white border-red-600'
             : 'border-gray-300 hover:border-red-400'"
         >
-          {{ CATEGORY_LABELS[c] }}
+          {{ MAIN_CATEGORIES[mainCategory as MainCategory].subcategories[c] }}
         </button>
       </div>
     </div>

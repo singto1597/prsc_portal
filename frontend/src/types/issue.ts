@@ -2,8 +2,20 @@
 
 export type IssueLevel = 'room' | 'level' | 'council';
 export type IssueStatus = 'pending' | 'in_progress' | 'resolved' | 'escalated' | 'cancelled';
-export type TopicType = 'living' | 'problem' | 'suggestion';
-export type Category = 'academic' | 'discipline' | 'activity' | 'reception' | 'sanitation' | 'other';
+
+// หมวดหลัก 3 หมวด (ตรงกับ backend config/categories.json)
+export type MainCategory = 'suggestion' | 'wellbeing' | 'report';
+// หมวดย่อยทั้งหมด (แต่ละหมวดย่อยอยู่ใต้หมวดหลักเดียว)
+export type Category =
+  | 'academic'
+  | 'reception'
+  | 'activity'
+  | 'discipline'
+  | 'democracy'
+  | 'physical_health'
+  | 'mental_health'
+  | 'complaint'
+  | 'grievance';
 
 export interface IssueStep {
   id: number;
@@ -41,7 +53,7 @@ export interface Issue {
   id: number;
   room_id: number | null;
   room_name: string | null;
-  topic_type: TopicType;
+  main_category: MainCategory;
   category: Category;
   title: string;
   description: string;
@@ -65,21 +77,48 @@ export interface Issue {
   status_history?: StatusHistory[];
 }
 
-// ===== Labels (ภาษาไทย) =====
-export const TOPIC_LABELS: Record<TopicType, string> = {
-  living: 'แจ้งสภาพความเป็นอยู่',
-  problem: 'แจ้งปัญหา',
-  suggestion: 'ข้อเสนอแนะ',
+// ===== Labels (ภาษาไทย) — ตรงกับ backend config/categories.json =====
+export interface MainCategoryInfo {
+  label: string;
+  subcategories: Record<string, string>;
+}
+
+export const MAIN_CATEGORIES: Record<MainCategory, MainCategoryInfo> = {
+  suggestion: {
+    label: 'เสนอความคิดเห็น',
+    subcategories: {
+      academic: 'วิชาการ',
+      reception: 'ปฏิคม',
+      activity: 'กิจกรรม',
+      discipline: 'วินัย',
+      democracy: 'ประชาธิปไตย',
+    },
+  },
+  wellbeing: {
+    label: 'สุขภาวะทางกายและใจ',
+    subcategories: {
+      physical_health: 'สุขภาวะทางกาย',
+      mental_health: 'สุขภาวะทางใจ',
+    },
+  },
+  report: {
+    label: 'แจ้งเหตุ',
+    subcategories: {
+      complaint: 'ร้องทุกข์',
+      grievance: 'ร้องเรียน',
+    },
+  },
 };
 
-export const CATEGORY_LABELS: Record<Category, string> = {
-  academic: 'วิชาการ',
-  discipline: 'วินัย',
-  activity: 'กิจกรรม',
-  reception: 'ปฏิคม',
-  sanitation: 'สุขาภิบาล',
-  other: 'อื่นๆ',
+export const MAIN_CATEGORY_LABELS: Record<MainCategory, string> = {
+  suggestion: 'เสนอความคิดเห็น',
+  wellbeing: 'สุขภาวะทางกายและใจ',
+  report: 'แจ้งเหตุ',
 };
+
+export function subcategoryLabel(main_category: MainCategory, category: string): string {
+  return MAIN_CATEGORIES[main_category]?.subcategories[category] ?? category;
+}
 
 export const STATUS_LABELS: Record<string, string> = {
   pending: 'รอรับเรื่อง',

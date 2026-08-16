@@ -2,21 +2,9 @@ import asyncpg
 from datetime import datetime, timedelta, timezone
 from core.config import settings
 from core.exceptions import ForbiddenError
+from core.categories import get_subcategory_label
+from core.rbac import get_access_scope
 
-# 🏷️ แผนที่ label ภาษาไทย
-CATEGORY_LABELS = {
-    "academic": "วิชาการ",
-    "discipline": "วินัย",
-    "activity": "กิจกรรม",
-    "reception": "ปฏิคม",
-    "sanitation": "สุขาภิบาล",
-    "other": "อื่นๆ",
-}
-TOPIC_LABELS = {
-    "living": "สภาพความเป็นอยู่",
-    "problem": "ปัญหา",
-    "suggestion": "ข้อเสนอแนะ",
-}
 STATUS_LABELS = {
     "pending": "รอรับเรื่อง",
     "in_progress": "กำลังดำเนินการ",
@@ -51,36 +39,73 @@ async def get_dashboard(pool: asyncpg.Pool, user_id: int) -> dict:
                 raise ForbiddenError("คุณไม่มีสิทธิ์ดู Dashboard")
 
     async with pool.acquire() as conn:
+        # 🛡️ scope: ครูทั่วไป (teacher) เห็นสถิติเฉพาะระดับชั้นตัวเองเท่านั้น
+        scope = await get_access_scope(conn, user_id)
+        level_where = ""
+        level_params = []
+        if scope["scope"] == "level" and scope.get("level"):
+            level_where = " AND r.level = $1"
+            level_params.append(scope["level"])
+
+        issue_join = " LEFT JOIN rooms r ON r.id = i.room_id"
+
         # 1. จำนวนรวม + แยกสถานะ
-        total = await conn.fetchval("SELECT COUNT(*) FROM issues WHERE deleted_at IS NULL") or 0
-        pending = await conn.fetchval("SELECT COUNT(*) FROM issues WHERE deleted_at IS NULL AND status='pending'") or 0
-        in_progress = await conn.fetchval("SELECT COUNT(*) FROM issues WHERE deleted_at IS NULL AND status='in_progress'") or 0
-        resolved = await conn.fetchval("SELECT COUNT(*) FROM issues WHERE deleted_at IS NULL AND status='resolved'") or 0
-        escalated = await conn.fetchval("SELECT COUNT(*) FROM issues WHERE deleted_at IS NULL AND status='escalated'") or 0
+        def _count(extra_where: str = "") -> int:
+            return conn.fetchval(
+                f"SELECT COUNT(*) FROM issues i{issue_join} WHERE i.deleted_at IS NULL{level_where}{extra_where}",
+                *level_params
+            ) or 0
 
-        total_students = await conn.fetchval("SELECT COUNT(*) FROM students WHERE deleted_at IS NULL") or 0
-        total_rooms = await conn.fetchval("SELECT COUNT(*) FROM rooms WHERE deleted_at IS NULL") or 0
+        total = await _count()
+        pending = await _count(" AND i.status='pending'")
+        in_progress = await _count(" AND i.status='in_progress'")
+        resolved = await _count(" AND i.status='resolved'")
+        escalated = await _count(" AND i.status='escalated'")
 
-        # 2. top categories
+        # ครูทั่วไป → จำนวนนักเรียน/ห้อง เฉพาะระดับชั้นตัวเอง
+        if level_params:
+            total_students = await conn.fetchval(
+                f"SELECT COUNT(*) FROM students s LEFT JOIN rooms r ON r.id = s.room_id WHERE s.deleted_at IS NULL{level_where}",
+                *level_params
+            ) or 0
+            total_rooms = await conn.fetchval(
+                f"SELECT COUNT(*) FROM rooms r WHERE r.deleted_at IS NULL{level_where}",
+                *level_params
+            ) or 0
+        else:
+            total_students = await conn.fetchval("SELECT COUNT(*) FROM students WHERE deleted_at IS NULL") or 0
+            total_rooms = await conn.fetchval("SELECT COUNT(*) FROM rooms WHERE deleted_at IS NULL") or 0
+
+        # 2. top categories (ตามหมวดหลัก+หมวดย่อยใหม่)
         cat_rows = await conn.fetch(
-            """
-            SELECT category, COUNT(*) AS cnt FROM issues
-            WHERE deleted_at IS NULL
-            GROUP BY category ORDER BY cnt DESC LIMIT 6
-            """
+            f"""
+            SELECT i.main_category, i.category, COUNT(*) AS cnt
+            FROM issues i{issue_join}
+            WHERE i.deleted_at IS NULL{level_where}
+            GROUP BY i.main_category, i.category
+            ORDER BY cnt DESC LIMIT 6
+            """,
+            *level_params
         )
         top_categories = [
-            {"category": r["category"], "label": CATEGORY_LABELS.get(r["category"], r["category"]), "count": r["cnt"]}
+            {
+                "main_category": r["main_category"],
+                "category": r["category"],
+                "label": get_subcategory_label(r["main_category"], r["category"]),
+                "count": r["cnt"],
+            }
             for r in cat_rows
         ]
 
         # 3. by status
         status_rows = await conn.fetch(
-            """
-            SELECT status, COUNT(*) AS cnt FROM issues
-            WHERE deleted_at IS NULL
-            GROUP BY status
-            """
+            f"""
+            SELECT i.status, COUNT(*) AS cnt
+            FROM issues i{issue_join}
+            WHERE i.deleted_at IS NULL{level_where}
+            GROUP BY i.status
+            """,
+            *level_params
         )
         by_status = [
             {"status": r["status"], "label": STATUS_LABELS.get(r["status"], r["status"]), "count": r["cnt"]}
@@ -92,9 +117,14 @@ async def get_dashboard(pool: asyncpg.Pool, user_id: int) -> dict:
         trend = []
         for i in range(6, -1, -1):
             day = today - timedelta(days=i)
+            day_params = list(level_params) + [day]
+            day_clause = f" AND i.created_at::date = ${len(day_params)}"
             cnt = await conn.fetchval(
-                "SELECT COUNT(*) FROM issues WHERE deleted_at IS NULL AND created_at::date = $1",
-                day
+                f"""
+                SELECT COUNT(*) FROM issues i{issue_join}
+                WHERE i.deleted_at IS NULL{level_where}{day_clause}
+                """,
+                *day_params
             ) or 0
             trend.append({"date": day.isoformat(), "count": cnt})
 

@@ -80,3 +80,34 @@ async def test_me_with_token(client, created_user):
     res = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert res.status_code == 200
     assert res.json()["username"] == username
+
+
+# === Section 4: School-wide role (admin/ครูสภา — ไม่ผูกห้อง) ===
+@pytest.mark.asyncio
+async def test_admin_school_wide_profile_and_me(client, db_pool):
+    """admin/ครูสภา (room_id NULL) login → /me + /students/me/profile ได้ ไม่ 404"""
+    import random
+    username = f"adm{random.randint(100000, 999999)}"  # ≤10 chars (student_id เป็น VARCHAR(10))
+    uid = await auth_service.register_user(
+        db_pool, username, "1234", "แอดมิน ระบบ",
+        username, "", 0, "admin"
+    )
+
+    login = client.post("/api/auth/login", json={"username": username, "password": "1234"})
+    assert login.status_code == 200
+    data = login.json()
+    assert data["user"]["roles"], "admin ต้องมี roles (แม้ไม่มีห้อง)"
+    # role admin ต้องมี is_admin + permissions ครบ (จาก roles.json)
+    assert data["user"]["roles"][0]["role"] == "admin"
+    assert data["user"]["roles"][0]["is_admin"] is True
+
+    token = data["access_token"]
+    # /auth/me
+    res = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert res.status_code == 200
+    assert res.json()["roles"][0]["role"] == "admin"
+    # /students/me/profile (LEFT JOIN rooms — ไม่ 404 เพราะไม่มีห้อง)
+    res = client.get("/api/students/me/profile", headers={"Authorization": f"Bearer {token}"})
+    assert res.status_code == 200
+    assert res.json()["class_role"] == "admin"
+    assert res.json()["room_id"] is None
