@@ -39,13 +39,26 @@ async def authenticate_user(pool: asyncpg.Pool, username: str, password: str) ->
             "SELECT id, password_hash FROM users WHERE username = $1 AND deleted_at IS NULL",
             username
         )
-    if not row:
-        raise NotFoundError("ไม่พบชื่อผู้ใช้นี้ หรือรหัสผ่านไม่ถูกต้อง")
+        if not row:
+            raise NotFoundError("ไม่พบชื่อผู้ใช้นี้ หรือรหัสผ่านไม่ถูกต้อง")
 
-    if not verify_password(password, row["password_hash"]):
-        raise ForbiddenError("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง")
+        if not verify_password(password, row["password_hash"]):
+            raise ForbiddenError("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง")
 
-    return row["id"]
+        # 🛡️ Audit log: บันทึกการเข้าใช้งาน (dashboard ใช้นับ "การเข้าใช้งาน")
+        from core.logger import AuditLogger
+        await AuditLogger("auth_service").log(
+            conn=conn,
+            action="login",
+            actor_identifier=username,
+            client_source="web",
+            user_id=row["id"],
+            entity_type="user",
+            entity_id=row["id"],
+            endpoint_or_command="POST /auth/login",
+        )
+
+        return row["id"]
 
 
 async def change_password(pool: asyncpg.Pool, user_id: int, old_password: str, new_password: str) -> None:

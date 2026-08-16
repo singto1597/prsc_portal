@@ -3,6 +3,7 @@ import asyncpg
 
 from core.dependencies import get_db_pool, get_current_user
 from core.exceptions import NotFoundError, ForbiddenError, ValidationError, ConflictError
+from core.categories import all_main_category_codes
 from models.issue_schemas import (
     IssueCreateRequest, IssueOut, IssueStepOut, IssueCountdownOut,
     StepCreateRequest, CountdownSetRequest, EscalateRequest,
@@ -59,6 +60,7 @@ async def list_issues(
     received: bool = Query(False, description="เรื่องที่ฉันรับ/อยู่ในระดับฉัน (มองเห็นได้ทั้งหมด)"),
     status: str | None = Query(None),
     category: str | None = Query(None),
+    main_category: str | None = Query(None, description="กรองตามหมวดหลัก: suggestion/wellbeing/report"),
     level: str | None = Query(None, description="กรองตามระดับ: room/level/council"),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
@@ -67,10 +69,12 @@ async def list_issues(
 ):
     """รายการปัญหา (visibility ตามพีระมิด + ตัวกรอง)"""
     uid = _ensure_user(user_ctx)
+    if main_category and main_category not in all_main_category_codes():
+        raise HTTPException(status_code=400, detail=f"หมวดหลักไม่ถูกต้อง: {main_category}")
     issues = await issue_service.list_issues(
         pool, uid, only_mine=mine, received=received,
-        status_filter=status, category=category, level_filter=level,
-        limit=limit, offset=offset,
+        status_filter=status, category=category, main_category=main_category,
+        level_filter=level, limit=limit, offset=offset,
     )
     return [IssueOut(**i) for i in issues]
 

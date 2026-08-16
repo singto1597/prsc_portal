@@ -18,11 +18,12 @@ export async function listIssues(params: {
   received?: boolean;
   status?: string;
   category?: string;
+  main_category?: string;
   level?: string;
   limit?: number;
   offset?: number;
 }): Promise<Issue[]> {
-  const res: any = await api.get('/api/issues', { params });
+  const res = (await api.get('/api/issues', { params })) as Issue[];
   return res;
 }
 

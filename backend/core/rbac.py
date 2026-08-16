@@ -122,6 +122,7 @@ async def get_access_scope(conn: asyncpg.Connection, user_id: int) -> dict:
       - scope='super'  : SUPER_ADMIN_ID — เห็นทุกอย่างทั้งระบบ
       - scope='all'    : admin / ครูสภา (teacher_council) / ประธานสภา — เห็นทุกอย่าง
       - scope='level'  : ครูทั่วไป (teacher) — เห็นเฉพาะระดับชั้น (staff_level เช่น 'ม.4')
+      - scope='none'   : ครูทั่วไปที่ยังไม่มี staff_level — ไม่มีขอบเขตข้อมูล (ห้ามมองทั้งโรงเรียน)
       - scope='pyramid': ปกติ — มองตามพีระมิด (ใช้กับเรื่อง/issue เท่านั้น)
 
     ตัวอย่าง: ครู ม.4 → {"scope": "level", "level": "ม.4"}
@@ -144,6 +145,10 @@ async def get_access_scope(conn: asyncpg.Connection, user_id: int) -> dict:
 
     is_admin = any(r["is_admin"] and r["status"] == "active" for r in rows)
 
+    # ⚠️ ครูทั่วไปที่ยังไม่ได้ระบุ staff_level → scope='none' (ไม่มีขอบเขตข้อมูล)
+    # เดิมจะตกไปเป็น 'pyramid' ซึ่ง dashboard แปลงเป็น 'all' → ครูที่ไม่มีระดับชั้นจะเห็นทั้งโรงเรียน (ข้อมูลรั่ว)
+    has_teacher_no_level = False
+
     for r in rows:
         if r["status"] != "active":
             continue
@@ -151,8 +156,13 @@ async def get_access_scope(conn: asyncpg.Connection, user_id: int) -> dict:
         if r["is_admin"] or r["class_role"] in SCOPE_ALL_ROLES:
             return {"scope": "all", "level": None, "is_admin": True}
         # scope 'level': ครูทั่วไป (ต้องมี staff_level ระบุระดับชั้น)
-        if r["class_role"] in SCOPE_LEVEL_ROLES and r["staff_level"]:
-            return {"scope": "level", "level": r["staff_level"], "is_admin": False}
+        if r["class_role"] in SCOPE_LEVEL_ROLES:
+            if r["staff_level"]:
+                return {"scope": "level", "level": r["staff_level"], "is_admin": False}
+            has_teacher_no_level = True
+
+    if has_teacher_no_level:
+        return {"scope": "none", "level": None, "is_admin": is_admin}
 
     return {"scope": "pyramid", "level": None, "is_admin": is_admin}
 
