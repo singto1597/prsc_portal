@@ -19,10 +19,22 @@ export async function importStudents(file: File, default_password = '1234'): Pro
   skipped: number;
   errors: string[];
 }> {
+  // 1. สร้างกล่อง Form สำหรับใส่ไฟล์เท่านั้น
   const form = new FormData();
   form.append('file', file);
-  form.append('default_password', default_password);
-  const res: any = await api.post('/api/students/import', form);
+
+  // 2. ยิง API โดยแยกของ 2 อย่างให้ถูกต้องตามที่ Backend ต้องการ
+  const res: any = await api.post('/api/students/import', form, {
+    // แนบไฟล์ไปใน Body พร้อมบังคับ Header
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+    // แนบ default_password ไปใน URL Query
+    params: {
+      default_password: default_password,
+    },
+  });
+  
   return res;
 }
 
