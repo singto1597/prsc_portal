@@ -224,10 +224,6 @@ async def update_my_profile(pool: asyncpg.Pool, user_id: int, *, prefix=None, fi
 # ============================================================
 # 🚀 Import จากไฟล์ Excel
 # ============================================================
-# รูปแบบคอลัมน์ที่รองรับ (หัวคอลัมน์ภาษาไทย):
-#   รหัสนักเรียน | ห้องเรียน (ม.4/1) | เลขที่ | คำนำหน้า | ชื่อ | นามสกุล | ชื่อเล่น | ตำแหน่งในห้องเรียน
-# คอลัมน์ที่จำเป็น: รหัสนักเรียน, ห้องเรียน, เลขที่
-# คอลัมน์ที่ใช้ทั้งหมด (ต้อง map ทั้งหมด ไม่ใช่แค่ required)
 ALL_COLUMNS = [
     "รหัสนักเรียน", "ห้องเรียน", "เลขที่",
     "คำนำหน้า", "ชื่อ", "นามสกุล", "ชื่อเล่น", "ตำแหน่งในห้องเรียน",
@@ -247,14 +243,13 @@ async def import_students_from_excel(pool: asyncpg.Pool, file_bytes: bytes, defa
     if not rows:
         raise ValidationError("ไฟล์ว่างเปล่า")
 
-    # หา index ของหัวคอลัมน์
     header = [str(c).strip() if c is not None else "" for c in rows[0]]
     col_index = {}
     for name in REQUIRED_COLUMNS:
         if name not in header:
             raise ValidationError(f"ไม่พบคอลัมน์ '{name}' ในไฟล์ Excel (ต้องมี: {', '.join(sorted(REQUIRED_COLUMNS))})")
         col_index[name] = header.index(name)
-    # map คอลัมน์เพิ่มเติม (ชื่อ, นามสกุล, ...) ที่อาจมีหรือไม่มีก็ได้
+        
     for name in ALL_COLUMNS:
         if name not in col_index and name in header:
             col_index[name] = header.index(name)
@@ -267,6 +262,10 @@ async def import_students_from_excel(pool: asyncpg.Pool, file_bytes: bytes, defa
     imported = 0
     skipped = 0
     errors = []
+    
+    # 🌟 สมุดจดจำ (Cache) สำหรับลดภาระฐานข้อมูลและป้องกัน Unique Error
+    room_cache = {}
+    user_cache = {}
 
     async with pool.acquire() as conn:
         async with conn.transaction():
@@ -297,45 +296,49 @@ async def import_students_from_excel(pool: asyncpg.Pool, file_bytes: bytes, defa
                         errors.append(f"แถว {total}: ไม่มีชื่อ-นามสกุล")
                         continue
 
-                    # สร้าง room ถ้ายังไม่มี
-                    room_id = await conn.fetchval(
-                        "SELECT id FROM rooms WHERE room_code = $1 AND deleted_at IS NULL", room_code
-                    )
-                    if not room_id:
-                        # สร้าง room ใหม่ (ถอด ม.4 จาก 'ม.4/1')
-                        level = room_code.split("/")[0] if "/" in room_code else None
-                        room_name = room_code
+                    # 🌟 1. ระบบจัดการ Room (เช็คจาก Cache ก่อนเสมอ)
+                    if room_code in room_cache:
+                        room_id = room_cache[room_code]
+                    else:
                         room_id = await conn.fetchval(
-                            """
-                            INSERT INTO rooms (room_code, room_name, level, room_number)
-                            VALUES ($1, $2, $3, NULL)
-                            RETURNING id
-                            """,
-                            room_code, room_name, level
+                            "SELECT id FROM rooms WHERE room_code = $1 AND deleted_at IS NULL", room_code
                         )
+                        if not room_id:
+                            level = room_code.split("/")[0] if "/" in room_code else None
+                            room_name = room_code
+                            room_id = await conn.fetchval(
+                                """
+                                INSERT INTO rooms (room_code, room_name, level, room_number)
+                                VALUES ($1, $2, $3, NULL)
+                                RETURNING id
+                                """,
+                                room_code, room_name, level
+                            )
+                        room_cache[room_code] = room_id # บันทึกลงสมุดจด
 
-                    # สร้าง username = รหัสนักเรียน
                     username = student_id
-                    # 🔑 รหัสผ่านเริ่มต้น = เลขรหัสนักเรียน (เช่น 47075 → 47075/47075)
-                    # ถ้า default_password ถูกตั้ง override (ไม่ใช่ค่า default) ให้ใช้ค่านั้น
-                    initial_password = student_id if default_password in ("", "1234") else default_password
-                    hashed = auth_service.hash_password(initial_password)
-
-                    # user
-                    user = await conn.fetchval(
-                        "SELECT id FROM users WHERE username = $1 AND deleted_at IS NULL", username
-                    )
-                    if not user:
+                    
+                    # 🌟 2. ระบบจัดการ User (เช็คจาก Cache ก่อนเสมอ)
+                    if username in user_cache:
+                        user = user_cache[username]
+                    else:
                         user = await conn.fetchval(
-                            """
-                            INSERT INTO users (username, password_hash, full_name)
-                            VALUES ($1, $2, $3)
-                            RETURNING id
-                            """,
-                            username, hashed, f"{prefix} {first_name} {last_name}".strip()
+                            "SELECT id FROM users WHERE username = $1 AND deleted_at IS NULL", username
                         )
+                        if not user:
+                            initial_password = student_id if default_password in ("", "1234") else default_password
+                            hashed = auth_service.hash_password(initial_password)
+                            user = await conn.fetchval(
+                                """
+                                INSERT INTO users (username, password_hash, full_name)
+                                VALUES ($1, $2, $3)
+                                RETURNING id
+                                """,
+                                username, hashed, f"{prefix} {first_name} {last_name}".strip()
+                            )
+                        user_cache[username] = user # บันทึกลงสมุดจด
 
-                    # student (upsert โดย room_id + student_id)
+                    # 3. สร้าง/อัปเดตข้อมูลนักเรียน
                     student = await conn.fetchval(
                         """
                         SELECT id FROM students
@@ -343,6 +346,7 @@ async def import_students_from_excel(pool: asyncpg.Pool, file_bytes: bytes, defa
                         """,
                         room_id, student_id
                     )
+                    
                     if student:
                         await conn.execute(
                             """
@@ -376,5 +380,5 @@ async def import_students_from_excel(pool: asyncpg.Pool, file_bytes: bytes, defa
         "total_rows": total,
         "imported": imported,
         "skipped": skipped,
-        "errors": errors[:50],  # จำกัด error 50 อัน
+        "errors": errors[:50],
     }
