@@ -279,12 +279,27 @@ onBeforeUnmount(stopPolling);
         <label class="block text-sm font-medium text-gray-700 mb-1">
           1. เลือกไฟล์ Excel <span class="text-gray-400 font-normal">(.xlsx)</span>
         </label>
-        <input
-          type="file"
-          accept=".xlsx"
-          @change="onFileChange"
-          class="w-full text-sm file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-red-600 file:text-white hover:file:bg-red-700"
-        />
+        <div class="flex flex-wrap items-center gap-2">
+          <input
+            type="file"
+            accept=".xlsx"
+            @change="onFileChange"
+            class="flex-1 min-w-[200px] text-sm file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-red-600 file:text-white hover:file:bg-red-700"
+          />
+          <!-- แสดงชื่อไฟล์ที่เลือก — custom file input ซ่อนข้อความ "No file chosen" ของ browser -->
+          <span
+            v-if="file"
+            class="inline-flex items-center gap-1.5 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 max-w-full"
+            :title="file.name"
+          >
+            <i class="bi bi-file-earmark-excel text-red-600"></i>
+            <span class="truncate max-w-[260px]">{{ file.name }}</span>
+            <button type="button" class="text-gray-400 hover:text-red-600" title="ล้างไฟล์ที่เลือก" @click="file = null">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </span>
+          <span v-else class="text-xs text-gray-400">ยังไม่ได้เลือกไฟล์ (.xlsx)</span>
+        </div>
       </div>
       <button
         @click="handleUpload"
