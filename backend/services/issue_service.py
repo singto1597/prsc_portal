@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 from core.exceptions import NotFoundError, ForbiddenError, ValidationError
 from core.config import settings
-from core.categories import is_valid_category
+from core.categories import is_valid_category, all_main_category_codes
 
 # 🔼 ลำดับการ Escalate (พีระมิด)
 # room (หัวหน้าห้อง+รอง) → level (ประธานระดับ) → council (สภานักเรียน)
@@ -357,6 +357,7 @@ async def list_issues(
     received: bool = False,
     status_filter: Optional[str] = None,
     category: Optional[str] = None,
+    main_category: Optional[str] = None,
     level_filter: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
@@ -365,6 +366,7 @@ async def list_issues(
     รายการปัญหา — filter visibility ตามระดับผู้ใช้
 
     received=True: แสดงทุกเรื่องที่ผู้ใช้มองเห็นได้ (พีระมิด — ระดับสูงมองลงเห็นทุกระดับล่าง)
+    main_category: กรองตามหมวดหลัก (suggestion / wellbeing / report) — ใช้จาก Dashboard
     level_filter: จำกัดให้ดูเฉพาะระดับที่เลือก (room/level/council)
     """
     level = await user_level(pool, user_id)
@@ -436,11 +438,24 @@ async def list_issues(
 
         # ---- ตัวกรอง ----
         if status_filter:
-            params.append(status_filter)
-            where.append(f"i.status = ${len(params)}")
+            # รองรับหลายสถานะคั่นด้วย "," (เช่น "pending,in_progress,escalated")
+            # ใช้กับฟิลเตอร์ "ยังไม่เสร็จ" ของหน้า ReceivedIssues — กรองฝั่ง server ไม่ใช่ตัด client
+            status_list = [s.strip() for s in status_filter.split(",") if s.strip()]
+            if len(status_list) > 1:
+                params.append(status_list)
+                where.append(f"i.status = ANY(${len(params)}::text[])")
+            else:
+                params.append(status_filter)
+                where.append(f"i.status = ${len(params)}")
         if category:
             params.append(category)
             where.append(f"i.category = ${len(params)}")
+        if main_category:
+            # ตรวจหมวดหลัก (กันค่าแปลก → 400 แทน 500)
+            if main_category not in all_main_category_codes():
+                raise ValueError(f"หมวดหลักไม่ถูกต้อง: {main_category}")
+            params.append(main_category)
+            where.append(f"i.main_category = ${len(params)}")
         if level_filter:
             # กรองตามระดับปัจจุบันของเรื่อง (ถ้าระบุ) — ต้องอยู่ในระดับที่มองเห็นเท่านั้น
             if level_filter not in LEVEL_ORDER:

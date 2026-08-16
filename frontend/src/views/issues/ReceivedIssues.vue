@@ -1,16 +1,56 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
-import { RouterLink } from 'vue-router';
+import { ref, onMounted, computed, watch } from 'vue';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { listIssues } from '@/services/issue';
 import { MAIN_CATEGORY_LABELS, subcategoryLabel, STATUS_LABELS, LEVEL_LABELS, type Issue } from '@/types/issue';
 import { useAuthStore } from '@/stores/auth';
 
 const authStore = useAuthStore();
+const route = useRoute();
+const router = useRouter();
 const issues = ref<Issue[]>([]);
 const isLoading = ref(true);
 const error = ref('');
 const statusFilter = ref('not_resolved');  // default: ซ่อนเรื่องที่เสร็จแล้ว (ดูเฉพาะยังไม่เสร็จ)
 const levelFilter = ref('');   // '' = ทุกระดับที่มองเห็น, room/level/council
+const mainCategoryFilter = ref('');  // '' = ทุกหมวด, suggestion/wellbeing/report
+
+// สถานะ "ยังไม่เสร็จ" = pending + in_progress + escalated (ให้ server กรอง — กันหน้าว่างตอน 100 เรื่องแรกเสร็จหมด)
+const NOT_RESOLVED_STATUSES = 'pending,in_progress,escalated';
+
+// ตั้งค่าเริ่มต้นจาก URL (คลิก "ดูทั้งหมด" จาก Dashboard → มาเจอหมวดนั้นเลย)
+const initMainCat = route.query.main_category;
+if (typeof initMainCat === 'string' && initMainCat) {
+  mainCategoryFilter.value = initMainCat;
+}
+
+// URL เป็น source of truth: แก้ URL เอง / back-forward → ปรับ filter ตาม URL
+watch(() => route.query.main_category, (val) => {
+  const v = typeof val === 'string' ? val : '';
+  if (v !== mainCategoryFilter.value) {
+    mainCategoryFilter.value = v;
+    load();
+  }
+});
+
+// เลือกหมวดจาก dropdown → เขียนกลับไปที่ URL (refresh/แชร์ URL แล้วได้ข้อมูลตรงกัน)
+function onMainCategoryChange() {
+  const query = { ...route.query };
+  if (mainCategoryFilter.value) {
+    query.main_category = mainCategoryFilter.value;
+  } else {
+    delete query.main_category;
+  }
+  router.replace({ query });
+  load();
+}
+
+// ตัวเลือกหมวดหลัก (จาก types/issue.ts)
+const mainCategoryOptions = [
+  { value: 'suggestion', label: MAIN_CATEGORY_LABELS.suggestion },
+  { value: 'wellbeing', label: MAIN_CATEGORY_LABELS.wellbeing },
+  { value: 'report', label: MAIN_CATEGORY_LABELS.report },
+];
 
 // ระดับสูงสุดของผู้ใช้ (สำหรับจำกัด dropdown ระดับที่เห็น)
 const myLevel = computed(() => {
@@ -43,21 +83,17 @@ async function load() {
   isLoading.value = true;
   error.value = '';
   try {
-    // "not_resolved" = โหลดทุกสถานะแล้วกรองฝั่ง client (ตัด resolved/cancelled)
+    // "not_resolved" = ส่งสถานะที่ยังไม่เสร็จให้ server กรอง (ไม่โหลดทุกสถานะแล้วตัด client
+    // — เดิมถ้า 100 เรื่องแรกเสร็จหมดจะเห็นหน้าว่างทั้งที่ยังมีเรื่องค้างอยู่)
     const raw = statusFilter.value === 'not_resolved';
     issues.value = await listIssues({
       received: true,
-      status: raw ? undefined : (statusFilter.value || undefined),
+      status: raw ? NOT_RESOLVED_STATUSES : (statusFilter.value || undefined),
       level: levelFilter.value || undefined,
+      main_category: mainCategoryFilter.value || undefined,
     });
-    if (raw) {
-      issues.value = issues.value.filter((i) => {
-        const s: string = i.status;
-        return s !== 'resolved' && s !== 'cancelled';
-      });
-    }
-  } catch (e: any) {
-    error.value = e.message || 'โหลดข้อมูลไม่สำเร็จ';
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'โหลดข้อมูลไม่สำเร็จ';
   } finally {
     isLoading.value = false;
   }
@@ -82,6 +118,11 @@ function statusColor(s: string) {
 
     <!-- Filters -->
     <div class="flex flex-wrap gap-3 mb-4">
+      <select v-model="mainCategoryFilter" @change="onMainCategoryChange"
+        class="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+        <option value="">ทุกหมวดหลัก</option>
+        <option v-for="mc in mainCategoryOptions" :key="mc.value" :value="mc.value">{{ mc.label }}</option>
+      </select>
       <select v-model="levelFilter" @change="load"
         class="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
         <option value="">ทุกระดับที่ฉันมองเห็น</option>
