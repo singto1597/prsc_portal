@@ -35,14 +35,15 @@ def _scope_clause(scope: dict) -> tuple:
     """
     สร้าง WHERE clause + params จำกัดขอบเขตข้อมูลสำหรับ dashboard
     - scope='level' (ครูทั่วไป) → เฉพาะห้องที่ระดับชั้นตรงกับ staff_level (เช่น 'ม.4')
-    - scope='none' (ครูที่ไม่มีระดับชั้น) → ไม่เห็นข้อมูลใดเลย (กันเห็นทั้งโรงเรียน)
-    - scope อื่น (all/super) → ไม่จำกัด (ดูทั้งโรงเรียน)
+    - scope='super'/'all' (แอดมิน/ครูสภา/ประธานสภา) → ไม่จำกัด (ดูทั้งโรงเรียน)
+    - scope อื่น (none = ครูไม่มีระดับ, pyramid = บทบาทที่ไม่มี scope กำหนด เช่น council_member)
+      → ไม่เห็นข้อมูลใดเลย (fail-closed — กันเห็นทั้งโรงเรียนแบบเดียวกับ scope 'all')
     """
     if scope["scope"] == "level" and scope.get("level"):
         return " AND r.level = $1", [scope["level"]]
-    if scope["scope"] == "none":
-        return " AND 1 = 0", []
-    return "", []
+    if scope["scope"] in ("super", "all"):
+        return "", []
+    return " AND 1 = 0", []
 
 
 async def get_dashboard(pool: asyncpg.Pool, user_id: int) -> dict:
@@ -59,13 +60,16 @@ async def get_dashboard(pool: asyncpg.Pool, user_id: int) -> dict:
         scope = await get_access_scope(conn, user_id)
         level_where, level_params = _scope_clause(scope)
 
-        # scope ที่ส่งให้ frontend: 'level' = เฉพาะระดับชั้น, 'none' = ไม่มีระดับ (ครูที่ยังไม่ตั้ง), อื่นๆ = ทั้งโรงเรียน
+        # scope ที่ส่งให้ frontend: 'level' = เฉพาะระดับชั้น, 'none' = ไม่มีข้อมูล, 'all' = ทั้งโรงเรียน
+        # ⚠️ fail-closed: scope ที่ไม่ได้ระบุไว้ (เช่น 'pyramid' ของ council_member — มี VIEW_DASHBOARD
+        #    แต่อยู่นอก SCOPE_ALL_ROLES/SCOPE_LEVEL_ROLES) ต้องไม่ถูกเลื่อนเป็น 'all'
+        #    เดิม scope แปลกๆ รั่วไปเป็น 'all' → เห็นตัวเลขทั้งโรงเรียน + ข้อมูลเข้าระบบ (audit_logs)
         if scope["scope"] == "level":
             dashboard_scope = "level"
-        elif scope["scope"] == "none":
-            dashboard_scope = "none"
-        else:
+        elif scope["scope"] in ("super", "all"):
             dashboard_scope = "all"
+        else:
+            dashboard_scope = "none"
 
         # 3. หมวดหลักทั้ง 3 (จาก config/categories.json)
         main_categories = get_main_categories()
@@ -164,11 +168,12 @@ async def get_dashboard(pool: asyncpg.Pool, user_id: int) -> dict:
         total_students, total_rooms = await _count_people(conn, scope)
 
         # ── 10. แนวโน้ม 7 วัน (เทียบวันตาม Asia/Bangkok) ──
-        trend = await _trend_7days(conn, level_where, level_params)
+        trend = await _trend_7days(conn, level_where, level_params, category_codes)
 
-        # ── 11. การเข้าใช้งาน (audit_logs) — เฉพาะผู้ที่เห็นทั้งโรงเรียน ──
-        # (ครูระดับชั้นไม่ควรเห็นว่าใครเข้าระบบบ้างทั้งโรงเรียน — ข้อมูลส่วนบุคคลข้ามระดับ)
-        if dashboard_scope == "all":
+        # ── 11. การเข้าใช้งาน (audit_logs) — เฉพาะ scope 'super'/'all' (admin/ครูสภา/ประธานสภา) ──
+        # (ข้อมูลการเข้าระบบ = ข้อมูลส่วนบุคคลข้ามระดับ — ดูจาก scope เดิม ไม่ใช่ dashboard_scope
+        #  เผื่ออนาคตมี scope ใหม่โดนแมปเป็น 'all' ข้อมูลเข้าระบบจะยังถูกจำกัดที่บทบาทระดับโรงเรียน)
+        if scope["scope"] in ("super", "all"):
             usage_count, recent_logins = await _usage(conn)
         else:
             usage_count, recent_logins = 0, []
@@ -271,10 +276,12 @@ async def get_dashboard(pool: asyncpg.Pool, user_id: int) -> dict:
 
 
 async def _count_people(conn: asyncpg.Connection, scope: dict) -> tuple:
-    """จำนวนนักเรียน/ห้อง — ครูทั่วไปนับเฉพาะระดับชั้นตัวเอง, ครูที่ไม่มีระดับชั้น = 0"""
-    if scope["scope"] == "none":
-        # ครูที่ยังไม่มี staff_level → ไม่เห็นจำนวนนักเรียน/ห้องเลย (กันเห็นทั้งโรงเรียน)
-        return 0, 0
+    """
+    จำนวนนักเรียน/ห้อง
+    - scope='level' (ครูทั่วไป) → นับเฉพาะระดับชั้นตัวเอง
+    - scope='super'/'all' (แอดมิน/ครูสภา/ประธานสภา) → นับทั้งโรงเรียน
+    - scope อื่น (none/pyramid) → 0 (fail-closed — ไม่เห็นจำนวนทั้งโรงเรียน)
+    """
     if scope["scope"] == "level" and scope.get("level"):
         level = scope["level"]
         total_students = await conn.fetchval(
@@ -289,32 +296,41 @@ async def _count_people(conn: asyncpg.Connection, scope: dict) -> tuple:
             "SELECT COUNT(*) FROM rooms r WHERE r.deleted_at IS NULL AND r.level = $1",
             level
         ) or 0
-    else:
+    elif scope["scope"] in ("super", "all"):
         total_students = await conn.fetchval(
             "SELECT COUNT(*) FROM students WHERE deleted_at IS NULL"
         ) or 0
         total_rooms = await conn.fetchval(
             "SELECT COUNT(*) FROM rooms WHERE deleted_at IS NULL"
         ) or 0
+    else:
+        # ครูที่ยังไม่มี staff_level / บทบาทที่ไม่มี scope กำหนด → ไม่เห็นจำนวนนักเรียน/ห้องเลย
+        return 0, 0
     return total_students, total_rooms
 
 
-async def _trend_7days(conn: asyncpg.Connection, level_where: str, level_params: list) -> list:
+async def _trend_7days(conn: asyncpg.Connection, level_where: str, level_params: list, category_codes: list) -> list:
     """แนวโน้ม 7 วันย้อนหลัง (นับวันตาม Asia/Bangkok) — 1 query แล้วเติมวันที่ที่ไม่มีเรื่อง"""
     today = datetime.now(timezone.utc).astimezone(BKK).date()
 
-    # ระบุ placeholder ของวันที่ให้ต่อจาก level_params (บทเรียน: นับ $n ให้ครบ — อย่าเริ่ม $1 ซ้ำ)
-    date_param = len(level_params) + 1
+    # ⚠️ ต้องกรอง main_category ด้วย key set เดียวกับ total_issues/by_status/overdue (category_codes)
+    #    — ถ้าไม่กรอง หมวดที่อยู่นอก config (เก่า/insert ตรง) จะขึ้นในกราฟแต่ไม่อยู่ในตัวเลขอื่น
+    #    (บทเรียน: "Dashboard หลาย query รวมหมวดเดียว" — ตัวเลขทุกจุดต้องนับจาก key set เดียวกัน)
+    # ระบุ placeholder ให้ต่อจาก level_params (บทเรียน: นับ $n ให้ครบ — อย่าเริ่ม $1 ซ้ำ)
+    next_param = len(level_params) + 1
+    cat_param = next_param        # $n      = หมวดหลักที่รู้จัก
+    date_param = next_param + 1   # $n+1    = วันที่เริ่มต้น
     rows = await conn.fetch(
         f"""
         SELECT (i.created_at AT TIME ZONE 'Asia/Bangkok')::date AS day, COUNT(*) AS cnt
         FROM issues i
         LEFT JOIN rooms r ON r.id = i.room_id
         WHERE i.deleted_at IS NULL{level_where}
+          AND i.main_category = ANY(${cat_param}::text[])
           AND (i.created_at AT TIME ZONE 'Asia/Bangkok')::date >= ${date_param}
         GROUP BY day
         """,
-        *level_params, today - timedelta(days=6)
+        *level_params, category_codes, today - timedelta(days=6)
     )
     counts = {r["day"]: r["cnt"] for r in rows}
 

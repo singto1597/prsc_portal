@@ -210,6 +210,65 @@ async def test_dashboard_teacher_without_level_scope(client, db_pool, dashboard_
     assert all(c["total"] == 0 for c in body["main_categories"])
 
 
+@pytest.mark.asyncio
+async def test_dashboard_council_member_scope_fail_closed(client, db_pool, dashboard_world):
+    """
+    council_member (สภานักเรียน) มี VIEW_DASHBOARD แต่อยู่นอก SCOPE_ALL_ROLES / SCOPE_LEVEL_ROLES
+    → ต้อง fail-closed เป็น scope 'none' (ไม่เห็นตัวเลขทั้งโรงเรียน + ข้อมูลเข้าระบบ)
+    (เดิม scope 'pyramid' รั่วไปเป็น 'all' — เห็น total_issues ทั้งโรงเรียน + recent_logins)
+    """
+    world = dashboard_world
+
+    # ให้ระบบมีข้อมูล (1 เรื่องใน ม.4) — สภานักเรียนต้องไม่เห็น
+    assert _mk(client, world, title="เรื่องใน ม.4").status_code == 200
+
+    sid = f"CM{random.randint(1000, 9999)}"
+    council_member = await _register(db_pool, sid, "1234", "สภานักเรียน", sid, "", "council_member")
+
+    res = client.get("/api/dashboard/summary",
+                     headers={"Authorization": f"Bearer {council_member['token']}"})
+    assert res.status_code == 200, f"→ {res.status_code}: {res.text}"
+    body = res.json()
+    assert body["scope"] == "none", f"ต้อง fail-closed เป็น none แต่ได้ {body['scope']}"
+    assert body["scope_label"] is None
+    assert body["total_issues"] == 0
+    assert body["total_students"] == 0
+    assert body["total_rooms"] == 0
+    assert body["usage_count"] == 0, "ห้ามเห็นข้อมูลการเข้าระบบ (ข้อมูลส่วนบุคคลข้ามระดับ)"
+    assert body["recent_logins"] == []
+    assert all(c["total"] == 0 for c in body["main_categories"])
+
+
+@pytest.mark.asyncio
+async def test_dashboard_trend_excludes_unknown_main_category(client, db_pool, dashboard_world):
+    """
+    เรื่องที่มี main_category อยู่นอก config (เก่า/insert ตรง) ต้องไม่ถูกนับใน trend
+    — trend ต้องนับจาก key set เดียวกับ total_issues/by_status (บทเรียน: "Dashboard หลาย query รวมหมวดเดียว")
+    มิฉะนั้นกราฟขึ้นเรื่องที่ตัวเลขอื่นไม่นับ → ตัวเลขในหน้าจอไม่ตรงกัน
+    """
+    world = dashboard_world
+
+    # เรื่องปกติ 1 เรื่อง (ถูกนับทั้งใน total + trend)
+    assert _mk(client, world, title="เรื่องปกติ").status_code == 200
+
+    # insert ตรง: หมวดหลักเก่าที่ไม่อยู่ใน config (สร้างล่าสุด → อยู่ในช่วง 7 วัน)
+    # (API กรองหมวดไม่อนุญาตให้สร้างด้วยหมวดนอก config — สถานการณ์จริงคือข้อมูลเดิม/insert ตรง)
+    async with db_pool.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO issues (room_id, main_category, category, title, description)
+            VALUES ($1, 'legacy_main', 'legacy_cat', 'หมวดเก่า', 'ทดสอบ')
+            """,
+            world["room4_id"],
+        )
+
+    body = _dashboard(client, world, "admin").json()
+    # ไม่ถูกนับใน total
+    assert body["total_issues"] == 1, f"เรื่องหมวดเก่าต้องไม่ถูกนับ: {body['total_issues']}"
+    # ไม่ถูกนับใน trend (7 วันต้องตรงกับ total — นับจาก key set เดียวกัน)
+    assert sum(t["count"] for t in body["trend"]) == 1, f"trend ต้องไม่รวมหมวดเก่า: {body['trend']}"
+
+
 # === Section 2: กลุ่มตาม 3 หมวดหลัก + สถานะ + หมวดย่อย + เรื่องล่าสุด ===
 @pytest.mark.asyncio
 async def test_dashboard_main_categories_grouping(client, db_pool, dashboard_world):

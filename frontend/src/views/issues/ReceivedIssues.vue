@@ -36,16 +36,15 @@ function mainOfCategory(cat: string): string {
 }
 
 // ตั้งค่าเริ่มต้นจาก URL (คลิกจาก Dashboard → มาเจอหมวด/หมวดย่อยนั้นเลย)
-const initMainCat = route.query.main_category;
-if (typeof initMainCat === 'string' && initMainCat) {
-  mainCategoryFilter.value = initMainCat;
-}
-const initCat = route.query.category;
-if (typeof initCat === 'string' && initCat) {
-  // URL มีแค่ ?category= (ไม่มี main_category) → หาหมวดหลักให้เอง เพื่อให้ dropdown ตรงกัน
-  if (!mainCategoryFilter.value) {
-    mainCategoryFilter.value = mainOfCategory(initCat);
-  }
+const initMainCat = typeof route.query.main_category === 'string' ? route.query.main_category : '';
+const initCat = typeof route.query.category === 'string' ? route.query.category : '';
+
+// URL มีแค่ ?category= (ไม่มี main_category) → หาหมวดหลักให้เอง เพื่อให้ dropdown ตรงกัน
+const effectiveMain = initMainCat || mainOfCategory(initCat);
+if (effectiveMain) mainCategoryFilter.value = effectiveMain;
+
+// หมวดย่อยต้อง belong กับหมวดหลักที่เลือก → ถ้าไม่ (เช่น แก้ URL มือ) ให้ตัดทิ้ง เหมือนที่ watch ทำ
+if (initCat && mainOfCategory(initCat) === effectiveMain) {
   subcategoryFilter.value = initCat;
 }
 
