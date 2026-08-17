@@ -234,39 +234,47 @@ async def init_db(pool: asyncpg.Pool):
                 # --- 10. ตารางรองรับ dashboard ---
                 # (การนับสถิติสามารถ query ตรงจาก issues ได้ แต่ให้มี view/ตารางสรุปไว้ก่อน)
 
-                # --- 11. Index เพื่อความเร็ว ---
-                await conn.execute("""
-                    CREATE INDEX IF NOT EXISTS idx_issues_room_status ON issues(room_id, status);
-                    CREATE INDEX IF NOT EXISTS idx_issues_reporter ON issues(reporter_id);
-                    CREATE INDEX IF NOT EXISTS idx_issues_level ON issues(current_level);
-                    CREATE INDEX IF NOT EXISTS idx_issues_main_category ON issues(main_category);
-                    CREATE INDEX IF NOT EXISTS idx_issues_category ON issues(category);
-                    CREATE INDEX IF NOT EXISTS idx_issue_escalations_issue ON issue_escalations(issue_id);
-                    CREATE INDEX IF NOT EXISTS idx_issue_steps_issue ON issue_steps(issue_id);
-                    CREATE INDEX IF NOT EXISTS idx_issue_countdowns_issue ON issue_countdowns(issue_id);
-                    CREATE INDEX IF NOT EXISTS idx_issue_status_history_issue ON issue_status_history(issue_id);
-                    CREATE INDEX IF NOT EXISTS idx_students_room_no_active
-                        ON students(room_id, student_no)
-                        WHERE deleted_at IS NULL;
-                    CREATE INDEX IF NOT EXISTS idx_students_role_active
-                        ON students(class_role)
-                        WHERE deleted_at IS NULL;
-                    -- กันสร้าง student ซ้ำ (room, เลขประจำตัว) — import แบบ ON CONFLICT ใช้ index นี้
-                    CREATE UNIQUE INDEX IF NOT EXISTS uq_students_room_student_active
-                        ON students(room_id, student_id)
-                        WHERE deleted_at IS NULL;
-                """)
-
     except Exception as e:
         logger.error(f"❌ Failed to initialize Database: {e}")
         raise e
 
     # 🚀 รัน migration files (อัปเกรด schema ของ DB เดิม + กันรันซ้ำผ่าน schema_migrations)
+    # ⚠️ ต้องรันก่อนสร้าง index — DB เดิมที่ยังไม่มีคอลัมน์ (เช่น issues.main_category จาก
+    # migration 001) ถ้าสร้าง index ก่อนจะ crash ด้วย UndefinedColumnError (เจอจริงบน staging:
+    # 'column "main_category" does not exist')
     try:
         from core.migrations import run_migrations
         await run_migrations(pool)
     except Exception as e:
         logger.error(f"❌ Failed to run migrations: {e}")
+        raise e
+
+    # --- 11. Index เพื่อความเร็ว (รันหลัง migrations — อ้างคอลัมน์ที่ migration อาจเพิ่งเพิ่ม) ---
+    try:
+        async with pool.acquire() as conn:
+            await conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_issues_room_status ON issues(room_id, status);
+                CREATE INDEX IF NOT EXISTS idx_issues_reporter ON issues(reporter_id);
+                CREATE INDEX IF NOT EXISTS idx_issues_level ON issues(current_level);
+                CREATE INDEX IF NOT EXISTS idx_issues_main_category ON issues(main_category);
+                CREATE INDEX IF NOT EXISTS idx_issues_category ON issues(category);
+                CREATE INDEX IF NOT EXISTS idx_issue_escalations_issue ON issue_escalations(issue_id);
+                CREATE INDEX IF NOT EXISTS idx_issue_steps_issue ON issue_steps(issue_id);
+                CREATE INDEX IF NOT EXISTS idx_issue_countdowns_issue ON issue_countdowns(issue_id);
+                CREATE INDEX IF NOT EXISTS idx_issue_status_history_issue ON issue_status_history(issue_id);
+                CREATE INDEX IF NOT EXISTS idx_students_room_no_active
+                    ON students(room_id, student_no)
+                    WHERE deleted_at IS NULL;
+                CREATE INDEX IF NOT EXISTS idx_students_role_active
+                    ON students(class_role)
+                    WHERE deleted_at IS NULL;
+                -- กันสร้าง student ซ้ำ (room, เลขประจำตัว) — import แบบ ON CONFLICT ใช้ index นี้
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_students_room_student_active
+                    ON students(room_id, student_id)
+                    WHERE deleted_at IS NULL;
+            """)
+    except Exception as e:
+        logger.error(f"❌ Failed to create indexes: {e}")
         raise e
 
     logger.info("✅ PRSC Portal Database Tables & Indexes Initialized Successfully!")

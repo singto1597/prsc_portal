@@ -254,3 +254,9 @@
   4. Template: `v-else-if="loadError"` → error panel + ปุ่ม "ลองใหม่" (แทน empty state); empty state ต้องโชว์เฉพาะเมื่อ fetch สำเร็จจริงๆ
   - **กฎ: UI ที่มี state "ว่าง" ต้องแยกจาก state "อ่านไม่ได้" เสมอ; loop poll ต้องมีใน-flight guard + นับ failure**
 - **Date Added:** 2026-08-17
+
+### 🛠️ init_db ต้องรัน migrations ก่อนสร้าง index — ไม่งั้น DB เก่า crash-loop ตั้งแต่ startup
+- **Context/Problem:** staging crash-loop ทุก replica ด้วย `UndefinedColumnError: column "main_category" does not exist` (init_db.py) — deploy schema ใหม่ (รื้อหมวดหมู่ → migration 001 เพิ่ม `issues.main_category`) ลงบน DB เดิม
+- **Root Cause:** `init_db` สร้าง table + **index ทั้งหมดใน transaction เดียว** (รวม `idx_issues_main_category ON issues(main_category)`) แล้วค่อยรัน `run_migrations` ทีหลัง → DB เก่าที่ยังไม่มีคอลัมน์ crash ตอน `CREATE INDEX` ก่อน migration จะมีโอกาสเพิ่มคอลัมน์; symptom ที่น่ากลัวคือ API ทุกตัว "Not found" เพราะ backend เริ่มไม่ติด (ถึงมี route ก็รับไม่ได้)
+- **Correct Pattern/Solution:** ลำดับใน init_db = `CREATE TABLE IF NOT EXISTS` → `run_migrations` → สร้าง index ที่อ้างคอลัมน์ (แยก index ออกเป็น block หลัง migrations); migration ทุกตัวเขียนให้ idempotent (`ADD COLUMN IF NOT EXISTS` / `CREATE TABLE IF NOT EXISTS` / `CREATE INDEX IF NOT EXISTS`) จึงรันซ้ำบน DB ใหม่ได้ปลอดภัย; **กฎ: คอลัมน์ที่เพิ่มผ่าน migration ต้องมีอยู่ก่อน statement ที่อ้างมัน (index/query) — ตรวจเส้นทาง upgrade DB เดิมด้วยเสมอ ไม่ใช่แค่ fresh install**; test regression: สร้าง DB ทิ้ง → สร้าง `issues` แบบไม่มี `main_category` → รัน `init_db` → assert คอลัมน์ + index ถูกสร้าง
+- **Date Added:** 2026-08-17
