@@ -49,8 +49,8 @@ async function handleLogin() {
             <img src="/logos/council-logo.png" alt="โลโก้สภานักเรียน"
               class="w-16 h-16 rounded-full object-cover shadow-lg ring-2 ring-rose-200 ring-offset-2" />
           </div>
-          <h1 class="text-2xl font-bold text-gray-900 tracking-tight">PRSC Portal</h1>
-          <p class="text-gray-500 mt-1">ระบบรับความคิดเห็นและปัญหาสภานักเรียน</p>
+          <h1 class="text-2xl font-bold text-gray-900 tracking-tight">PIRIvoice</h1>
+          <p class="text-gray-500 mt-1">ระบบรับฟังความคิดเห็นและปัญหา — เสียงจากชาวพิริยาลัย</p>
         </div>
 
         <form @submit.prevent="handleLogin" class="space-y-4">
@@ -85,7 +85,7 @@ async function handleLogin() {
 
         <p class="text-[11px] text-gray-400 text-center mt-6 leading-relaxed">
           พัฒนาโดย <span class="font-medium text-gray-500">นายพัฒนพล สุธรรม</span><br />
-          <span class="text-gray-300">© 2026 PRSC Portal. สงวนลิขสิทธิ์</span>
+          <span class="text-gray-300">© 2026 PIRIvoice. สงวนลิขสิทธิ์</span>
         </p>
       </div>
     </div>

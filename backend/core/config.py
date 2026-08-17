@@ -3,7 +3,7 @@ from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "PRSC Portal API (Issue & Feedback)"
+    PROJECT_NAME: str = "PIRIvoice API (ระบบรับฟังความคิดเห็นและปัญหาสภานักเรียน)"
     PROJECT_VERSION: str = "1.0.0"
 
     DATABASE_URL: str

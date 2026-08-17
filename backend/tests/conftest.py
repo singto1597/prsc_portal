@@ -1,5 +1,5 @@
 """
-Fixtures & Setup สำหรับ Pytest integration tests ของ PRSC Portal
+Fixtures & Setup สำหรับ Pytest integration tests ของ PIRIvoice
 
 Pattern ตามโปรเจคเก่า:
 - test_db_url: สร้าง DB ใหม่แบบสุ่มชื่อทุก session → init_db → drop ตอนจบ
@@ -20,7 +20,7 @@ from main import app
 from core.init_db import init_db
 
 # 📁 โฟลเดอร์เก็บไฟล์ Excel สำหรับเทส (แทน /data/imports ของ Docker)
-settings.IMPORT_STORAGE_DIR = tempfile.mkdtemp(prefix="prsc_import_test_")
+settings.IMPORT_STORAGE_DIR = tempfile.mkdtemp(prefix="piri_import_test_")
 
 
 @pytest_asyncio.fixture(scope="session")

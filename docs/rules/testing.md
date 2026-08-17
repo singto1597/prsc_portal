@@ -1,4 +1,4 @@
-description: Comprehensive rules and standards for writing and maintaining Pytest integration tests in the PRSC Portal (Issue & Feedback) API project.
+description: Comprehensive rules and standards for writing and maintaining Pytest integration tests in the PIRIvoice (Issue & Feedback) API project.
 globs: tests/**/*.py
 ---
 

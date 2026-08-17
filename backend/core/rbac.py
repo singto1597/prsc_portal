@@ -4,7 +4,7 @@ import asyncpg
 from core.exceptions import ForbiddenError
 from core.config import settings
 
-# 💡 รายการสิทธิ์ทั้งหมดของระบบ PRSC Portal
+# 💡 รายการสิทธิ์ทั้งหมดของระบบ PIRIvoice
 # (ตำแหน่ง/ระดับ จะแมปกับ permissions ผ่าน config/roles.json)
 AVAILABLE_PERMISSIONS = [
     "SUBMIT_ISSUE",          # นักเรียนทุกคนแจ้งปัญหา/ความคิดเห็นได้

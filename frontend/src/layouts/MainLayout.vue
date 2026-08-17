@@ -108,8 +108,8 @@ const isActive = (path: string) => {
         <RouterLink to="/" class="flex items-center h-16 px-5 bg-gradient-to-r from-red-600 to-red-700 shrink-0">
           <img src="/logos/school-logo.png" alt="โลโก้โรงเรียน" class="w-9 h-9 rounded-full object-cover mr-3 border border-white/30" />
           <div>
-            <span class="text-white text-base font-black tracking-wider leading-none">PRSC PORTAL</span>
-            <p class="text-[10px] text-red-100 leading-none mt-1">สภานักเรียน</p>
+            <span class="text-white text-base font-black tracking-wider leading-none">PIRIvoice</span>
+            <p class="text-[10px] text-red-100 leading-none mt-1">เสียงจากชาวพิริยาลัย</p>
           </div>
         </RouterLink>
 
@@ -184,7 +184,7 @@ const isActive = (path: string) => {
       <div v-if="isSidebarOpen" class="fixed inset-y-0 left-0 z-50 md:hidden w-64 bg-white shadow-2xl flex flex-col">
         <div class="flex items-center h-14 px-4 bg-gradient-to-r from-red-600 to-red-700">
           <img src="/logos/school-logo.png" alt="โลโก้โรงเรียน" class="w-8 h-8 rounded-full object-cover mr-3" />
-          <span class="text-white font-black">PRSC PORTAL</span>
+          <span class="text-white font-black">PIRIvoice</span>
         </div>
         <nav class="flex-1 p-3 space-y-1 overflow-y-auto">
           <RouterLink
@@ -219,7 +219,7 @@ const isActive = (path: string) => {
         </button>
         <div class="flex items-center gap-2">
           <img src="/logos/school-logo.png" alt="โลโก้โรงเรียน" class="w-7 h-7 rounded-full object-cover" />
-          <span class="font-bold text-red-700">PRSC Portal</span>
+          <span class="font-bold text-red-700">PIRIvoice</span>
         </div>
         <button @click="goToProfile" class="w-8 h-8 rounded-full bg-gradient-to-br from-red-100 to-red-50 text-red-600 flex items-center justify-center text-sm font-bold">
           {{ avatarChar }}

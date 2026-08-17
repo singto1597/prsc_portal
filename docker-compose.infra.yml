@@ -24,10 +24,10 @@ services:
       replicas: 1
 
 volumes:
-  prsc_staging_postgres_data:
-  prsc_production_postgres_data:
-  prsc_staging_redis_data:
-  prsc_production_redis_data:
+  piri_staging_postgres_data:
+  piri_production_postgres_data:
+  piri_staging_redis_data:
+  piri_production_redis_data:
 
 # ใช้ Alias ชื่อ shared_network แล้วชี้ name ไปที่ตัวแปร
 networks:
