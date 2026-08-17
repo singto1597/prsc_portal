@@ -22,7 +22,7 @@ logger = logging.getLogger("API_MAIN")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """ก่อน yield = ตอนเปิด, หลัง yield = ตอนปิด"""
-    logger.info("🚀 Starting PRSC Portal API...")
+    logger.info("🚀 Starting PIRIvoice API...")
 
     try:
         app.state.db_pool = await asyncpg.create_pool(
@@ -48,7 +48,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.PROJECT_VERSION,
-    description="PRSC Portal API — ระบบรับความคิดเห็นและปัญหาสภานักเรียน",
+    description="PIRIvoice API — ระบบรับฟังความคิดเห็นและปัญหาสภานักเรียน (เสียงจากชาวพิริยาลัย)",
     lifespan=lifespan
 )
 
@@ -58,9 +58,14 @@ app.add_middleware(
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://0.0.0.0:5173",
+        # 🔄 โดเมนใหม่ PIRIvoice (rebrand)
+        "https://pirivoice.com",
+        "https://www.pirivoice.com",
+        "https://test.pirivoice.com",
+        "https://staging.pirivoice.com",
+        # 🔁 โดเมนเก่าช่วงเปลี่ยนผ่าน (ยังไม่ย้าย DNS) — เก็บไว้กัน CORS พัง อย่าลบจนกว่าจะย้ายเสร็จ
         "https://prsc-test.singto1597.xyz",
         "https://prsc-test.pirivoice.com",
-        "https://www.pirivoice.com",
     ],
     allow_credentials=True,
     allow_methods=["*"],

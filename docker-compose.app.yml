@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   backend:
-    image: prsc-${ENV_NAME}-backend:${IMAGE_TAG:-latest}
+    image: pirivoice-${ENV_NAME}-backend:${IMAGE_TAG:-latest}
     env_file:
       - .env
     environment:
@@ -33,7 +33,7 @@ services:
         - "traefik.docker.network=traefik-public"
 
   frontend:
-    image: prsc-${ENV_NAME}-frontend:${IMAGE_TAG:-latest}
+    image: pirivoice-${ENV_NAME}-frontend:${IMAGE_TAG:-latest}
     networks:
       - traefik-public
     deploy:
@@ -54,7 +54,7 @@ services:
   # - อ่านไฟล์ .xlsx จาก shared volume (imports_data เดียวกับ backend ที่อัปโหลด)
   # - max_jobs=1 → ประมวลผลทีละงาน กันชนกันสร้างข้อมูลซ้ำ
   worker:
-    image: prsc-${ENV_NAME}-backend:${IMAGE_TAG:-latest}
+    image: pirivoice-${ENV_NAME}-backend:${IMAGE_TAG:-latest}
     env_file:
       - .env
     environment:

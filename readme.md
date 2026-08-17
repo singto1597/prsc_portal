@@ -1,6 +1,8 @@
-# 🏫 PRSC Portal — ระบบรับความคิดเห็นและปัญหา (สภานักเรียน)
+# 🏫 PIRIvoice — ระบบรับฟังความคิดเห็นและปัญหา (เสียงจากชาวพิริยาลัย)
 
-ระบบรับความคิดเห็น/ปัญหา (Issue & Feedback Portal) ที่นักเรียนแจ้งเรื่องเข้ามา แล้วไต่ระดับการแก้ไขเป็นขั้นตามสายงาน (Escalation Pyramid):
+> **PIRIvoice** (Pirivoice / เสียงจากชาวพิริยาลัย) — ระบบรับฟังความคิดเห็นและปัญหาสภานักเรียน พิริยาลัย (เดิมชื่อ PRSC Portal)
+
+ระบบรับฟังความคิดเห็น/ปัญหา (Issue & Feedback Portal) ที่นักเรียนแจ้งเรื่องเข้ามา แล้วไต่ระดับการแก้ไขเป็นขั้นตามสายงาน (Escalation Pyramid):
 **หัวหน้าห้อง + รอง 4 ฝ่าย → ประธานระดับ → สภานักเรียน/ประธานสภา**
 
 ออกแบบด้วยสถาปัตยกรรม **Microservices & Monorepo** รองรับการ Deploy ด้วย Docker Swarm และ Traefik
@@ -26,8 +28,8 @@
 
 ### 1. โคลนโปรเจกต์
 ```bash
-git clone <repo-url> prsc_portal
-cd prsc_portal
+git clone <repo-url> pirivoice
+cd pirivoice
 ```
 
 ### 2. ตั้งค่า Environment Variables
@@ -102,7 +104,7 @@ docker compose -f docker-compose.test.yml run --rm test_runner sh -c "export PYT
 cp .env.example .env   # แล้วแก้ DATABASE_URL, JWT_SECRET, API_KEY, SUPER_ADMIN_ID
 
 # 2. รัน Postgres (Docker)
-docker run -d --name prsc_dev_db -e POSTGRES_USER=prsc -e POSTGRES_PASSWORD=prsc_dev_pw -e POSTGRES_DB=prsc_dev -p 5434:5432 postgres:16-alpine
+docker run -d --name piri_dev_db -e POSTGRES_USER=piri -e POSTGRES_PASSWORD=piri_dev_pw -e POSTGRES_DB=piri_dev -p 5434:5432 postgres:16-alpine
 
 # 3. Backend
 cd backend
@@ -110,7 +112,7 @@ cd backend
 
 # 4. Seed ข้อมูลตัวอย่าง (สำหรับนำเสนอ)
 cd backend
-DATABASE_URL=postgresql://prsc:prsc_dev_pw@localhost:5434/prsc_dev ./venv/bin/python -m scripts.seed_data
+DATABASE_URL=postgresql://piri:piri_dev_pw@localhost:5434/piri_dev ./venv/bin/python -m scripts.seed_data
 
 # 5. Frontend
 cd frontend

@@ -1,6 +1,6 @@
 # ⚙️ Backend Rules (FastAPI + asyncpg)
 
-คุณคือ Senior Backend Engineer ที่ดูแลระบบ PRSC Portal (ระบบรับความคิดเห็นและปัญหาสภานักเรียน) กฎเหล่านี้คือมาตรฐานที่ต้องปฏิบัติตามอย่างเคร่งครัด
+คุณคือ Senior Backend Engineer ที่ดูแลระบบ PIRIvoice (ระบบรับฟังความคิดเห็นและปัญหาสภานักเรียน) กฎเหล่านี้คือมาตรฐานที่ต้องปฏิบัติตามอย่างเคร่งครัด
 
 ## 1. Stack & Core Technologies
 - **Framework:** FastAPI (Python 3.12+)

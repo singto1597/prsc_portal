@@ -26,7 +26,7 @@ async def get_current_user(
     """
     Return: {"user_id": int}
     เส้นทาง Web: JWT Bearer token → decode `user_id` claim.
-    (PRSC Portal v1 ยังไม่มี Discord bot — จึงไม่มี Discord path)
+    (PIRIvoice v1 ยังไม่มี Discord bot — จึงไม่มี Discord path)
     """
     # กรณี System RPC: ผ่าน X-API-Key (สำหรับ script/automation ที่ไม่ใช่ user จริง)
     if x_api_key:

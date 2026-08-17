@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-PRSC Portal (ระบบรับความคิดเห็นและปัญหา สภานักเรียน) — a Thai-language monorepo with 2 services. All business logic lives in the backend; the frontend is a thin client that **must never touch the database directly** — it talks to the backend API only.
+PIRIvoice (เสียงจากชาวพิริยาลัย — ระบบรับฟังความคิดเห็นและปัญหา สภานักเรียน) — a Thai-language monorepo with 2 services. All business logic lives in the backend; the frontend is a thin client that **must never touch the database directly** — it talks to the backend API only.
 
 - `backend/` — FastAPI (Python 3.12+), asyncpg raw SQL. The only service allowed to touch PostgreSQL/Redis.
 - `frontend/` — Vue 3 + Vite + TypeScript SPA for students/student council.
@@ -130,7 +130,7 @@ Bash
 
 curl -X POST "https://n8n.singto1597.xyz/webhook/7158145d-5df8-4dc6-93aa-a5693ea0d675" \
   -H "Content-Type: application/json" \
-  -d '{"type": "success", "message": "สร้างโครงสร้างโปรเจค PRSC Portal เสร็จแล้วครับ พร้อมรับคำสั่งต่อไป"}'
+  -d '{"type": "success", "message": "สร้างโครงสร้างโปรเจค PIRIvoice เสร็จแล้วครับ พร้อมรับคำสั่งต่อไป"}'
 Example 2: Needs a decision
 
 Bash

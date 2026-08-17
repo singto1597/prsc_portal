@@ -10,7 +10,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 try:
     from core.config import settings
 except ImportError:
-    sys.path.append(os.path.join(os.getcwd(), 'prsc-backend'))
+    sys.path.append(os.path.join(os.getcwd(), 'pirivoice-backend'))
     from core.config import settings
 
 logging.basicConfig(
@@ -21,7 +21,7 @@ logger = logging.getLogger("API_INIT_DB")
 
 async def init_db(pool: asyncpg.Pool):
     """
-    สร้าง Table ทั้งหมดในระบบ PRSC Portal หากยังไม่มี (Schema Setup)
+    สร้าง Table ทั้งหมดในระบบ PIRIvoice หากยังไม่มี (Schema Setup)
     ฟังก์ชันนี้ถูกเรียกใช้ทั้งจาก main.py (Startup) และ run_setup (Manual CLI)
     """
     try:
@@ -277,7 +277,7 @@ async def init_db(pool: asyncpg.Pool):
         logger.error(f"❌ Failed to create indexes: {e}")
         raise e
 
-    logger.info("✅ PRSC Portal Database Tables & Indexes Initialized Successfully!")
+    logger.info("✅ PIRIvoice Database Tables & Indexes Initialized Successfully!")
 
 async def run_setup():
     logger.info("🚀 Starting Manual Database Setup...")

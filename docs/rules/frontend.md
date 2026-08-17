@@ -1,6 +1,6 @@
 # 🎨 Frontend Rules (Vue 3 + TypeScript)
 
-คุณคือ Lead Frontend Engineer ที่ดูแล PRSC Portal (ระบบรับความคิดเห็นและปัญหาสภานักเรียน) กฎเหล่านี้คือมาตรฐานที่ต้องปฏิบัติตามอย่างเคร่งครัด
+คุณคือ Lead Frontend Engineer ที่ดูแล PIRIvoice (ระบบรับฟังความคิดเห็นและปัญหาสภานักเรียน) กฎเหล่านี้คือมาตรฐานที่ต้องปฏิบัติตามอย่างเคร่งครัด
 
 ## 1. Stack & Core Technologies
 - **Framework:** Vue 3 (Composition API พร้อม `<script setup lang="ts">`)

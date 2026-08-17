@@ -1,6 +1,6 @@
-# 🏫 PRSC Portal — Lessons จากพัฒนาระบบรับความคิดเห็นและปัญหา
+# 🏫 PIRIvoice — Lessons จากพัฒนาระบบรับฟังความคิดเห็นและปัญหา
 
-> ส่วนนี้บันทึกบทเรียนที่เจอจริงระหว่างพัฒนาระบบ PRSC Portal (สภานักเรียน) ตั้งแต่โครงสร้าง → backend → frontend → deploy
+> ส่วนนี้บันทึกบทเรียนที่เจอจริงระหว่างพัฒนาระบบ PIRIvoice (สภานักเรียน) ตั้งแต่โครงสร้าง → backend → frontend → deploy
 
 ### 🛠️ asyncpg AmbiguousParameterError — `$1` ซ้ำใน 2 คอลัมน์คนละ type
 - **Context/Problem:** `INSERT INTO rooms (room_code, room_name) VALUES ($1,$1)` → `AmbiguousParameterError: inconsistent types deduced for parameter $1` (VARCHAR vs TEXT) และ `INSERT has more expressions than target columns` เมื่อ parameter count ไม่ตรงคอลัมน์
@@ -269,4 +269,14 @@
 - **Context/Problem:** staging crash-loop ทุก replica ด้วย `UndefinedColumnError: column "main_category" does not exist` (init_db.py) — deploy schema ใหม่ (รื้อหมวดหมู่ → migration 001 เพิ่ม `issues.main_category`) ลงบน DB เดิม
 - **Root Cause:** `init_db` สร้าง table + **index ทั้งหมดใน transaction เดียว** (รวม `idx_issues_main_category ON issues(main_category)`) แล้วค่อยรัน `run_migrations` ทีหลัง → DB เก่าที่ยังไม่มีคอลัมน์ crash ตอน `CREATE INDEX` ก่อน migration จะมีโอกาสเพิ่มคอลัมน์; symptom ที่น่ากลัวคือ API ทุกตัว "Not found" เพราะ backend เริ่มไม่ติด (ถึงมี route ก็รับไม่ได้)
 - **Correct Pattern/Solution:** ลำดับใน init_db = `CREATE TABLE IF NOT EXISTS` → `run_migrations` → สร้าง index ที่อ้างคอลัมน์ (แยก index ออกเป็น block หลัง migrations); migration ทุกตัวเขียนให้ idempotent (`ADD COLUMN IF NOT EXISTS` / `CREATE TABLE IF NOT EXISTS` / `CREATE INDEX IF NOT EXISTS`) จึงรันซ้ำบน DB ใหม่ได้ปลอดภัย; **กฎ: คอลัมน์ที่เพิ่มผ่าน migration ต้องมีอยู่ก่อน statement ที่อ้างมัน (index/query) — ตรวจเส้นทาง upgrade DB เดิมด้วยเสมอ ไม่ใช่แค่ fresh install**; test regression: สร้าง DB ทิ้ง → สร้าง `issues` แบบไม่มี `main_category` → รัน `init_db` → assert คอลัมน์ + index ถูกสร้าง
+- **Date Added:** 2026-08-17
+
+### 🛠️ Rebrand เปลี่ยนชื่อโปรเจค (PRSC Portal → PIRIvoice) — แยก "ชื่อที่โชว์" กับ "identifier ที่ผูกข้อมูล"
+- **Context/Problem:** rebrand โปรเจคครั้งใหญ่ ต้องไล่เปลี่ยนชื่อทุกจุด แต่บางตำแหน่งผูกกับข้อมูลจริง — เปลี่ยนผิดทีเดียว deploy แล้วข้อมูล "หาย" หรือเว็บ CORS พังเงียบๆ
+- **Root Cause:** ชื่อเดียวกันซ้ำหลายชั้น (UI string / docs / package name / docker image / volume / DB name / CORS origin) แต่ความเสี่ยงต่างกัน — identifier ที่ persistent (volume ที่ services mount, DB name, domain) ไม่ใช่แค่เครื่องสำอาง
+- **Correct Pattern/Solution:**
+  1. **เปลี่ยนได้ทันที (ปลอดภัย):** display string ในหน้าเว็บ (index.html title/meta, sidebar, login, FastAPI title/description), docs/comments/docstring, package name (`package.json`+`package-lock.json` ต้องแก้คู่กัน), docker image name (แก้ให้ตรงกันทั้ง `pull_all.sh` + `docker-compose.app.yml` — rollback ยังทำงานเพราะ oh_shit deploy ผ่าน compose), container/DB name ของ test (throwaway), temp prefix
+  2. **ผูกกับข้อมูลจริง → ระวัง:** named volume ที่ service mount อยู่ (เปลี่ยนชื่อ = Docker สร้าง volume ใหม่เปล่า ข้อมูลเก่าเหลือเป็น orphan — ถ้าจำเป็นให้ใช้ `external: true` + `name: <ชื่อเดิม>`), DB name ใน .env จริง (ต้อง `ALTER DATABASE` ไม่ใช่แค่แก้ตัวอักษร), CORS origins (โดเมนที่ deploy อยู่ถูกลบ → เว็บเก่าเรียก API ไม่ได้) — rebrand นี้เก็บโดเมนเก่าไว้ช่วงเปลี่ยนผ่าน + เพิ่มโดเมนใหม่ pirivoice.com
+  3. **เจอ bug ซ่อนใน infra compose นี้:** services mount `${ENV_NAME}_postgres_data` แต่ `volumes:` section ประกาศ `prsc_staging_*`/`piri_staging_*` (ไม่ได้ถูก mount — dead) → ข้อมูลจริงอยู่ที่ volume ที่ Docker auto-create ชื่อ `staging_postgres_data`/`production_postgres_data` — อย่าเดาว่าข้อมูลอยู่ตามชื่อใน volumes section
+  4. **คีย์เวิร์ดค้นหา:** index.html ต้องมี `<meta name="description">` + `<meta name="keywords">` (PIRIvoice / Pirivoice / เสียงจากชาวพิริยาลัย / ระบบรับฟังความคิดเห็นและปัญหา / สภานักเรียน) — และเก็บชื่อเก่าไว้ที่ readme ("เดิมชื่อ PRSC Portal") เพื่อให้ search คำเก่ายังเจอ
 - **Date Added:** 2026-08-17

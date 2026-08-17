@@ -1,5 +1,5 @@
 {
-  "_comment": "หมวดหมู่การรับแจ้งเรื่อง PRSC Portal — 3 หมวดหลัก แต่ละหมวดมีหัวข้อย่อย (subcategory). main_category + category ถูกเก็บในตาราง issues",
+  "_comment": "หมวดหมู่การรับแจ้งเรื่อง PIRIvoice — 3 หมวดหลัก แต่ละหมวดมีหัวข้อย่อย (subcategory). main_category + category ถูกเก็บในตาราง issues",
   "main_categories": {
     "suggestion": {
       "label": "เสนอความคิดเห็น",

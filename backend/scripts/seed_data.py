@@ -1,5 +1,5 @@
 """
-Seed Data สำหรับ PRSC Portal — สร้างข้อมูลตัวอย่างสำหรับนำเสนอ
+Seed Data สำหรับ PIRIvoice — สร้างข้อมูลตัวอย่างสำหรับนำเสนอ
 
 วิธีรัน:
     cd backend

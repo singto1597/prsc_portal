@@ -1,5 +1,5 @@
 {
-  "_comment": "ตำแหน่ง/ระดับ ในระบบ PRSC Portal — แมปตำแหน่งไปเป็น permissions (JSONB array) ที่ rbac ใช้. หมวดหมู่การรับแจ้งย้ายไป config/categories.json แล้ว",
+  "_comment": "ตำแหน่ง/ระดับ ในระบบ PIRIvoice — แมปตำแหน่งไปเป็น permissions (JSONB array) ที่ rbac ใช้. หมวดหมู่การรับแจ้งย้ายไป config/categories.json แล้ว",
   "levels": {
     "student": "นักเรียน (แจ้งปัญหา / ดูสถานะของตัวเอง)",
     "class_committee": "หัวหน้าห้อง + รอง 4 ฝ่าย (รับเรื่องระดับห้อง)",

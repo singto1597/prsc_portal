@@ -2,15 +2,15 @@ services:
   # 1. จักรวาลจำลอง: Test Database (สะอาด 100%)
   test_db:
     image: postgres:16-alpine
-    container_name: prsc_test_postgres
+    container_name: piri_test_postgres
     environment:
       POSTGRES_USER: test_admin
       POSTGRES_PASSWORD: test_password
-      POSTGRES_DB: test_prsc_db
+      POSTGRES_DB: test_piri_db
     ports:
       - "5435:5432" # ใช้พอร์ต 5435 (5433 ถูกโปรเจคอื่นใช้)
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U test_admin -d test_prsc_db"]
+      test: ["CMD-SHELL", "pg_isready -U test_admin -d test_piri_db"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -20,13 +20,13 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: prsc_test_runner
+    container_name: piri_test_runner
     user: "root"
     volumes:
       - ./backend:/app:z
     environment:
       # 🚨 OVERRIDE DATABASE_URL ให้ชี้มาที่ Test DB ตัวนี้แทน!
-      - DATABASE_URL=postgresql://test_admin:test_password@test_db:5432/test_prsc_db
+      - DATABASE_URL=postgresql://test_admin:test_password@test_db:5432/test_piri_db
       - API_KEY=test-api-key-1234
       - SECRET_KEY=test-secret
       - JWT_SECRET=test-jwt-secret
