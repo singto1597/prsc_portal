@@ -255,6 +255,16 @@
   - **กฎ: UI ที่มี state "ว่าง" ต้องแยกจาก state "อ่านไม่ได้" เสมอ; loop poll ต้องมีใน-flight guard + นับ failure**
 - **Date Added:** 2026-08-17
 
+### 🛠️ เซลล์ Excel ที่เป็นตัวเลข float (40000.0) — `str()` ได้ "40000.0" ต้องตัด `.0` ก่อนใช้เป็น identifier
+- **Context/Problem:** import นักเรียนได้ `student_id = "40000.0"` (login ได้ด้วย 40000.0/40000.0) — ไฟล์ .xlsx ที่สร้างจากเครื่องมืออื่น (Excel/Google Sheets/macro) เก็บเลขรหัสเป็น `<v>40000.0</v>` ใน XML → `openpyxl._cast_number` (worksheet/_reader.py) เห็น `.`/`e` → คืน `float` (40000.0) → `str(40000.0)` = `"40000.0"`
+- **Root Cause:** เขียน `str(cell or "").strip()` ตรงๆ — ไม่ได้คิดว่า cell เป็น float ที่ลงตัว; (openpyxl เขียน float 40000.0 เองจะ normalize เป็น int ตอน save → `make_xlsx_bytes` ปกติไม่เจอ bug นี้ ต้อง craft XML ให้เก็บ `<v>40000.0</v>` ถึงจะจำลองได้)
+- **Correct Pattern/Solution:**
+  1. helper `_cell_to_str(value)`: `None → ""`, `float ที่ is_integer() → str(int(value))`, นอกนั้น `str(value).strip()` — ใช้กับ `student_id`/`room_code` (identifier) แทน `str(x or "")`
+  2. float ที่มีเศษ (40000.5) อย่า truncate — คืน `str(40000.5)` ตามเดิม (ข้อมูลผิด ปล่อยให้เห็นไม่ใช่ตัดทิ้งเงียบๆ)
+  3. test: สร้าง xlsx แล้ว `zipfile` เข้าไปแก้ XML sheet — regex `(<c r="A\d+"...>)(<v>)(\d+)(</v>) → \1\2\3.0\4` เฉพาะคอลัมน์ A (อย่าแทน `<v>` ทั้งหมด — จะพัง shared-string index ของคอลัมน์ string); assert student_id == '40000' + login ผ่าน 40000/40000
+  - **กฎ: ค่า identifier ที่อ่านจาก spreadsheet ต้องแปลงผ่าน "cell → string" ที่จัดการ float ลงตัวเสมอ; อย่า `str()` ตรงๆ**
+- **Date Added:** 2026-08-17
+
 ### 🛠️ init_db ต้องรัน migrations ก่อนสร้าง index — ไม่งั้น DB เก่า crash-loop ตั้งแต่ startup
 - **Context/Problem:** staging crash-loop ทุก replica ด้วย `UndefinedColumnError: column "main_category" does not exist` (init_db.py) — deploy schema ใหม่ (รื้อหมวดหมู่ → migration 001 เพิ่ม `issues.main_category`) ลงบน DB เดิม
 - **Root Cause:** `init_db` สร้าง table + **index ทั้งหมดใน transaction เดียว** (รวม `idx_issues_main_category ON issues(main_category)`) แล้วค่อยรัน `run_migrations` ทีหลัง → DB เก่าที่ยังไม่มีคอลัมน์ crash ตอน `CREATE INDEX` ก่อน migration จะมีโอกาสเพิ่มคอลัมน์; symptom ที่น่ากลัวคือ API ทุกตัว "Not found" เพราะ backend เริ่มไม่ติด (ถึงมี route ก็รับไม่ได้)

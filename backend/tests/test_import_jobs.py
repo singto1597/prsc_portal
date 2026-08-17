@@ -5,6 +5,8 @@ import io
 import json
 import os
 import random
+import re
+import zipfile
 
 import pytest
 import pytest_asyncio
@@ -31,6 +33,27 @@ def make_xlsx_bytes(rows, header=None):
     bio = io.BytesIO()
     wb.save(bio)
     return bio.getvalue()
+
+
+def make_xlsx_bytes_with_float_student_id(rows, header=None):
+    """สร้างไฟล์ .xlsx ที่ cell รหัสนักเรียน (คอลัมน์ A) ถูกจัดเก็บเป็น float (<v>40000.0</v>) ใน XML —
+    จำลองไฟล์จากเครื่องมืออื่น (Excel/Google Sheets/macro ที่เก็บเลขรหัสแบบทศนิยม) ที่ openpyxl
+    อ่านคืนเป็น float 40000.0 → ต้อง import เป็น '40000' ไม่ใช่ '40000.0'.
+    แก้เฉพาะคอลัมน์ A (r=\"A<row>\") — กันทำลาย <v> ของ shared-string index ในคอลัมน์อื่น"""
+    data = make_xlsx_bytes(rows=rows, header=header)
+    zin = zipfile.ZipFile(io.BytesIO(data))
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zout:
+        for item in zin.infolist():
+            content = zin.read(item.filename)
+            if item.filename.startswith("xl/worksheets/"):
+                content = re.sub(
+                    br'(<c r="A\d+"[^>]*>)(<v>)(\d+)(</v>)',
+                    br"\1\2\3.0\4",
+                    content,
+                )
+            zout.writestr(item, content)
+    return out.getvalue()
 
 
 @pytest_asyncio.fixture
@@ -333,6 +356,37 @@ async def test_worker_completes_job_and_creates_students(client, db_pool, admin_
         user = await conn.fetchrow("SELECT * FROM users WHERE username = '47001'")
         assert user is not None
         assert auth_service.verify_password("47001", user["password_hash"]) is True
+
+
+@pytest.mark.asyncio
+async def test_worker_imports_float_student_id_without_dot_zero(client, db_pool, admin_user):
+    """รหัสนักเรียนที่ไฟล์เก็บเป็น float (40000.0) → import เป็น '40000' ไม่ใช่ '40000.0'
+    (student_id + username + รหัสผ่านเริ่มต้นต้องไม่มี .0 ต่อท้าย)"""
+    _, username, password = admin_user
+    token = login_token(client, username, password)
+    rows = [
+        [40000, "ม.4/1", 1, "นาย", "สมชาย", "ใจดี", "", ""],
+        [47001, "ม.4/1", 2, "นางสาว", "สมหญิง", "รักเรียน", "", ""],
+    ]
+    res = upload_excel(client, token, make_xlsx_bytes_with_float_student_id(rows=rows))
+    assert res.status_code == 200, res.text
+    job_id = res.json()["id"]
+
+    result = await import_service.process_import_job(db_pool, job_id)
+    assert result["status"] == "COMPLETED"
+    assert result["imported"] == 2
+    assert result["skipped"] == 0
+    assert result["errors"] == [], result["errors"]
+
+    # 🔍 Deep DB: student_id ต้องเป็น '40000' ไม่ใช่ '40000.0' + user เข้าระบบด้วย 40000/40000
+    async with db_pool.acquire() as conn:
+        students = await conn.fetch(
+            "SELECT student_id FROM students WHERE student_id IN ('40000', '47001') ORDER BY student_id"
+        )
+        assert [s["student_id"] for s in students] == ["40000", "47001"]
+        user = await conn.fetchrow("SELECT * FROM users WHERE username = '40000'")
+        assert user is not None
+        assert auth_service.verify_password("40000", user["password_hash"]) is True
 
 
 @pytest.mark.asyncio
