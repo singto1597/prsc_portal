@@ -432,6 +432,15 @@ def _get(r: tuple, col_index: dict, name: str):
     return r[i] if i is not None and i < len(r) else None
 
 
+def _cell_to_str(value) -> str:
+    """แปลงค่าเซลล์ Excel → string ที่อ่านง่าย (ไม่มี .0 ต่อท้ายเลขทศนิยมที่ลงตัว เช่น 40000.0 → '40000')"""
+    if value is None:
+        return ""
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value).strip()
+
+
 def _to_int(value) -> int:
     """แปลงค่าจาก Excel → int (รับได้ทั้ง int/float/str; ว่าง = 0)"""
     if value is None:
@@ -459,9 +468,10 @@ async def _process_single_row(
     asyncpg error อื่นๆ ปล่อยให้ลอยขึ้นไป (batch จะ fallback / job จะ FAILED)
     """
     try:
-        # ⚠️ ใช้ `or ""` — ถ้าเซลล์ว่าง (None) `str(None)` = "None" (truthy!) → จะไปสร้าง user/room ปลอม
-        student_id = str(_get(r, col_index, "รหัสนักเรียน") or "").strip()
-        room_code = str(_get(r, col_index, "ห้องเรียน") or "").strip()
+        # ⚠️ ใช้ _cell_to_str — ถ้าเซลล์ว่าง (None) `str(None)` = "None" (truthy!) → จะไปสร้าง user/room ปลอม;
+        # และถ้า Excel เก็บตัวเลขเป็น float (40000.0) ต้องตัด .0 ทิ้ง (ไม่งั้น username = "40000.0")
+        student_id = _cell_to_str(_get(r, col_index, "รหัสนักเรียน"))
+        room_code = _cell_to_str(_get(r, col_index, "ห้องเรียน"))
         try:
             student_no = _to_int(_get(r, col_index, "เลขที่"))
         except (ValueError, TypeError):
