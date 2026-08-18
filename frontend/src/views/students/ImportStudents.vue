@@ -197,9 +197,12 @@ onBeforeUnmount(stopPolling);
   <div class="max-w-5xl mx-auto">
     <!-- หัวข้อ + ปุ่มดาวน์โหลด Template -->
     <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
-      <h1 class="text-2xl font-bold text-gray-900">
-        <i class="bi bi-inbox mr-1"></i> นำเข้านักเรียนจาก Excel
-      </h1>
+      <div>
+        <h1 class="text-xl sm:text-2xl font-bold text-gray-900 leading-tight">
+          <i class="bi bi-file-earmark-excel mr-1 text-red-500"></i> นำเข้านักเรียนจาก Excel
+        </h1>
+        <p class="text-sm text-gray-500">อัปโหลดรายชื่อ + ตำแหน่งในห้องเรียนเป็นชุด</p>
+      </div>
       <button
         @click="handleDownloadTemplate"
         :disabled="isDownloadingTemplate"

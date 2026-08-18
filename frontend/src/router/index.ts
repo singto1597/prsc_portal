@@ -42,6 +42,16 @@ const router = createRouter({
           component: () => import('@/views/Profile.vue'),
         },
         {
+          path: 'profile/edit',
+          name: 'profile-edit',
+          component: () => import('@/views/ProfileEdit.vue'),
+        },
+        {
+          path: 'profile/password',
+          name: 'profile-password',
+          component: () => import('@/views/ChangePassword.vue'),
+        },
+        {
           path: 'issues/new',
           name: 'new-issue',
           component: () => import('@/views/issues/NewIssue.vue'),
@@ -89,12 +99,21 @@ router.beforeEach(async (to) => {
     return { name: 'dashboard' };
   }
 
-  // ตรวจ permission ถ้า route ต้องการ (ต้อง load user ก่อน)
-  const needPermission = to.meta.requiresPermission as string | undefined;
-  if (needPermission && isAuthenticated) {
+  if (isAuthenticated) {
+    // โหลด user ให้ชัวร์ (ใช้ตรวจ permission + must_change_password)
     if (!authStore.user) {
       try { await authStore.loadMe(); } catch { /* ignore */ }
     }
+
+    // 🔐 บัญชีที่ระบบสร้างให้ (seed) ยังไม่ได้เปลี่ยนรหัส → บังคับไปหน้าเปลี่ยนรหัสก่อนใช้ระบบ
+    if (authStore.mustChangePassword && to.name !== 'profile-password') {
+      return { name: 'profile-password' };
+    }
+  }
+
+  // ตรวจ permission ถ้า route ต้องการ
+  const needPermission = to.meta.requiresPermission as string | undefined;
+  if (needPermission && isAuthenticated) {
     if (!authStore.hasPermission(needPermission)) {
       // ไม่มีสิทธิ์ → ไปหน้าแรกที่เข้าได้ตามบทบาท
       return getHomeRoute();

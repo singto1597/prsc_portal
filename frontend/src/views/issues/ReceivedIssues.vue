@@ -172,33 +172,36 @@ function statusColor(s: string) {
 <template>
   <div>
     <div class="flex items-center justify-between mb-5">
-      <h1 class="text-2xl font-bold text-gray-900"><i class="bi bi-inbox mr-1"></i> เรื่องที่รับ / ระดับฉัน</h1>
+      <div>
+        <h1 class="text-xl sm:text-2xl font-bold text-gray-900 leading-tight"><i class="bi bi-inbox mr-1 text-red-500"></i> เรื่องที่รับ / ระดับฉัน</h1>
+        <p class="text-sm text-gray-500">เรื่องที่รอคุณและทีมรับผิดชอบดำเนินการ</p>
+      </div>
     </div>
 
-    <!-- Filters -->
-    <div class="flex flex-wrap gap-3 mb-4">
+    <!-- Filters (mobile = เรียงแนวตั้งเต็มแถว, sm+ = เรียงแนวนอน) -->
+    <div class="grid grid-cols-1 sm:flex sm:flex-wrap gap-2 sm:gap-3 mb-4">
       <select v-model="mainCategoryFilter" @change="onMainCategoryChange"
-        class="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+        class="w-full sm:w-auto px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white">
         <option value="">ทุกหมวดหลัก</option>
         <option v-for="mc in mainCategoryOptions" :key="mc.value" :value="mc.value">{{ mc.label }}</option>
       </select>
       <select v-model="subcategoryFilter" @change="onSubcategoryChange"
         :disabled="!mainCategoryFilter"
-        class="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white disabled:bg-gray-50 disabled:text-gray-400">
+        class="w-full sm:w-auto px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white disabled:bg-gray-50 disabled:text-gray-400">
         <option value="">
           {{ mainCategoryFilter ? 'ทุกหมวดย่อย' : 'เลือกหมวดหลักก่อน' }}
         </option>
         <option v-for="sc in availableSubcategories" :key="sc.value" :value="sc.value">{{ sc.label }}</option>
       </select>
       <select v-model="levelFilter" @change="load"
-        class="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+        class="w-full sm:w-auto px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white">
         <option value="">ทุกระดับที่ฉันมองเห็น</option>
         <option v-for="lv in visibleLevels" :key="lv" :value="lv">
           ระดับ{{ lv === 'room' ? 'ห้อง (หัวหน้าห้อง / รอง)' : lv === 'level' ? 'ชั้น (ประธานระดับ)' : 'สภานักเรียน' }}
         </option>
       </select>
       <select v-model="statusFilter" @change="load"
-        class="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+        class="w-full sm:w-auto px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white">
         <option value="not_resolved">ยังไม่เสร็จ (รอรับ / กำลังทำ / ส่งต่อ)</option>
         <option value="">ทุกสถานะ (รวมเสร็จแล้ว)</option>
         <option value="pending">รอรับ</option>
@@ -207,7 +210,7 @@ function statusColor(s: string) {
         <option value="resolved">เสร็จแล้ว</option>
         <option value="cancelled">ถูกยกเลิก</option>
       </select>
-      <span class="self-center text-sm text-gray-400">
+      <span class="self-center text-sm text-gray-400 px-1">
         แสดง {{ issues.length }} เรื่อง
       </span>
     </div>

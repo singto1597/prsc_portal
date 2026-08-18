@@ -31,10 +31,13 @@ function statusColor(s: string) {
 
 <template>
   <div>
-    <div class="flex items-center justify-between mb-5">
-      <h1 class="text-2xl font-bold text-gray-900"><i class="bi bi-file-earmark-text mr-1"></i> เรื่องของฉัน</h1>
-      <RouterLink to="/issues/new" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm">
-        <i class="bi bi-plus-lg mr-1"></i> แจ้งเรื่องใหม่
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+      <div>
+        <h1 class="text-xl sm:text-2xl font-bold text-gray-900 leading-tight"><i class="bi bi-file-earmark-text mr-1 text-red-500"></i> เรื่องของฉัน</h1>
+        <p class="text-sm text-gray-500">ติดตามสถานะเรื่องที่คุณแจ้ง</p>
+      </div>
+      <RouterLink to="/issues/new" class="btn-gradient text-sm shrink-0">
+        <i class="bi bi-plus-lg"></i> แจ้งเรื่องใหม่
       </RouterLink>
     </div>
 
