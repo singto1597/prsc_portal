@@ -80,7 +80,7 @@ const infoRows = computed(() => {
   if (!p) return [];
   const rows: { icon: string; label: string; value: string }[] = [
     { icon: 'bi-person-badge', label: 'รหัสนักเรียน', value: p.student_id },
-    { icon: 'bi-hash', label: 'เลขที่', value: p.student_no != null ? String(p.student_no) : '-' },
+    { icon: 'bi-hash', label: 'เลขที่', value: p.student_no ? String(p.student_no) : '-' },
     { icon: 'bi-emoji-smile', label: 'ชื่อเล่น', value: p.nickname || '-' },
     { icon: 'bi-telephone', label: 'เบอร์โทร', value: p.phone_number || '-' },
     { icon: 'bi-envelope', label: 'อีเมล', value: p.email || '-' },

@@ -43,6 +43,11 @@ export const useAuthStore = defineStore('auth', () => {
     return me;
   }
 
+  // เคลียร์ flag บังคับเปลี่ยนรหัสฝั่ง client (หลังเปลี่ยนสำเร็จ — กัน redirect วน)
+  function markPasswordChanged() {
+    if (user.value) user.value.must_change_password = false;
+  }
+
   function hasPermission(perm: string): boolean {
     if (isAdmin.value) return true;
     return permissions.value.includes(perm);
@@ -68,6 +73,7 @@ export const useAuthStore = defineStore('auth', () => {
     setUser,
     login,
     loadMe,
+    markPasswordChanged,
     hasPermission,
     logout,
   };

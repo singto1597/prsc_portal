@@ -41,7 +41,8 @@ async function submit() {
   try {
     await changePassword(oldPass.value, newPass.value);
     oldPass.value = newPass.value = confirmPass.value = '';
-    // อัปเดต flag (must_change_password → false) แล้วค่อยพากลับหน้าแรก
+    // อัปเดต flag (must_change_password → false) — เคลียร์ local ก่อน กัน redirect วน
+    authStore.markPasswordChanged();
     try { await authStore.loadMe(); } catch { /* ignore */ }
     Swal.fire({
       icon: 'success',
