@@ -76,7 +76,11 @@ async def change_password(pool: asyncpg.Pool, user_id: int, old_password: str, n
 
         new_hash = hash_password(new_password)
         await conn.execute(
-            "UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2",
+            """
+            UPDATE users
+            SET password_hash = $1, must_change_password = FALSE, updated_at = NOW()
+            WHERE id = $2
+            """,
             new_hash, user_id
         )
 
@@ -86,7 +90,7 @@ async def get_user_by_id(pool: asyncpg.Pool, user_id: int) -> asyncpg.Record | N
     async with pool.acquire() as conn:
         return await conn.fetchrow(
             """
-            SELECT id, username, full_name
+            SELECT id, username, full_name, must_change_password
             FROM users
             WHERE id = $1 AND deleted_at IS NULL
             """,
@@ -254,6 +258,7 @@ def make_user_out(user_record, roles: list) -> dict:
         "full_name": user_record["full_name"],
         "is_admin": is_admin,
         "permissions": permissions,
+        "must_change_password": bool(user_record.get("must_change_password")),
         "roles": [
             {
                 "role": r["role"],

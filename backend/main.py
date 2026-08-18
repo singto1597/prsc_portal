@@ -35,6 +35,11 @@ async def lifespan(app: FastAPI):
         # 🚀 เรียกใช้ Schema Setup จาก core.init_db
         await init_db(app.state.db_pool)
 
+        # 👥 สร้างบัญชีผู้ดูแลระบบเริ่มต้น (admin/ครูสภา/ประธานสภา) ถ้ายังไม่มี
+        #    (idempotent + ตั้ง must_change_password → บังคับเปลี่ยนรหัสตอน login ครั้งแรก)
+        from core.seed_users import seed_default_users
+        await seed_default_users(app.state.db_pool)
+
     except Exception as e:
         logger.error(f"❌ Failed to connect to Database: {e}")
         raise e

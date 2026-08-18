@@ -37,6 +37,7 @@ class UserOut(BaseModel):
     full_name: Optional[str] = None
     is_admin: bool = False
     permissions: List[str] = []
+    must_change_password: bool = False  # บัญชี seed: บังคับเปลี่ยนรหัสครั้งแรก
     # ข้อมูลตำแหน่ง (อาจมีได้หลายห้อง แต่ใช้ห้องหลักก่อน)
     roles: List[UserRoleInfo] = []
 
