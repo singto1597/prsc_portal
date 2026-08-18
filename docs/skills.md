@@ -316,3 +316,13 @@
   4. **เทสของจริง:** `ENV_NAME=x docker stack config -c <file>` เป็นตัว validate เดียวกับ `stack deploy` — ใช้ตรวจว่าชื่อ interpolate ถูกก่อน deploy; ตรวจว่า `docker stack deploy` รันจาก shell ที่ `.env` ถูก export แล้ว
   - **กฎ: ถ้าอยากได้ "ชื่อทุกอย่างตาม ENV_NAME" — ชื่อที่ dynamic ต้อง interpolate ที่ layer ของ compose (`environment:` / `name:`), ไม่อ้าง `${}` ภายในไฟล์ `.env`; และ deploy ทุกครั้งต้อง export .env ก่อน**
 - **Date Added:** 2026-08-18
+
+### 🛠️ CSS stacking — absolute z-auto ทับ in-flow (avatar โดน gradient cover ทับ = หน้าโปรไฟล์ "บัคๆ")
+- **Context/Problem:** หน้าโปรไฟล์ (Profile.vue) avatar โดนดึงขึ้นมาซ้อน cover ด้วย `-mt-10 sm:-mt-14` แล้วดู "บัคๆ" — มีแถบคล้ำ/ด่างทับบน avatar ทั้งบน/กลาง/ล่าง ทั้งที่ตั้งใจให้ avatar อยู่หน้าสุด (ตรวจด้วย `document.elementFromPoint` ที่พิกัด avatar → คืน gradient overlay)
+- **Root Cause:** ภายในการ์ด `bg-white ... overflow-hidden` มี element ตกแต่งเป็น `absolute` z-auto (วงกลม `bg-white/10` + แถบ `bg-gradient-to-t from-black/10`) อยู่ที่ cover; identity section (avatar+ชื่อ) เป็น in-flow (static) → **ตาม CSS painting order, positioned element (z-auto) วาดทับ in-flow content ที่มาทีหลังใน DOM เสมอ** → gradient/วงกลมจึงทับ avatar ที่ดึงขึ้นมาซ้อน (ยิ่ง gradient `from-black/10` ชัด เพราะเข้มจริง)
+- **Correct Pattern/Solution:**
+  1. ให้ section ที่ต้องอยู่บนสุดเป็น `relative z-10` (หรือ z บวก) — สร้าง stacking context ของตัวเองให้อยู่เหนือ element ตกแต่ง z-auto: `identity wrapper → <div class="relative z-10 px-4 sm:px-6 ...">` — avatar+ชื่อจะอยู่บนสุดเสมอ โดย gradient/วงกลมยังโชว์บน cover ตรงส่วนที่เหลือ
+  2. จัด z-index เมนู ⋮/dropdown ให้สอดคล้องทั้งระบบ: overlay ปิดเมนู `fixed inset-0 z-40` (เหนือ header มือถือ z-30 → แตะที่ไหนก็ปิด; ใต้ dropdown z-50), wrapper เมนู `absolute z-50` — ไล่เลขตาม MainLayout (sidebar z-50, mobile overlay z-40, header z-30)
+  3. **วิธีตรวจโดยไม่เห็นภาพ:** playwright `document.elementFromPoint(x,y)` + เปรียบเทียบ `getBoundingClientRect()` ว่าตรงไหนทับกัน แล้วดูว่า element ไหนเป็น topmost (เทียบ class) — หา bug "มี element ทับกัน" ได้แม่นกว่าการเดาจากโค้ด
+  - **กฎ: ใน layout ที่ดึง element ด้วย margin ลบ/ซ้อนทับกัน ถ้าเห็นเงา/แถบ/element ตกแต่งวาดทับ content ให้สงสัย painting order ก่อน — element `position` ใดๆ (z-auto) จะทับ in-flow เสมอ ต้องเติม `relative z-*` ที่ content ที่ควรอยู่บนสุด**
+- **Date Added:** 2026-08-18

@@ -114,8 +114,9 @@ const infoRows = computed(() => {
             <div class="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/10 to-transparent"></div>
           </div>
 
-          <!-- ตัวตน -->
-          <div class="px-4 sm:px-6 pb-5 sm:pb-6">
+          <!-- ตัวตน: relative z-10 → avatar/ชื่อวาดอยู่บนสุด เหนือลวดลายวงกลมและแถบไล่เงา cover
+               (มิฉะนั้น absolute z-auto จะทับ avatar → ขอบคล้ำ/ด่างแบบ bug) -->
+          <div class="relative z-10 px-4 sm:px-6 pb-5 sm:pb-6">
             <div class="flex items-start gap-3 sm:gap-4">
               <!-- avatar: มี -mt เท่านั้น เพื่อให้ทับ cover มุมซ้าย (ไม่ดึงชื่อขึ้นด้วย) -->
               <div class="-mt-10 sm:-mt-14 shrink-0">
@@ -145,7 +146,7 @@ const infoRows = computed(() => {
         </div>
 
         <!-- เมนู ⋮ (อยู่ข้างนอก overflow-hidden → dropdown ไม่ถูกตัด) -->
-        <div class="absolute top-3 right-3 z-30">
+        <div class="absolute top-3 right-3 z-50">
           <button
             @click="menuOpen = !menuOpen"
             aria-label="เมนูโปรไฟล์"
@@ -174,8 +175,8 @@ const infoRows = computed(() => {
           </transition>
         </div>
 
-        <!-- Overlay ปิดเมนู -->
-        <div v-if="menuOpen" class="fixed inset-0 z-20" @click="menuOpen = false"></div>
+        <!-- Overlay ปิดเมนู: z-40 → อยู่ใต้ dropdown (z-50) แต่เหนือ header มือถือ (z-30) → แตะที่ไหนก็ปิดได้ -->
+        <div v-if="menuOpen" class="fixed inset-0 z-40" @click="menuOpen = false"></div>
       </div>
 
       <!-- ===== ข้อมูลส่วนตัว ===== -->
