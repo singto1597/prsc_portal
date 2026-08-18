@@ -129,6 +129,78 @@ npm run dev
 | `99001` | ประธานสภา (Admin) | ทุกเรื่อง + Dashboard |
 | `41006` | นักเรียน ม.4/1 | เรื่องของตัวเอง |
 
+---
+
+## 👥 บัญชีผู้ดูแลระบบอัตโนมัติ (สร้างตอนเปิดระบบครั้งแรก)
+
+เมื่อ **backend สตาร์ทครั้งแรก** ระบบจะสร้างบัญชีผู้ดูแลระบบให้อัตโนมัติ 3 บัญชี:
+**แอดมิน** (`admin`), **ครูสภา** (`teacher_council`), **ประธานสภา** (`council_president`)
+
+- Username เป็นแบบสุ่มที่เดายาก (เช่น `piri_admin_9f2k3c`) — นักเรียนเดาไม่ออก
+- รหัสผ่านชั่วคราวสุ่ม 12 ตัว — **ระบบบังคับให้เปลี่ยนรหัสเมื่อ login ครั้งแรก**
+- สร้างเฉพาะเมื่อยังไม่มีผู้ใช้ตำแหน่งเหล่านี้ในระบบ (idempotent — restart ซ้ำไม่สร้างเพิ่ม)
+
+### 🔑 วิธีดู username / รหัสผ่านชั่วคราว
+
+**วิธีที่ 1 — ดูจาก log ของ backend (แนะนำใน Docker Swarm):**
+```bash
+# ตัวอย่าง stack ชื่อ staging_app → เปลี่ยนตาม ENV_NAME
+docker service logs staging_app_backend | grep "username"
+# หรือดูข้อความสรุปทั้งบล็อก
+docker service logs staging_app_backend | grep -A2 "สร้างบัญชีผู้ดูแลระบบ"
+```
+
+**วิธีที่ 2 — อ่านจากไฟล์ที่ระบบเขียนไว้ให้:**
+```bash
+# ระบบเขียนไฟล์ไว้ที่โฟลเดอร์ที่รัน backend
+cat default_admin_credentials.txt
+```
+- ใน dev = โฟลเดอร์ที่รัน `uvicorn`; ใน Docker = โฟลเดอร์ทำงานของ container
+- กำหนด path เองได้ผ่าน `SEED_CREDENTIALS_FILE` ใน `.env` (ไฟล์นี้ถูก gitignore แล้ว)
+
+**การใช้งานครั้งแรก:** login ด้วย username + รหัสชั่วคราว → ระบบบังคับเปลี่ยนรหัสผ่านก่อนใช้งาน
+→ หลังเปลี่ยนครบแล้วควรลบไฟล์ credentials ทิ้ง
+
+> ⚠️ ถ้าลบ admin/ครูสภาออกจากระบบ แล้ว restart backend → ระบบจะสร้างบัญชีใหม่พร้อม credentials ใหม่
+
+---
+
+## 🧹 การรีเซ็ตระบบ (ล้างข้อมูล เริ่มต้นใหม่)
+
+ล้างฐานข้อมูลทั้งหมด (นักเรียน / เรื่อง / ประวัติ) แล้วให้ระบบสร้าง schema + บัญชี admin ใหม่
+
+```bash
+# 0. โหลด environment (ตามชื่อ ENV_NAME ใน .env เช่น staging / production)
+export $(grep -v '^#' .env | xargs)
+
+# 1. หยุดแอป + infra
+docker stack rm ${ENV_NAME}_app
+docker stack rm ${ENV_NAME}_infra
+
+# 2. ลบ volume ฐานข้อมูล (⚠️ ข้อมูลทั้งหมดจะหายถาวร!)
+docker volume rm ${ENV_NAME}_postgres_data
+
+# 3. Deploy ใหม่ — init_db สร้าง schema ใหม่ + สร้างบัญชี admin/ครูสภาใหม่
+docker stack deploy -c docker-compose.infra.yml ${ENV_NAME}_infra
+./pull_all.sh
+
+# 4. ดู credentials ใหม่ (ต่างจากรอบก่อนเสมอ)
+docker service logs ${ENV_NAME}_app_backend | grep "username"
+```
+
+**หลังจากรีเซ็ตแล้ว ต้องทำอะไรต่อ:**
+- นำเข้านักเรียนอีกครั้งผ่านหน้าเว็บ (เมนู "นำเข้า Excel") — หรือรัน seed ข้อมูลตัวอย่างสำหรับนำเสนอ:
+  ```bash
+  cd backend
+  DATABASE_URL=postgresql://... ./venv/bin/python -m scripts.seed_data
+  ```
+- ตรวจสอบบัญชี admin ใหม่จาก log/ไฟล์ แล้วเปลี่ยนรหัสตอน login ครั้งแรก
+
+> 💡 อยากเช็คว่าลบ volume สำเร็จไหม: `docker volume ls | grep ${ENV_NAME}_postgres`
+> volume ที่ใช้จริงคือ `${ENV_NAME}_postgres_data` (ตามที่ mount ใน `docker-compose.infra.yml`)
+
+---
+
 ## 🧪 เทส Backend
 
 ```bash

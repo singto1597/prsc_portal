@@ -101,16 +101,50 @@ const infoRows = computed(() => {
     </div>
 
     <div v-else-if="profile" class="space-y-4">
-      <!-- ===== Cover banner (แบบ FB) — เมนู ⋮ อยู่นอก overflow-hidden กัน dropdown ถูกตัด ===== -->
+      <!-- ===== การ์ดหลัก: cover + ตัวตน (avatar ทับ cover เฉพาะตัว, ชื่ออยู่บนพื้นขาวเสมอ) ===== -->
       <div class="relative">
-        <div class="bg-gradient-to-r from-red-600 via-rose-600 to-red-700 rounded-2xl shadow-lg overflow-hidden h-24 sm:h-28">
-          <!-- ลวดลายพื้นหลังบางๆ (ดูมีมิติ ไม่ทึบ) -->
-          <div class="absolute -right-8 -top-10 w-36 h-36 rounded-full bg-white/10"></div>
-          <div class="absolute right-24 -bottom-12 w-24 h-24 rounded-full bg-white/10"></div>
-          <div class="absolute right-1/3 -top-6 w-16 h-16 rounded-full bg-white/5"></div>
+        <div class="bg-white rounded-3xl shadow-sm overflow-hidden">
+          <!-- Cover banner -->
+          <div class="relative h-28 sm:h-36 bg-gradient-to-br from-red-600 via-rose-600 to-red-700">
+            <!-- ลวดลายวงกลม (ดูมีมิติ ไม่ทึบ) -->
+            <div class="absolute -right-10 -top-14 w-48 h-48 rounded-full bg-white/10"></div>
+            <div class="absolute right-1/4 -bottom-16 w-32 h-32 rounded-full bg-white/10"></div>
+            <div class="absolute left-1/3 -top-10 w-24 h-24 rounded-full bg-white/5"></div>
+            <!-- ไล่เงาด้านล่างเบา ๆ ให้ avatar กลืนกับ cover -->
+            <div class="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/10 to-transparent"></div>
+          </div>
+
+          <!-- ตัวตน -->
+          <div class="px-4 sm:px-6 pb-5 sm:pb-6">
+            <div class="flex items-start gap-3 sm:gap-4">
+              <!-- avatar: มี -mt เท่านั้น เพื่อให้ทับ cover มุมซ้าย (ไม่ดึงชื่อขึ้นด้วย) -->
+              <div class="-mt-10 sm:-mt-14 shrink-0">
+                <div class="w-16 h-16 sm:w-24 sm:h-24 rounded-2xl sm:rounded-3xl bg-white p-1 shadow-xl ring-4 ring-white">
+                  <div class="w-full h-full rounded-xl sm:rounded-2xl bg-gradient-to-br from-red-500 to-rose-500 text-white flex items-center justify-center text-2xl sm:text-4xl font-bold">
+                    {{ avatarChar }}
+                  </div>
+                </div>
+              </div>
+              <!-- ชื่อ + ตำแหน่ง: pt ชัดเจน → อยู่ใต้ cover บนพื้นขาว อ่านง่ายเสมอ -->
+              <div class="min-w-0 flex-1 pt-3 sm:pt-5">
+                <h1 class="text-lg sm:text-2xl font-bold text-gray-900 leading-snug break-words">{{ fullName }}</h1>
+                <div class="flex flex-wrap gap-1.5 mt-2">
+                  <span class="px-2.5 py-1 bg-red-100 text-red-700 text-xs font-semibold rounded-full">
+                    <i class="bi bi-mortarboard mr-1"></i>{{ roleLabel }}
+                  </span>
+                  <span v-if="profile.staff_level" class="px-2.5 py-1 bg-amber-100 text-amber-700 text-xs font-semibold rounded-full">
+                    <i class="bi bi-clipboard-check mr-1"></i>ระดับ {{ profile.staff_level }}
+                  </span>
+                  <span v-if="profile.room_code" class="px-2.5 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded-full">
+                    <i class="bi bi-door-closed mr-1"></i>{{ profile.room_code }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <!-- เมนูจุด 3 จุด (ตั้งค่าโปรไฟล์) -->
+        <!-- เมนู ⋮ (อยู่ข้างนอก overflow-hidden → dropdown ไม่ถูกตัด) -->
         <div class="absolute top-3 right-3 z-30">
           <button
             @click="menuOpen = !menuOpen"
@@ -140,47 +174,23 @@ const infoRows = computed(() => {
           </transition>
         </div>
 
-        <!-- Overlay ปิดเมนู (อยู่ใต้เมนู z-30 แต่ทับเนื้อหาด้านล่าง) -->
+        <!-- Overlay ปิดเมนู -->
         <div v-if="menuOpen" class="fixed inset-0 z-20" @click="menuOpen = false"></div>
-
-        <!-- ===== ตัวตน: avatar เล็กมุมซ้าย + ชื่อเต็ม (ไม่ตัดคำ) ===== -->
-        <div class="-mt-10 sm:-mt-12 px-4 sm:px-6 relative z-10">
-        <div class="flex items-end gap-3">
-          <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white p-0.5 shadow-lg ring-4 ring-white shrink-0">
-            <div class="w-full h-full rounded-[14px] bg-gradient-to-br from-red-100 to-rose-50 text-red-600 flex items-center justify-center text-2xl sm:text-3xl font-bold">
-              {{ avatarChar }}
-            </div>
-          </div>
-          <div class="pb-0.5 min-w-0 flex-1">
-            <h1 class="text-lg sm:text-2xl font-bold text-gray-900 leading-snug break-words">{{ fullName }}</h1>
-            <div class="flex flex-wrap gap-1.5 mt-1.5">
-              <span class="px-2.5 py-1 bg-red-100 text-red-700 text-xs font-semibold rounded-full">
-                <i class="bi bi-mortarboard mr-1"></i>{{ roleLabel }}
-              </span>
-              <span v-if="profile.staff_level" class="px-2.5 py-1 bg-amber-100 text-amber-700 text-xs font-semibold rounded-full">
-                <i class="bi bi-clipboard-check mr-1"></i>ระดับ {{ profile.staff_level }}
-              </span>
-              <span v-if="profile.room_code" class="px-2.5 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded-full">
-                <i class="bi bi-door-closed mr-1"></i>{{ profile.room_code }}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
       </div>
 
-      <!-- ===== ข้อมูลส่วนตัว (row icon — กันเบียดจอเล็ก) ===== -->
-      <div class="bg-white rounded-2xl shadow-sm p-5">
-        <h2 class="text-base font-bold text-gray-800 mb-4 flex items-center gap-2">
+      <!-- ===== ข้อมูลส่วนตัว ===== -->
+      <div class="bg-white rounded-3xl shadow-sm p-5 sm:p-6">
+        <h2 class="text-base font-bold text-gray-800 mb-1 flex items-center gap-2">
           <i class="bi bi-person-lines-fill text-red-500"></i> ข้อมูลส่วนตัว
         </h2>
+        <p class="text-xs text-gray-400 mb-4">ข้อมูลและช่องทางการติดต่อของคุณ</p>
         <div class="grid sm:grid-cols-2 gap-x-6 gap-y-3">
           <div
             v-for="row in infoRows"
             :key="row.label"
             class="flex items-center gap-3 py-1.5 min-w-0"
           >
-            <span class="w-8 h-8 rounded-lg bg-gray-50 text-gray-400 flex items-center justify-center shrink-0">
+            <span class="w-9 h-9 rounded-xl bg-red-50 text-red-500 flex items-center justify-center shrink-0">
               <i :class="['bi', row.icon]"></i>
             </span>
             <div class="min-w-0">
