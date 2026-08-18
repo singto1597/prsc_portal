@@ -1,0 +1,63 @@
+# =========================================================
+# 🛡️ docker-compose.proxy.yml — Traefik Reverse Proxy (ตัวกลาง)
+#
+# เป็นตัวกลาง **1 เครื่อง 1 อัน** — ติดตั้งครั้งเดียวต่อเครื่อง แล้วทุกระบบ /
+# หลายโปรเจค / หลาย environment แชร์ตัวเดียวกัน ผ่าน network "traefik-public"
+# คอยรับทราฟฟิกพอร์ต 80 (และ 443 ถ้าเปิด HTTPS) แล้วส่งต่อไปยัง services
+# ที่ติด label "traefik.enable=true" (backend / frontend)
+#
+# ติดตั้งครั้งเดียวด้วยสคริปต์:  ./setup_traefik.sh
+#   (รันซ้ำได้ — ถ้ามีแล้วจะข้าม; จะ deploy เป็น stack ชื่อ "global_proxy")
+#
+# ⚠️ เงื่อนไขก่อนรัน: ต้องเปิดโหมด Swarm + สร้าง network "traefik-public" ก่อน
+#    (./setup_traefik.sh เตรียมให้ครบ)
+# =========================================================
+version: "3.8"
+
+services:
+  traefik:
+    image: traefik:latest
+    command:
+      # --- API Dashboard (ปิดไว้; เปิดตอนต้องการด้วย --api.dashboard=true + ผูกพอร์ต 8080) ---
+      - "--api.insecure=false"
+      # --- Docker Swarm Provider: ค้นหา service ที่มี label traefik.enable=true ---
+      - "--providers.docker=true"
+      - "--providers.docker.swarmMode=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=traefik-public"
+      - "--providers.docker.swarmModeRefreshSeconds=15"
+      # --- EntryPoint หลัก (HTTP) ---
+      - "--entrypoints.web.address=:80"
+
+      # 🚀 ==== เปิด HTTPS (Let's Encrypt) เมื่อมี domain จริง ====
+      #  1) ตั้ง ACME_EMAIL ใน .env (หรือแทน ${ACME_EMAIL} เป็น email ตรงๆ)
+      #  2) ยกเลิก comment 4 บรรทัดด้านล่าง + เปิดพอร์ต "443:443" ในส่วน ports
+      #  3) ชี้ DNS ของ API_DOMAIN / WEB_DOMAIN มาที่ IP ของเซิร์ฟเวอร์ แล้วรัน ./setup.sh ใหม่
+      # - "--entrypoints.websecure.address=:443"
+      # - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:-admin@yourdomain.com}"
+      # - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      # - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      #   หมายเหตุ: ถ้า domain อยู่หลัง Cloudflare (proxy on) ใช้ DNS-01 แทน:
+      # - "--certificatesresolvers.letsencrypt.acme.dnschallenge.provider=cloudflare"
+      #   (แล้วเพิ่ม env CLOUDFLARE_DNS_API_TOKEN ที่ service นี้)
+    ports:
+      - "80:80"
+      # - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # - proxy_letsencrypt:/letsencrypt
+    networks:
+      - traefik-public
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+      restart_policy:
+        condition: any
+
+# เปิดเมื่อใช้ HTTPS (Let's Encrypt) — เป็น volume ถาวรเก็บ certificate
+# volumes:
+#   proxy_letsencrypt:
+
+networks:
+  traefik-public:
+    external: true

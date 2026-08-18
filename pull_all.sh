@@ -2,7 +2,9 @@
 
 # 1. โหลดตัวแปรจากไฟล์ .env นอกสุด
 if [ -f .env ]; then
-    export $(grep -v '^#' .env | xargs)
+    set -a
+    . ./.env
+    set +a
     echo "⚙️ โหลด Environment: $ENV_NAME"
 else
     echo "❌ ไม่พบไฟล์ .env"

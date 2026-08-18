@@ -303,3 +303,16 @@
   4. **Filter row:** `grid grid-cols-1 sm:flex sm:flex-wrap` + select `w-full sm:w-auto` → บนมือถือเรียงแนวตั้งเต็มแถว ไม่เบียดกัน
   5. **ชื่อ/ข้อความล้น:** เติม `min-w-0` + `break-words` ที่ element ใน flex/grid (ชื่อคน, หัวข้อ) — กัน flex ตัดหรือกว้างเกินจอ
 - **Date Added:** 2026-08-18
+
+### 🛠️ Docker Swarm deploy — top-level volume key ใส่ `${ENV_NAME}` ไม่ได้ + `docker stack deploy` ไม่อ่าน `.env` เอง
+- **Context/Problem:** เขียนสคริปต์ตั้งค่าระบบ (setup.sh) ให้ทุกชื่อ (network/stack/volume/image) อ้างอิงจาก `ENV_NAME` ใน `.env` — "เปลี่ยนชื่อแล้วรันใหม่ได้ทันที" — แล้วเจอ 2 กับดักตอนทำให้ compose ใช้ `${ENV_NAME}` ในชื่อ:
+  1. ใส่ `${ENV_NAME}_postgres_data` ตรงๆ ใน `volumes:` section (เป็น key) → `docker stack config`/deploy พังด้วย `volumes additional properties '${ENV_NAME}_postgres_data' not allowed` (Compose ไม่ interpolate `${}` ที่ key ของ top-level `volumes` map)
+  2. `.env` ใส่ `DATABASE_URL=...@${ENV_NAME}_infra_db:5432/...` แล้วคิดว่า compose/environment จะแทนค่าให้เอง → **`docker stack deploy` (และ `docker stack config`) ไม่อ่านไฟล์ `.env` เพื่อ interpolate** (ต่างจาก `docker compose config` ที่อ่าน) และ `env_file` ก็ส่งค่าดิบไปทั้ง `${...}` → container ได้ host ที่ผิด
+- **Root Cause:** (1) compose-go interpolate ค่าใน yaml แต่ key ของ `volumes:` map ไม่ถูก interpolate เหมือนกันหมด → ต้องใช้ "key คงที่ + `name: ${ENV_NAME}_...`"; (2) stack deploy ใช้ shell environment ของ process ที่เรียก (คนที่ export `.env` มาก่อน) ไม่ใช่ `.env` ในโฟลเดอร์เอง
+- **Correct Pattern/Solution:**
+  1. **Volume ชื่อตาม env:** `volumes:` ใช้ key คงที่ (`postgres_data:`) แล้วตั้ง `name: ${ENV_NAME}_postgres_data` ข้างใต้ (services mount อ้าง key คงที่) — validate ผ่านทั้ง `docker stack config` และ `docker compose config`
+  2. **DATABASE_URL/REDIS_URL ตาม env:** ไม่วางใจค่าใน `.env` — ไป override ใน compose `environment:` เช่น `DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${ENV_NAME}_infra_db:5432/${POSTGRES_DB}` (compose interpolate ค่าของตัวเองได้)
+  3. **สคริปต์ทุกตัวที่ deploy ต้อง export `.env` ก่อน** `docker stack deploy`: `set -a; . ./.env; set +a` (แทน `export $(grep -v '^#' .env | xargs)` ซึ่งพังถ้ามี trailing comment เช่น `# 30 days`)
+  4. **เทสของจริง:** `ENV_NAME=x docker stack config -c <file>` เป็นตัว validate เดียวกับ `stack deploy` — ใช้ตรวจว่าชื่อ interpolate ถูกก่อน deploy; ตรวจว่า `docker stack deploy` รันจาก shell ที่ `.env` ถูก export แล้ว
+  - **กฎ: ถ้าอยากได้ "ชื่อทุกอย่างตาม ENV_NAME" — ชื่อที่ dynamic ต้อง interpolate ที่ layer ของ compose (`environment:` / `name:`), ไม่อ้าง `${}` ภายในไฟล์ `.env`; และ deploy ทุกครั้งต้อง export .env ก่อน**
+- **Date Added:** 2026-08-18
