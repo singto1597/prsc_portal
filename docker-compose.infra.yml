@@ -6,7 +6,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ${ENV_NAME}_postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     networks:
       - shared_network
       - db-management
@@ -17,17 +17,20 @@ services:
     image: redis:7-alpine
     command: redis-server --appendonly yes
     volumes:
-      - ${ENV_NAME}_redis_data:/data
+      - redis_data:/data
     networks:
       - shared_network
     deploy:
       replicas: 1
 
 volumes:
-  prsc_staging_postgres_data: 
-  prsc_production_postgres_data: 
-  prsc_staging_redis_data: 
-  prsc_production_redis_data:
+  # volume จริงของ Postgres/Redis — ตั้งชื่อตาม ENV_NAME
+  # ⚠️ ใช้ key คงที่ (postgres_data/redis_data) + ระบุ name: dynamic
+  #    (ห้ามใส่ ${ENV_NAME} ตรงๆ ที่ key — compose ไม่อนุญาต ตรวจแล้วด้วย `docker stack config`)
+  postgres_data:
+    name: ${ENV_NAME}_postgres_data
+  redis_data:
+    name: ${ENV_NAME}_redis_data
 
 # ใช้ Alias ชื่อ shared_network แล้วชี้ name ไปที่ตัวแปร
 networks:

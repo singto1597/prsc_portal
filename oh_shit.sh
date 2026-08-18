@@ -3,7 +3,9 @@ echo "🚨 เริ่มกระบวนการกู้ภัยฉุก
 
 # 1. โหลดตัวแปรจาก .env
 if [ -f .env ]; then
-    export $(grep -v '^#' .env | xargs)
+    set -a
+    . ./.env
+    set +a
 else
     echo "❌ ไม่พบไฟล์ .env"
     exit 1

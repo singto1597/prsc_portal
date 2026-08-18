@@ -6,6 +6,10 @@ services:
     env_file:
       - .env
     environment:
+      # 🚨 DATABASE_URL/REDIS_URL ต้องชี้ host ตาม ENV_NAME เสมอ
+      #    (host ของ Postgres/Redis ใน Swarm = ${ENV_NAME}_infra_db / ${ENV_NAME}_infra_redis)
+      #    override ตรงนี้ → เปลี่ยน ENV_NAME ใน .env แล้วระบบชี้ service ตัวใหม่ให้อัตโนมัติ
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${ENV_NAME}_infra_db:5432/${POSTGRES_DB}
       - REDIS_URL=redis://${ENV_NAME}_infra_redis:6379/0
       - IMPORT_STORAGE_DIR=/data/imports
     volumes:
@@ -58,6 +62,7 @@ services:
     env_file:
       - .env
     environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${ENV_NAME}_infra_db:5432/${POSTGRES_DB}
       - REDIS_URL=redis://${ENV_NAME}_infra_redis:6379/0
       - IMPORT_STORAGE_DIR=/data/imports
     volumes:
@@ -78,7 +83,9 @@ services:
 
 volumes:
   # Shared volume เก็บไฟล์ .xlsx ที่อัปโหลด — backend เขียน, worker อ่าน
+  # (ตั้งชื่อตาม ENV_NAME → staging/production ใช้คนละ volume กัน)
   imports_data:
+    name: ${ENV_NAME}_imports_data
 
 networks:
   traefik-public:
