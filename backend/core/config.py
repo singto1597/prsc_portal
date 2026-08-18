@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     # อายุงานค้าง (นาที) ที่ worker กู้คืนตอนเริ่มต้น — PROCESSING/QUEUED ค้างเกินนี้ → reset กลับ QUEUED
     IMPORT_RECOVERY_STALE_MINUTES: int = 35
 
+    # Seed users (admin/ครูสภา/ประธานสภา) ตอนเปิดระบบครั้งแรก — ไฟล์เก็บ username+รหัสชั่วคราว
+    SEED_CREDENTIALS_FILE: str = "default_admin_credentials.txt"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

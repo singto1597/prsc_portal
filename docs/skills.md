@@ -280,3 +280,26 @@
   3. **เจอ bug ซ่อนใน infra compose นี้:** services mount `${ENV_NAME}_postgres_data` แต่ `volumes:` section ประกาศ `prsc_staging_*`/`piri_staging_*` (ไม่ได้ถูก mount — dead) → ข้อมูลจริงอยู่ที่ volume ที่ Docker auto-create ชื่อ `staging_postgres_data`/`production_postgres_data` — อย่าเดาว่าข้อมูลอยู่ตามชื่อใน volumes section
   4. **คีย์เวิร์ดค้นหา:** index.html ต้องมี `<meta name="description">` + `<meta name="keywords">` (PIRIvoice / Pirivoice / เสียงจากชาวพิริยาลัย / ระบบรับฟังความคิดเห็นและปัญหา / สภานักเรียน) — และเก็บชื่อเก่าไว้ที่ readme ("เดิมชื่อ PRSC Portal") เพื่อให้ search คำเก่ายังเจอ
 - **Date Added:** 2026-08-17
+
+### 🛠️ Seed users (admin/ครูสภา/ประธานสภา) ตอนเปิดระบบครั้งแรก — username ยาว ≠ student_id VARCHAR(10) + bังคับเปลี่ยนรหัสครั้งแรก
+- **Context/Problem:** ต้องการสร้างบัญชีผู้ดูแลระบบอัตโนมัติตอน `init_db`/startup ครั้งแรก ด้วย username เดายาก แล้วบังคับเปลี่ยนรหัสตอน login ครั้งแรก — แต่ `students.student_id` เป็น `VARCHAR(10)` (จำกัด 10 ตัว) ขณะที่ `users.username` เป็น `VARCHAR(100)`
+- **Root Cause:** เข้าใจผิดว่า username กับ student_id ต้องเป็นค่าเดียวกัน → username ยาวๆ (`piri_admin_9f2k3c` = 17 ตัว) เกิน 10 ตัวของ student_id → INSERT พัง (หรือต้องสั้นจนเดาได้)
+- **Correct Pattern/Solution:**
+  1. **แยกค่า:** `users.username` (login, VARCHAR 100) = ยาวๆ เดายาก `piri_<role>_<hex6>`; `students.student_id` (identifier, VARCHAR 10) = สั้นๆ แยกกัน เช่น `PADM` + `secrets.token_hex(2).upper()` → แสดงในโปรไฟล์เป็น "รหัสนักเรียน"
+  2. **idempotent:** ตรวจก่อน seed ว่า `students.class_role IN ('admin','teacher_council','council_president') AND status='active' AND deleted_at IS NULL` มีแล้วหรือยัง → มีแล้วข้าม (กันสร้างซ้ำตอน restart/test)
+  3. **บังคับเปลี่ยนรหัส:** เพิ่มคอลัมน์ `users.must_change_password BOOLEAN DEFAULT FALSE` (migration `ADD COLUMN IF NOT EXISTS` + แก้ `CREATE TABLE` ใน init_db ให้ตรงกัน) → seed ตั้ง TRUE → `change_password` เคลียร์เป็น FALSE → frontend guard redirect ไปหน้าเปลี่ยนรหัส
+  4. **Credentials:** เขียนไฟล์ (gitignored) + log ตอน startup; path จาก `settings.SEED_CREDENTIALS_FILE`
+  - **กฎ: username (login) กับ student_id (identifier 10 ตัว) ไม่จำเป็นต้องค่าเดียวกัน; ฟีเจอร์ seed/boot ที่ idempotent ต้อง "เช็คมีแล้ว → ข้าม" ไม่ใช่ "INSERT ON CONFLICT" อย่างเดียว** (กรณี role ซ้ำกับ user ต่างกัน)
+  - **เทส Gotcha:** `TestClient(app)` เปิด lifespan → seed รันก่อน test body → test ที่เรียก `seed_default_users` เองได้ `{}` (โดน skip) — **อย่าใช้ fixture `client` ใน test seed; สร้าง TestClient เองหลัง seed** (คุมคำสั่ง seed เองได้)
+- **Date Added:** 2026-08-18
+
+### 🛠️ Frontend mobile UX — iOS auto-zoom, dropdown โดน overflow-hidden ตัด, ตารางบนจอเล็ก
+- **Context/Problem:** ปรับปรุงมือถือเจอ 3 บั๊ก/จุดหักมุม: (1) iOS Safari ซูมจอทุกครั้งที่แตะ input ที่ font < 16px; (2) dropdown เมนูที่วางใน container `overflow-hidden` โดนตัด (render ยาวเกิน parent); (3) ตาราง `<table>` บนจอแคบอ่านไม่รู้เรื่อง
+- **Root Cause:** (1) iOS auto-zoom เป็นพฤติกรรมบังคับของช่องกรอกที่ font-size ต่ำกว่า 16px — Tailwind `text-sm` (14px) ตกทุกจุด; (2) CSS overflow clipping ใช้กับ container ที่มี dropdown อยู่ด้านใน; (3) ตารางหลายคอลัมน์ถูกบีบแนวตั้งบนความกว้างแคบ
+- **Correct Pattern/Solution:**
+  1. **iOS zoom:** ใน `main.css` เพิ่ม `@media (max-width:640px){ input,textarea,select { font-size:16px !important } }` — override `text-sm` เฉพาะมือถือ กัน zoom ทุกครั้งที่แตะ
+  2. **Dropdown ถูกตัด:** แยกโครงสร้าง — container ที่ `overflow-hidden` ไว้เฉพาะพื้นหลัง/ลวดลาย (วงกลมตกแต่ง) ส่วนปุ่มเมนู + dropdown ย้ายไปอยู่ใน `<div class="relative">` ครอบนอก (ไม่โดน clip) + จัด z-index (overlay `z-20` ปิดเมนู อยู่ใต้ปุ่มเมนู `z-30`)
+  3. **ตารางมือถือ:** dual layout — `md:hidden` = การ์ดรายการ (avatar/ชื่อ/ข้อมูล) + `hidden md:block` = `<table>` เดิมบนเดสก์ท็อป; ฟังก์ชัน action (เช่น เปลี่ยนตำแหน่ง) ใช้ร่วมกันได้
+  4. **Filter row:** `grid grid-cols-1 sm:flex sm:flex-wrap` + select `w-full sm:w-auto` → บนมือถือเรียงแนวตั้งเต็มแถว ไม่เบียดกัน
+  5. **ชื่อ/ข้อความล้น:** เติม `min-w-0` + `break-words` ที่ element ใน flex/grid (ชื่อคน, หัวข้อ) — กัน flex ตัดหรือกว้างเกินจอ
+- **Date Added:** 2026-08-18

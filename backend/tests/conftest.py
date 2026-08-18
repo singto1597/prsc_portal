@@ -12,6 +12,7 @@ import asyncpg
 import asyncio
 import uuid
 import tempfile
+import os
 from urllib.parse import urlparse
 from fastapi.testclient import TestClient
 
@@ -21,6 +22,11 @@ from core.init_db import init_db
 
 # 📁 โฟลเดอร์เก็บไฟล์ Excel สำหรับเทส (แทน /data/imports ของ Docker)
 settings.IMPORT_STORAGE_DIR = tempfile.mkdtemp(prefix="piri_import_test_")
+
+# 🔑 ไฟล์ credentials ของ seed users — ชี้ไป temp dir (กันเขียนทับไฟล์จริงตอนเทส)
+settings.SEED_CREDENTIALS_FILE = os.path.join(
+    tempfile.mkdtemp(prefix="piri_seed_test_"), "seed_credentials.txt"
+)
 
 
 @pytest_asyncio.fixture(scope="session")

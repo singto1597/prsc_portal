@@ -1,27 +1,16 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
+import { useRouter } from 'vue-router';
 import Swal from 'sweetalert2';
-import { getMyProfile, updateMyProfile, changePassword, type MyProfile } from '@/services/profile';
+import { getMyProfile, type MyProfile } from '@/services/profile';
 import { useAuthStore } from '@/stores/auth';
 
+const router = useRouter();
 const authStore = useAuthStore();
 
 const profile = ref<MyProfile | null>(null);
 const isLoading = ref(true);
-const isEditing = ref(false);
-
-// form
-const editPrefix = ref('');
-const editFirstName = ref('');
-const editLastName = ref('');
-const editNickname = ref('');
-const editPhone = ref('');
-const editEmail = ref('');
-
-// password form
-const oldPass = ref('');
-const newPass = ref('');
-const confirmPass = ref('');
+const menuOpen = ref(false);
 
 const ROLE_LABELS: Record<string, string> = {
   student: 'นักเรียน',
@@ -33,6 +22,9 @@ const ROLE_LABELS: Record<string, string> = {
   level_president: 'ประธานระดับ',
   council_member: 'สภานักเรียน',
   council_president: 'ประธานสภา',
+  teacher: 'ครู',
+  teacher_council: 'ครูสภา',
+  admin: 'แอดมิน',
 };
 
 const avatarChar = computed(() => {
@@ -40,213 +32,173 @@ const avatarChar = computed(() => {
   return name ? name.charAt(0).toUpperCase() : 'ส';
 });
 
+const fullName = computed(() => {
+  const p = profile.value;
+  if (!p) return '';
+  return [p.prefix, p.first_name, p.last_name].filter(Boolean).join(' ').trim();
+});
+
+const roleLabel = computed(() => {
+  const r = profile.value?.class_role || '';
+  return ROLE_LABELS[r] || r || 'สมาชิก';
+});
+
 async function load() {
   isLoading.value = true;
   try {
     profile.value = await getMyProfile();
-  } catch (e: any) {
-    Swal.fire({ icon: 'error', title: 'โหลดโปรไฟล์ไม่สำเร็จ', text: e.message });
+  } catch (e: unknown) {
+    Swal.fire({ icon: 'error', title: 'โหลดโปรไฟล์ไม่สำเร็จ', text: e instanceof Error ? e.message : 'เกิดข้อผิดพลาด' });
   } finally {
     isLoading.value = false;
   }
 }
 onMounted(load);
 
-function startEdit() {
-  if (!profile.value) return;
-  isEditing.value = true;
-  editPrefix.value = profile.value.prefix || '';
-  editFirstName.value = profile.value.first_name || '';
-  editLastName.value = profile.value.last_name || '';
-  editNickname.value = profile.value.nickname || '';
-  editPhone.value = profile.value.phone_number || '';
-  editEmail.value = profile.value.email || '';
+const goEdit = () => { menuOpen.value = false; router.push({ name: 'profile-edit' }); };
+const goPassword = () => { menuOpen.value = false; router.push({ name: 'profile-password' }); };
+
+function logout() {
+  menuOpen.value = false;
+  Swal.fire({
+    icon: 'question',
+    title: 'ออกจากระบบ?',
+    showCancelButton: true,
+    confirmButtonText: 'ออกจากระบบ',
+    cancelButtonText: 'ยกเลิก',
+  }).then((result) => {
+    if (result.isConfirmed) {
+      authStore.logout();
+      router.push({ name: 'login' });
+    }
+  });
 }
 
-async function saveProfile() {
-  if (!editFirstName.value.trim() || !editLastName.value.trim()) {
-    Swal.fire({ icon: 'warning', title: 'กรอกชื่อให้ครบ', text: 'ชื่อ และ นามสกุล จำเป็น' });
-    return;
+// แถวข้อมูลส่วนตัว (icon + label + value) — กันเบียด/ตัดคำบนจอเล็ก
+const infoRows = computed(() => {
+  const p = profile.value;
+  if (!p) return [];
+  const rows: { icon: string; label: string; value: string }[] = [
+    { icon: 'bi-person-badge', label: 'รหัสนักเรียน', value: p.student_id },
+    { icon: 'bi-hash', label: 'เลขที่', value: p.student_no ? String(p.student_no) : '-' },
+    { icon: 'bi-emoji-smile', label: 'ชื่อเล่น', value: p.nickname || '-' },
+    { icon: 'bi-telephone', label: 'เบอร์โทร', value: p.phone_number || '-' },
+    { icon: 'bi-envelope', label: 'อีเมล', value: p.email || '-' },
+    { icon: 'bi-door-closed', label: 'ห้องเรียน', value: p.room_code ? `${p.room_code}${p.level ? ` (${p.level})` : ''}` : '-' },
+  ];
+  // ชื่อผู้ใช้ (login) — แสดงเฉพาะเมื่อต่างจากรหัสนักเรียน (เช่น admin/ครู ที่ใช้ username ยาว)
+  if (p.username && p.username !== p.student_id) {
+    rows.push({ icon: 'bi-person-vcard', label: 'ชื่อผู้ใช้', value: p.username });
   }
-  try {
-    profile.value = await updateMyProfile({
-      prefix: editPrefix.value.trim() || null,
-      first_name: editFirstName.value.trim(),
-      last_name: editLastName.value.trim(),
-      nickname: editNickname.value.trim() || null,
-      phone_number: editPhone.value.trim() || null,
-      email: editEmail.value.trim() || null,
-    });
-    isEditing.value = false;
-    // อัปเดต display name ใน auth store
-    await authStore.loadMe();
-    Swal.fire({ icon: 'success', title: 'บันทึกโปรไฟล์แล้ว', timer: 1200, showConfirmButton: false });
-  } catch (e: any) {
-    Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: e.message });
-  }
-}
-
-async function submitChangePassword() {
-  if (!oldPass.value || !newPass.value || !confirmPass.value) {
-    Swal.fire({ icon: 'warning', title: 'กรอกให้ครบ', text: 'กรอกรหัสผ่านเดิม, ใหม่, ยืนยัน' });
-    return;
-  }
-  if (newPass.value !== confirmPass.value) {
-    Swal.fire({ icon: 'warning', title: 'รหัสผ่านใหม่ไม่ตรงกัน', text: 'ยืนยันรหัสผ่านให้ตรงกับรหัสใหม่' });
-    return;
-  }
-  if (newPass.value.length < 4) {
-    Swal.fire({ icon: 'warning', title: 'รหัสสั้นไป', text: 'รหัสผ่านใหม่อย่างน้อย 4 ตัว' });
-    return;
-  }
-  try {
-    await changePassword(oldPass.value, newPass.value);
-    oldPass.value = newPass.value = confirmPass.value = '';
-    Swal.fire({ icon: 'success', title: 'เปลี่ยนรหัสผ่านสำเร็จ!', text: 'ครั้งหน้าใช้รหัสใหม่ในการเข้าสู่ระบบ' });
-  } catch (e: any) {
-    Swal.fire({ icon: 'error', title: 'เปลี่ยนรหัสไม่สำเร็จ', text: e.message });
-  }
-}
+  return rows;
+});
 </script>
 
 <template>
-  <div class="max-w-2xl mx-auto">
+  <div class="max-w-3xl mx-auto">
     <div v-if="isLoading" class="flex justify-center py-20">
       <div class="animate-spin w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full"></div>
     </div>
 
-    <div v-else-if="profile" class="space-y-5">
-      <!-- Header card -->
-      <div class="bg-white rounded-xl shadow-sm p-6">
-        <div class="flex items-center gap-4">
-          <div class="w-20 h-20 rounded-full bg-gradient-to-br from-red-100 to-red-50 text-red-600 flex items-center justify-center text-3xl font-bold shadow-inner border border-red-100">
-            {{ avatarChar }}
+    <div v-else-if="profile" class="space-y-4">
+      <!-- ===== Cover banner (แบบ FB) — เมนู ⋮ อยู่นอก overflow-hidden กัน dropdown ถูกตัด ===== -->
+      <div class="relative">
+        <div class="bg-gradient-to-r from-red-600 via-rose-600 to-red-700 rounded-2xl shadow-lg overflow-hidden h-24 sm:h-28">
+          <!-- ลวดลายพื้นหลังบางๆ (ดูมีมิติ ไม่ทึบ) -->
+          <div class="absolute -right-8 -top-10 w-36 h-36 rounded-full bg-white/10"></div>
+          <div class="absolute right-24 -bottom-12 w-24 h-24 rounded-full bg-white/10"></div>
+          <div class="absolute right-1/3 -top-6 w-16 h-16 rounded-full bg-white/5"></div>
+        </div>
+
+        <!-- เมนูจุด 3 จุด (ตั้งค่าโปรไฟล์) -->
+        <div class="absolute top-3 right-3 z-30">
+          <button
+            @click="menuOpen = !menuOpen"
+            aria-label="เมนูโปรไฟล์"
+            class="w-9 h-9 rounded-full bg-black/20 text-white hover:bg-black/30 flex items-center justify-center backdrop-blur-sm transition"
+            :class="{ 'bg-black/30': menuOpen }"
+          >
+            <i class="bi bi-three-dots-vertical text-lg"></i>
+          </button>
+
+          <transition name="fade-up">
+            <div v-if="menuOpen" class="absolute right-0 top-11 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50">
+              <div class="px-4 py-1.5 mb-1 border-b border-gray-50">
+                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">การจัดการบัญชี</p>
+              </div>
+              <button @click="goEdit" class="w-full text-left px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors flex items-center gap-3">
+                <i class="bi bi-pencil-square text-lg"></i> แก้ไขโปรไฟล์
+              </button>
+              <button @click="goPassword" class="w-full text-left px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors flex items-center gap-3">
+                <i class="bi bi-shield-lock text-lg"></i> เปลี่ยนรหัสผ่าน
+              </button>
+              <div class="h-px bg-gray-100 my-1"></div>
+              <button @click="logout" class="w-full text-left px-4 py-2.5 text-sm font-bold text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors flex items-center gap-3">
+                <i class="bi bi-box-arrow-right text-lg"></i> ออกจากระบบ
+              </button>
+            </div>
+          </transition>
+        </div>
+
+        <!-- Overlay ปิดเมนู (อยู่ใต้เมนู z-30 แต่ทับเนื้อหาด้านล่าง) -->
+        <div v-if="menuOpen" class="fixed inset-0 z-20" @click="menuOpen = false"></div>
+
+        <!-- ===== ตัวตน: avatar เล็กมุมซ้าย + ชื่อเต็ม (ไม่ตัดคำ) ===== -->
+        <div class="-mt-10 sm:-mt-12 px-4 sm:px-6 relative z-10">
+        <div class="flex items-end gap-3">
+          <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white p-0.5 shadow-lg ring-4 ring-white shrink-0">
+            <div class="w-full h-full rounded-[14px] bg-gradient-to-br from-red-100 to-rose-50 text-red-600 flex items-center justify-center text-2xl sm:text-3xl font-bold">
+              {{ avatarChar }}
+            </div>
           </div>
-          <div class="flex-1">
-            <h1 class="text-2xl font-bold text-gray-900">
-              {{ profile.prefix || '' }} {{ profile.first_name }} {{ profile.last_name }}
-            </h1>
-            <div class="flex flex-wrap gap-2 mt-2">
-              <span class="px-2.5 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">
-                <i class="bi bi-mortarboard mr-1"></i>{{ ROLE_LABELS[profile.class_role] || profile.class_role }}
+          <div class="pb-0.5 min-w-0 flex-1">
+            <h1 class="text-lg sm:text-2xl font-bold text-gray-900 leading-snug break-words">{{ fullName }}</h1>
+            <div class="flex flex-wrap gap-1.5 mt-1.5">
+              <span class="px-2.5 py-1 bg-red-100 text-red-700 text-xs font-semibold rounded-full">
+                <i class="bi bi-mortarboard mr-1"></i>{{ roleLabel }}
               </span>
-              <span class="px-2.5 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
+              <span v-if="profile.staff_level" class="px-2.5 py-1 bg-amber-100 text-amber-700 text-xs font-semibold rounded-full">
+                <i class="bi bi-clipboard-check mr-1"></i>ระดับ {{ profile.staff_level }}
+              </span>
+              <span v-if="profile.room_code" class="px-2.5 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded-full">
                 <i class="bi bi-door-closed mr-1"></i>{{ profile.room_code }}
               </span>
-              <span class="px-2.5 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
-                <i class="bi bi-hash mr-1"></i>{{ profile.student_no }}
-              </span>
             </div>
           </div>
-          <button v-if="!isEditing" @click="startEdit" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm">
-            <i class="bi bi-pencil-square mr-1"></i> แก้ไข
-          </button>
         </div>
       </div>
+      </div>
 
-      <!-- Profile details -->
-      <div class="bg-white rounded-xl shadow-sm p-6">
-        <h2 class="text-lg font-bold text-gray-800 mb-4">ข้อมูลส่วนตัว</h2>
-
-        <div v-if="!isEditing" class="grid grid-cols-2 gap-4">
-          <div>
-            <p class="text-xs text-gray-400 font-medium">รหัสนักเรียน</p>
-            <p class="font-mono text-gray-800">{{ profile.student_id }}</p>
-          </div>
-          <div>
-            <p class="text-xs text-gray-400 font-medium">เลขที่</p>
-            <p class="text-gray-800">{{ profile.student_no }}</p>
-          </div>
-          <div>
-            <p class="text-xs text-gray-400 font-medium">ชื่อ</p>
-            <p class="text-gray-800">{{ profile.first_name }}</p>
-          </div>
-          <div>
-            <p class="text-xs text-gray-400 font-medium">นามสกุล</p>
-            <p class="text-gray-800">{{ profile.last_name }}</p>
-          </div>
-          <div>
-            <p class="text-xs text-gray-400 font-medium">ชื่อเล่น</p>
-            <p class="text-gray-800">{{ profile.nickname || '-' }}</p>
-          </div>
-          <div>
-            <p class="text-xs text-gray-400 font-medium">เบอร์โทร</p>
-            <p class="text-gray-800">{{ profile.phone_number || '-' }}</p>
-          </div>
-          <div>
-            <p class="text-xs text-gray-400 font-medium">อีเมล</p>
-            <p class="text-gray-800">{{ profile.email || '-' }}</p>
-          </div>
-          <div>
-            <p class="text-xs text-gray-400 font-medium">ห้องเรียน</p>
-            <p class="text-gray-800">{{ profile.room_code }} ({{ profile.level }})</p>
-          </div>
-        </div>
-
-        <!-- Edit form -->
-        <div v-else class="space-y-3">
-          <div class="grid grid-cols-3 gap-3">
-            <div>
-              <label class="text-xs text-gray-500">คำนำหน้า</label>
-              <input v-model="editPrefix" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mt-1" placeholder="นาย/นางสาว" />
+      <!-- ===== ข้อมูลส่วนตัว (row icon — กันเบียดจอเล็ก) ===== -->
+      <div class="bg-white rounded-2xl shadow-sm p-5">
+        <h2 class="text-base font-bold text-gray-800 mb-4 flex items-center gap-2">
+          <i class="bi bi-person-lines-fill text-red-500"></i> ข้อมูลส่วนตัว
+        </h2>
+        <div class="grid sm:grid-cols-2 gap-x-6 gap-y-3">
+          <div
+            v-for="row in infoRows"
+            :key="row.label"
+            class="flex items-center gap-3 py-1.5 min-w-0"
+          >
+            <span class="w-8 h-8 rounded-lg bg-gray-50 text-gray-400 flex items-center justify-center shrink-0">
+              <i :class="['bi', row.icon]"></i>
+            </span>
+            <div class="min-w-0">
+              <p class="text-[11px] text-gray-400 font-medium leading-tight">{{ row.label }}</p>
+              <p class="text-sm text-gray-800 font-medium break-words leading-snug">{{ row.value }}</p>
             </div>
-            <div>
-              <label class="text-xs text-gray-500">ชื่อ *</label>
-              <input v-model="editFirstName" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mt-1" />
-            </div>
-            <div>
-              <label class="text-xs text-gray-500">นามสกุล *</label>
-              <input v-model="editLastName" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mt-1" />
-            </div>
-          </div>
-          <div>
-            <label class="text-xs text-gray-500">ชื่อเล่น</label>
-            <input v-model="editNickname" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mt-1" />
-          </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="text-xs text-gray-500">เบอร์โทร</label>
-              <input v-model="editPhone" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mt-1" />
-            </div>
-            <div>
-              <label class="text-xs text-gray-500">อีเมล</label>
-              <input v-model="editEmail" type="email" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mt-1" />
-            </div>
-          </div>
-          <div class="flex gap-2 pt-2">
-            <button @click="saveProfile" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm">
-              <i class="bi bi-check-lg mr-1"></i> บันทึก
-            </button>
-            <button @click="isEditing = false" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm">
-              ยกเลิก
-            </button>
           </div>
         </div>
       </div>
 
-      <!-- Change password -->
-      <div class="bg-white rounded-xl shadow-sm p-6">
-        <h2 class="text-lg font-bold text-gray-800 mb-4">เปลี่ยนรหัสผ่าน</h2>
-        <div class="space-y-3">
-          <div>
-            <label class="text-xs text-gray-500">รหัสผ่านเดิม</label>
-            <input v-model="oldPass" type="password" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mt-1" placeholder="••••••" />
-          </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="text-xs text-gray-500">รหัสผ่านใหม่</label>
-              <input v-model="newPass" type="password" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mt-1" placeholder="อย่างน้อย 4 ตัว" />
-            </div>
-            <div>
-              <label class="text-xs text-gray-500">ยืนยันรหัสผ่านใหม่</label>
-              <input v-model="confirmPass" type="password" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mt-1" placeholder="พิมพ์ซ้ำ" />
-            </div>
-          </div>
-          <button @click="submitChangePassword" class="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 text-sm">
-            <i class="bi bi-shield-lock mr-1"></i> เปลี่ยนรหัสผ่าน
-          </button>
-        </div>
-      </div>
+      <p class="text-center text-[11px] text-gray-300 pb-4">
+        แก้ไขโปรไฟล์หรือเปลี่ยนรหัสผ่านได้จากเมนู <i class="bi bi-three-dots-vertical"></i> มุมขวาบน
+      </p>
     </div>
   </div>
 </template>
+
+<style scoped>
+.fade-up-enter-active, .fade-up-leave-active { transition: all 0.18s ease; }
+.fade-up-enter-from, .fade-up-leave-to { opacity: 0; transform: translateY(6px) scale(0.98); }
+</style>

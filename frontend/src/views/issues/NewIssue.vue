@@ -95,29 +95,29 @@ async function handleSubmit() {
 
 <template>
   <div class="max-w-2xl mx-auto">
-    <h1 class="text-2xl font-bold text-gray-900 mb-1"><i class="bi bi-pencil-square mr-1"></i> แจ้งปัญหา / ความคิดเห็น</h1>
+    <h1 class="text-xl sm:text-2xl font-bold text-gray-900 mb-1 leading-tight"><i class="bi bi-pencil-square mr-1 text-red-500"></i> แจ้งปัญหา / ความคิดเห็น</h1>
     <p class="text-gray-500 text-sm mb-6">เรื่องจะถูกส่งต่อไปยังหัวหน้าห้อง + รองฝ่าย เพื่อดำเนินการ</p>
 
     <!-- Step 1: หมวดหลัก -->
     <div class="mb-6">
       <label class="block text-sm font-medium text-gray-700 mb-2">1. เลือกหมวดหลัก</label>
-      <div class="grid grid-cols-3 gap-3">
+      <div class="grid grid-cols-3 gap-2 sm:gap-3">
         <button
           v-for="(info, key) in MAIN_CATEGORIES"
           :key="key"
           type="button"
           @click="mainCategory = key as MainCategory; category = ''"
-          class="p-4 rounded-xl border-2 text-center transition"
+          class="p-3 sm:p-4 min-h-[88px] sm:min-h-0 rounded-xl border-2 text-center transition flex flex-col items-center justify-center"
           :class="mainCategory === key
             ? 'border-red-600 bg-red-50 text-red-700'
             : 'border-gray-200 hover:border-red-300'"
         >
-          <div class="text-2xl mb-1">
+          <div class="text-xl sm:text-2xl mb-1">
             <i v-if="key === 'suggestion'" class="bi bi-lightbulb"></i>
             <i v-else-if="key === 'wellbeing'" class="bi bi-heart-pulse"></i>
             <i v-else class="bi bi-exclamation-triangle"></i>
           </div>
-          <div class="text-sm font-medium">{{ info.label }}</div>
+          <div class="text-xs sm:text-sm font-medium leading-snug break-words">{{ info.label }}</div>
         </button>
       </div>
     </div>

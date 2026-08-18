@@ -56,6 +56,11 @@ const goToProfile = () => {
   router.push({ name: 'profile' });
 };
 
+const goToPassword = () => {
+  closeDropdowns();
+  router.push({ name: 'profile-password' });
+};
+
 function logout() {
   closeDropdowns();
   Swal.fire({
@@ -160,7 +165,7 @@ const isActive = (path: string) => {
                 <button @click="goToProfile" class="w-full text-left px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors flex items-center gap-3">
                   <i class="bi bi-person-badge text-lg"></i> โปรไฟล์ของฉัน
                 </button>
-                <button @click="goToProfile" class="w-full text-left px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors flex items-center gap-3">
+                <button @click="goToPassword" class="w-full text-left px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors flex items-center gap-3">
                   <i class="bi bi-key text-lg"></i> เปลี่ยนรหัสผ่าน
                 </button>
                 <div class="h-px bg-gray-100 my-1"></div>
@@ -202,6 +207,9 @@ const isActive = (path: string) => {
         <div class="p-3 border-t border-gray-100">
           <button @click="isSidebarOpen = false; goToProfile()" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-gray-700 hover:bg-red-50">
             <i class="bi bi-person-badge text-lg"></i> โปรไฟล์ของฉัน
+          </button>
+          <button @click="isSidebarOpen = false; goToPassword()" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-gray-700 hover:bg-red-50">
+            <i class="bi bi-key text-lg"></i> เปลี่ยนรหัสผ่าน
           </button>
           <button @click="isSidebarOpen = false; logout()" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold text-red-500 hover:bg-red-50 mt-1">
             <i class="bi bi-box-arrow-right text-lg"></i> ออกจากระบบ

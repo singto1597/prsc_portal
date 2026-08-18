@@ -27,6 +27,18 @@ async function handleLogin() {
   isLoading.value = true;
   try {
     await authStore.login(username.value.trim(), password.value);
+    // บัญชีที่ระบบสร้างให้ (seed) → บังคับเปลี่ยนรหัสก่อนใช้งาน (router guard คุมอีกชั้น)
+    if (authStore.mustChangePassword) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'เข้าสู่ระบบสำเร็จ',
+        text: 'บัญชีนี้ต้องเปลี่ยนรหัสผ่านก่อนใช้งาน',
+        timer: 1800,
+        showConfirmButton: false,
+      });
+      router.push({ name: 'profile-password' });
+      return;
+    }
     Swal.fire({ icon: 'success', title: 'เข้าสู่ระบบสำเร็จ!', text: `ยินดีต้อนรับ`, timer: 1000, showConfirmButton: false });
     router.push({ name: homeRouteName() });
   } catch (e: any) {

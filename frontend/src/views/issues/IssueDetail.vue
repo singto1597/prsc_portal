@@ -241,8 +241,8 @@ function countdownLabel(days: number): string {
     <!-- Header -->
     <div class="bg-white rounded-xl shadow-sm p-5">
       <div class="flex items-start justify-between gap-3">
-        <div>
-          <div class="flex gap-2 mb-2">
+        <div class="min-w-0">
+          <div class="flex flex-wrap gap-2 mb-2">
             <span class="px-2.5 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">
               {{ MAIN_CATEGORY_LABELS[issue.main_category] }}
             </span>
@@ -253,10 +253,10 @@ function countdownLabel(days: number): string {
               {{ LEVEL_LABELS[issue.current_level] }}
             </span>
           </div>
-          <h1 class="text-xl font-bold text-gray-900">{{ issue.title }}</h1>
-          <p class="text-gray-500 text-sm mt-1">โดย {{ issue.reporter_name || 'ไม่ระบุชื่อ' }} {{ issue.reporter_room ? `(${issue.reporter_room})` : '' }}</p>
+          <h1 class="text-lg sm:text-xl font-bold text-gray-900 leading-snug break-words">{{ issue.title }}</h1>
+          <p class="text-gray-500 text-sm mt-1 break-words">โดย {{ issue.reporter_name || 'ไม่ระบุชื่อ' }} {{ issue.reporter_room ? `(${issue.reporter_room})` : '' }}</p>
         </div>
-        <span class="px-3 py-1 text-sm font-medium rounded-full whitespace-nowrap"
+        <span class="px-3 py-1 text-sm font-medium rounded-full whitespace-nowrap shrink-0"
           :class="{
             'bg-yellow-100 text-yellow-700': issue.status === 'pending',
             'bg-blue-100 text-blue-700': issue.status === 'in_progress',
@@ -272,27 +272,27 @@ function countdownLabel(days: number): string {
       <p class="text-xs text-gray-400 mt-3">แจ้งเมื่อ {{ fmtDate(issue.created_at) }} · ห้อง {{ issue.room_name }}</p>
     </div>
 
-    <!-- Actions -->
-    <div v-if="canReceive || canManage" class="flex flex-wrap gap-2">
+    <!-- Actions (mobile = ปุ่มเต็มแถว, กดง่าย) -->
+    <div v-if="canReceive || canManage" class="grid grid-cols-1 sm:flex sm:flex-wrap gap-2">
       <button v-if="canReceive" @click="handleAccept"
-        class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium">
+        class="px-4 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-700 text-sm font-medium">
         <i class="bi bi-hand-thumbs-up mr-1"></i> รับเรื่อง + ตั้งเวลา
       </button>
       <button v-if="canManage && canEscalate" @click="handleEscalate"
-        class="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm font-medium">
+        class="px-4 py-2.5 bg-orange-500 text-white rounded-xl hover:bg-orange-600 text-sm font-medium">
         <i class="bi bi-arrow-up-circle mr-1"></i> ส่งต่อไประดับบน
       </button>
       <button v-if="canManage && issue.status === 'in_progress'" @click="handleResolve"
-        class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium">
+        class="px-4 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 text-sm font-medium">
         <i class="bi bi-check2-circle mr-1"></i> ปิดเรื่อง (เสร็จแล้ว)
       </button>
       <button v-if="canManage && issue.countdown && issue.status === 'in_progress'" @click="handleExtendCountdown"
-        class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium">
+        class="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 text-sm font-medium">
         <i class="bi bi-clock-history mr-1"></i> ยืดเวลา
       </button>
       <!-- ยกเลิก (ผู้แจ้ง — กันส่งผิด) -->
       <button v-if="canCancel" @click="handleCancel"
-        class="px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 text-sm font-medium">
+        class="px-4 py-2.5 bg-red-50 text-red-600 border border-red-200 rounded-xl hover:bg-red-100 text-sm font-medium">
         <i class="bi bi-x-circle mr-1"></i> ยกเลิกเรื่อง
       </button>
     </div>
@@ -339,13 +339,14 @@ function countdownLabel(days: number): string {
       </div>
       <p v-else class="text-sm text-gray-400">ยังไม่มีขั้นตอนการดำเนินงาน</p>
 
-      <div v-if="canManage" class="mt-3 flex gap-2">
+      <div v-if="canManage" class="mt-3 grid grid-cols-1 sm:flex gap-2">
         <input v-model="newStepTitle" type="text" placeholder="เพิ่มขั้นตอน..."
-          class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+          class="w-full sm:flex-1 px-3 py-2.5 border border-gray-300 rounded-xl text-sm"
           @keyup.enter="handleAddStep" />
         <input v-model="newStepDetail" type="text" placeholder="รายละเอียด (ไม่บังคับ)"
-          class="w-48 px-3 py-2 border border-gray-300 rounded-lg text-sm hidden sm:block" />
-        <button @click="handleAddStep" class="px-3 py-2 bg-gray-100 rounded-lg text-sm hover:bg-gray-200">
+          class="w-full sm:w-48 px-3 py-2.5 border border-gray-300 rounded-xl text-sm"
+          @keyup.enter="handleAddStep" />
+        <button @click="handleAddStep" class="px-4 py-2.5 bg-gray-100 rounded-xl text-sm hover:bg-gray-200">
           <i class="bi bi-plus-lg"></i>
         </button>
       </div>

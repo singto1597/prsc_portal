@@ -202,7 +202,7 @@ const chartOptions = { responsive: true, maintainAspectRatio: false };
     <!-- ===== Header ===== -->
     <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
       <div>
-        <h1 class="text-2xl font-bold text-gray-900"><i class="bi bi-bar-chart mr-1"></i> แดชบอร์ด</h1>
+        <h1 class="text-xl sm:text-2xl font-bold text-gray-900 leading-tight"><i class="bi bi-bar-chart mr-1 text-red-500"></i> แดชบอร์ด</h1>
         <p v-if="lastUpdated" class="text-xs text-gray-400 mt-0.5">
           อัปเดตล่าสุด <span class="font-medium text-gray-500">{{ fmtDateTime(lastUpdated) }}</span>
         </p>

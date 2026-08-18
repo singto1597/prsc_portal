@@ -67,3 +67,37 @@ select:focus {
   transform: translateY(-2px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
 }
+
+/* ===================== คอมโพเนนต์สไตล์กลาง (เรียบ หรู มืออาชีพ) ===================== */
+@layer components {
+  /* การ์ดมาตรฐานของระบบ — ใช้แทน rounded-xl/shadow-sm ที่เคยเขียนซ้ำ ๆ */
+  .page-card {
+    @apply bg-white rounded-2xl shadow-sm;
+  }
+  /* ปุ่มหลัก gradient แดง (ใช้กับทุกหน้าให้เป็นหนึ่งเดียว) */
+  .btn-gradient {
+    @apply inline-flex items-center justify-center gap-1.5 py-2.5 px-4 bg-gradient-to-r from-red-600 to-rose-600
+           text-white rounded-xl font-semibold shadow-md shadow-red-200
+           hover:from-red-700 hover:to-rose-700 transition-all disabled:opacity-50 disabled:pointer-events-none;
+  }
+  /* ปุ่มรอง (ขอบบาง) */
+  .btn-ghost-ui {
+    @apply inline-flex items-center justify-center gap-1.5 py-2.5 px-4 bg-white border border-gray-200
+           text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 hover:text-gray-800 transition;
+  }
+}
+
+/* 📱 iOS Safari: ป้องกัน auto-zoom ตอนแตะช่องกรอก (ต้อง font-size ≥ 16px บนมือถือ)
+   — ตัว text-sm (14px) ของ Tailwind ทำให้ iOS ซูมจอทุกครั้งที่แตะ input → กันไว้เลย */
+@media (max-width: 640px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* ✨ กันข้อความยาว ๆ (ชื่อ/ลิงก์) ทำให้ layout กว้างเกินจอบนมือถือ */
+.min-w-0-important {
+  min-width: 0 !important;
+}

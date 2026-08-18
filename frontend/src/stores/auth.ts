@@ -16,6 +16,8 @@ export const useAuthStore = defineStore('auth', () => {
   const roles = computed(() => user.value?.roles || []);
   const isAdmin = computed(() => user.value?.is_admin ?? false);
   const permissions = computed(() => user.value?.permissions || []);
+  // บัญชีที่ระบบสร้างให้ (seed) → ต้องบังคับเปลี่ยนรหัสก่อนเข้าใช้งาน
+  const mustChangePassword = computed(() => user.value?.must_change_password ?? false);
 
   function setToken(token: string) {
     accessToken.value = token;
@@ -41,6 +43,11 @@ export const useAuthStore = defineStore('auth', () => {
     return me;
   }
 
+  // เคลียร์ flag บังคับเปลี่ยนรหัสฝั่ง client (หลังเปลี่ยนสำเร็จ — กัน redirect วน)
+  function markPasswordChanged() {
+    if (user.value) user.value.must_change_password = false;
+  }
+
   function hasPermission(perm: string): boolean {
     if (isAdmin.value) return true;
     return permissions.value.includes(perm);
@@ -61,10 +68,12 @@ export const useAuthStore = defineStore('auth', () => {
     roles,
     isAdmin,
     permissions,
+    mustChangePassword,
     setToken,
     setUser,
     login,
     loadMe,
+    markPasswordChanged,
     hasPermission,
     logout,
   };

@@ -17,5 +17,6 @@ export interface AuthUser {
   full_name: string | null;
   is_admin: boolean;
   permissions: string[];
+  must_change_password: boolean; // บัญชี seed: บังคับเปลี่ยนรหัสครั้งแรก
   roles: UserRoleInfo[];
 }

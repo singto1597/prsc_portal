@@ -38,6 +38,7 @@ async def init_db(pool: asyncpg.Pool):
                     avatar_url TEXT,
                     phone_number TEXT,
                     email TEXT UNIQUE,
+                    must_change_password BOOLEAN NOT NULL DEFAULT FALSE,  -- บัญชี seed: บังคับเปลี่ยนรหัสครั้งแรก
                     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                     deleted_at TIMESTAMP DEFAULT NULL
