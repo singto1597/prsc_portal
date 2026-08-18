@@ -241,6 +241,17 @@ const isActive = (path: string) => {
           </Transition>
         </RouterView>
       </main>
+
+      <!-- 🏫 Footer ทุกหน้าในระบบ — ตัวหนังสือเล็กๆ เงียบๆ คล้ายเครดิตหน้า login -->
+      <footer class="shrink-0 px-4 py-2.5 md:py-3 text-center border-t border-gray-100/80 bg-white/40">
+        <p class="text-[11px] text-gray-400 leading-relaxed">
+          คณะกรรมการสภานักเรียน · โรงเรียนพิริยาลัยจังหวัดแพร่
+          <span class="text-gray-300">© 2026</span>
+        </p>
+        <p class="text-[10px] text-gray-300 leading-relaxed mt-0.5">
+          151 ถ.ยันตรกิจโกศล ต.ในเวียง อ.เมือง จ.แพร่ 54000
+        </p>
+      </footer>
     </div>
   </div>
 </template>
