@@ -25,6 +25,7 @@ function statusColor(s: string) {
     resolved: 'bg-green-100 text-green-700',
     escalated: 'bg-orange-100 text-orange-700',
     cancelled: 'bg-gray-200 text-gray-500',
+    rejected: 'bg-rose-100 text-rose-700',
   }[s] || 'bg-gray-100 text-gray-600';
 }
 </script>

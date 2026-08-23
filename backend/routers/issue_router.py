@@ -199,14 +199,14 @@ async def resolve_issue(
 @router.post("/{issue_id}/cancel", response_model=dict)
 async def cancel_issue(
     issue_id: int,
-    req: EscalateRequest,  # reuse (field reason = เหตุผลยกเลิก)
+    req: EscalateRequest,  # reuse (field reason = เหตุผลยกเลิก/ปัดตก)
     user_ctx: dict = Depends(get_current_user),
     pool: asyncpg.Pool = Depends(get_db_pool),
 ):
-    """ยกเลิกเรื่อง (ผู้แจ้ง — กันส่งผิด)"""
+    """ยกเลิก/ปัดตกเรื่อง — ผู้แจ้งยกเลิก (cancelled) / ผู้ดูแลปัดตก (rejected)"""
     uid = _ensure_user(user_ctx)
     try:
-        await issue_service.cancel_issue(pool, uid, issue_id, req.reason)
+        new_status = await issue_service.cancel_issue(pool, uid, issue_id, req.reason)
     except (NotFoundError, ForbiddenError, ValidationError) as e:
         raise _err(e)
-    return {"status": "cancelled"}
+    return {"status": new_status}

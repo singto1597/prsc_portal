@@ -336,3 +336,14 @@
   3. **`public/robots.txt`** (`Allow: /` + `Sitemap:`) + **`sitemap.xml`** (`/` priority 1.0, `/login` 0.8) — ไฟล์ใน `public/` ถูก copy ไป dist อัตโนมัติตอน build
   4. **กฎ: SPA ที่ข้อมูลหลังล็อกอิน — เนื้อหา SEO ที่ Google เห็นคือหน้า login + meta tag; อย่าทิ้งหน้า login ให้เป็นแค่ฟอร์มว่าง**
 - **Date Added:** 2026-08-23
+
+### 🛠️ สถานะ `rejected` (ถูกปัดตก) — ผู้ดูแลปัดตกต้องแยกหมวดจากผู้แจ้งยกเลิก (`cancelled`)
+- **Context/Problem:** ตอนแรก `cancel_issue` ให้ทั้งผู้แจ้งและผู้ดูแล (ผู้รับ/admin/ครูระดับชั้น — `_can_manage_issue`) ตั้ง status='cancelled' ด้วย note default "ผู้แจ้งยกเลิกเรื่อง" → ครู/หัวหน้าห้องปัดตกเรื่อง ขึ้นไทม์ไลน์เหมือนผู้แจ้งยกเลิก (เข้าใจผิดว่าเป็นผู้แจ้งถอนเรื่องเอง) — requirement: ผู้ดูแลปัดตกต้องเป็นหมวดใหม่ "ถูกปัดตก"
+- **Root Cause:** endpoint เดียว `/cancel` รับทั้ง 2 บทบาทแต่ไม่แยกผลตาม actor; ไทม์ไลน์ (IssueDetail) โชว์แค่ `h.note` ไม่โชว์ status
+- **Correct Pattern/Solution:**
+  1. **backend `cancel_issue`:** ถ้า `reporter_id == user_id` → status='cancelled' + note "ผู้แจ้งยกเลิกเรื่อง"; นอกนั้น (ผ่าน `_can_manage_issue`) → status='rejected' + note "ถูกปัดตก[: เหตุผล]" — แล้ว **คืน status จริง** เพื่อให้ router `return {"status": new_status}` ตรงกับที่เกิดขึ้น
+  2. **เพิ่ม status ใหม่ครบทุกจุด:** dashboard `STATUS_LABELS`/`STATUS_ORDER` + summary `by_status_all.get("rejected", 0)` + `DashboardSummary.rejected` (pydantic + frontend interface); frontend `IssueStatus` union + `STATUS_LABELS`/`STATUS_DOT/BAR/BADGE/SHORT` (สี rose ต่างจาก cancelled เทา) + `statusColor` ใน MyIssues/ReceivedIssues + option filter ใน ReceivedIssues
+  3. **frontend ปุ่มแยก:** `canCancel` (เฉพาะผู้แจ้ง) = "ยกเลิกเรื่อง" / `canReject` (canManage และไม่ใช่ผู้แจ้ง) = "ปัดตก" — ปุ่มเดียว `v-if="canCancel || canReject"` แล้วป้าย/ข้อความยืนยันตาม `isReporter`; ทั้งคู่เรียก `/cancel` เดิม (backend ตัดสิน status จาก actor)
+  4. **ไทม์ไลน์:** เพิ่ม chip สีแสดง `STATUS_LABELS[h.status]` ต่อรายการ status_history — ให้เห็นชัดว่าจุดไหน "ถูกปัดตก" ไม่ต้องเดาจาก note อย่างเดียว
+  - **กฎ: ถ้า endpoint หนึ่งรองรับหลายบทบาทที่ควรได้ผลต่างกัน อย่า hardcode status ใน router — ให้ service ตัดสินจาก actor แล้วคืนค่าจริง; เวลาเพิ่ม status ใหม่ ไล่ grep `cancelled` ทั้ง frontend+backend (labels/colors/filter/dashboard/test) ให้ครบก่อน**
+- **Date Added:** 2026-08-23

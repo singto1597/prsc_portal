@@ -53,6 +53,7 @@ export interface DashboardSummary {
   resolved: number;
   escalated: number;
   cancelled: number;
+  rejected: number;
   overdue: number;
   total_students: number;
   total_rooms: number;

@@ -92,7 +92,7 @@ async def init_db(pool: asyncpg.Pool):
                 #   wellbeing  → physical_health / mental_health
                 #   report     → complaint / grievance
                 # current_level: ตอนนี้เรื่องอยู่ที่ระดับไหน (room / level / council)
-                # status: 'pending' (ยังไม่มีใครรับ) / 'in_progress' / 'resolved' / 'escalated' / 'cancelled'
+                # status: 'pending' (ยังไม่มีใครรับ) / 'in_progress' / 'resolved' / 'escalated' / 'cancelled' / 'rejected'
                 await conn.execute("""
                 CREATE TABLE IF NOT EXISTS issues (
                     id SERIAL PRIMARY KEY,
@@ -108,7 +108,7 @@ async def init_db(pool: asyncpg.Pool):
                     current_level TEXT DEFAULT 'room',   -- ระดับปัจจุบัน: room / level / council
                     current_assignee_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
                     current_assignee_role TEXT,          -- บทบาทผู้รับปัจจุบัน (class_president, vice_academic, ...)
-                    status TEXT DEFAULT 'pending',       -- pending / in_progress / resolved / escalated / cancelled
+                    status TEXT DEFAULT 'pending',       -- pending / in_progress / resolved / escalated / cancelled / rejected
                     priority TEXT DEFAULT 'normal',      -- low / normal / high / urgent
                     is_anonymous BOOLEAN DEFAULT FALSE,
                     resolved_at TIMESTAMP WITH TIME ZONE,

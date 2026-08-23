@@ -14,10 +14,11 @@ STATUS_LABELS = {
     "resolved": "แก้ไขเสร็จ",
     "escalated": "ส่งต่อระดับบน",
     "cancelled": "ถูกยกเลิก",
+    "rejected": "ถูกปัดตก",
 }
 
 # ลำดับสถานะคงที่ (ให้ UI เรียงแน่นอน + เติม 0 ให้ครบ)
-STATUS_ORDER = ["pending", "in_progress", "escalated", "resolved", "cancelled"]
+STATUS_ORDER = ["pending", "in_progress", "escalated", "rejected", "resolved", "cancelled"]
 
 # เขตเวลาโรงเรียน (ทุกที่ในระบบ)
 BKK = timezone(timedelta(hours=7))
@@ -264,6 +265,7 @@ async def get_dashboard(pool: asyncpg.Pool, user_id: int) -> dict:
         "resolved": by_status_all.get("resolved", 0),
         "escalated": by_status_all.get("escalated", 0),
         "cancelled": by_status_all.get("cancelled", 0),
+        "rejected": by_status_all.get("rejected", 0),
         "overdue": overdue,
         "total_students": total_students,
         "total_rooms": total_rooms,

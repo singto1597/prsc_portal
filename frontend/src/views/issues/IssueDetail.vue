@@ -53,12 +53,23 @@ const canEscalate = computed(() => {
   return issue.value?.status === 'in_progress';
 });
 
+const isReporter = computed(() => !!issue.value && !!authStore.user && issue.value.reporter_id === authStore.user.id);
+
 const canCancel = computed(() => {
   if (!issue.value || !authStore.user) return false;
-  // เฉพาะผู้แจ้ง หรือ admin
-  const isReporter = issue.value.reporter_id === authStore.user.id;
-  if (!isReporter && !authStore.isAdmin) return false;
+  // เฉพาะผู้แจ้งเท่านั้นที่กดยกเลิก (กันส่งผิด) — ผู้ดูแลใช้ปัดตกแทน
+  if (!isReporter.value) return false;
   // เรื่องที่ปิดแล้ว ยกเลิกไม่ได้
+  if (issue.value.status === 'resolved') return false;
+  return true;
+});
+
+// ผู้ดูแล (ผู้รับ/admin) ปัดตกเรื่อง — ต่างจากผู้แจ้งยกเลิก (backend แยกเป็น status 'rejected')
+const canReject = computed(() => {
+  if (!issue.value || !authStore.user) return false;
+  if (isReporter.value) return false;
+  if (!canManage.value) return false;
+  // เรื่องที่ปิดแล้ว ปัดตกไม่ได้
   if (issue.value.status === 'resolved') return false;
   return true;
 });
@@ -175,14 +186,17 @@ async function handleResolve() {
 
 async function handleCancel() {
   if (!issue.value) return;
+  const reporterCancel = isReporter.value;
   const { value } = await Swal.fire({
     icon: 'warning',
-    title: 'ยกเลิกเรื่องนี้?',
-    text: 'กันส่งผิดหรือไม่ต้องการแล้ว — เมื่อยกเลิกแล้วจะกู้คืนไม่ได้',
+    title: reporterCancel ? 'ยกเลิกเรื่องนี้?' : 'ปัดตกเรื่องนี้?',
+    text: reporterCancel
+      ? 'กันส่งผิดหรือไม่ต้องการแล้ว — เมื่อยกเลิกแล้วจะกู้คืนไม่ได้'
+      : 'ผู้ดูแลกำลังปัดตกเรื่องนี้ — หลังปัดตกแล้วจะกู้คืนไม่ได้',
     input: 'text',
     inputPlaceholder: 'เหตุผล (ไม่บังคับ)',
     showCancelButton: true,
-    confirmButtonText: 'ยกเลิกเรื่อง',
+    confirmButtonText: reporterCancel ? 'ยกเลิกเรื่อง' : 'ปัดตก',
     confirmButtonColor: '#ef4444',
     cancelButtonText: 'กลับไป',
   });
@@ -190,10 +204,15 @@ async function handleCancel() {
 
   try {
     await cancelIssue(issue.value.id, value || undefined);
-    Swal.fire({ icon: 'success', title: 'ยกเลิกเรื่องแล้ว', timer: 1500, showConfirmButton: false });
+    Swal.fire({
+      icon: 'success',
+      title: reporterCancel ? 'ยกเลิกเรื่องแล้ว' : 'ปัดตกเรื่องแล้ว',
+      timer: 1500,
+      showConfirmButton: false,
+    });
     load();
   } catch (e: any) {
-    Swal.fire({ icon: 'error', title: 'ยกเลิกไม่สำเร็จ', text: e.message });
+    Swal.fire({ icon: 'error', title: 'ไม่สำเร็จ', text: e.message });
   }
 }
 
@@ -230,6 +249,18 @@ function countdownLabel(days: number): string {
   if (days === 1) return 'เหลือ 1 วัน';
   return `เหลือ ${days} วัน`;
 }
+
+// สี badge สำหรับรายการในไทม์ไลน์ (ตามสถานะแต่ละจุด) — ให้เห็นชัดว่าจุดไหน "ถูกปัดตก"
+function historyStatusBadge(s: string): string {
+  return {
+    pending: 'bg-yellow-100 text-yellow-700',
+    in_progress: 'bg-blue-100 text-blue-700',
+    escalated: 'bg-orange-100 text-orange-700',
+    resolved: 'bg-green-100 text-green-700',
+    cancelled: 'bg-gray-200 text-gray-500',
+    rejected: 'bg-rose-100 text-rose-700',
+  }[s] || 'bg-gray-100 text-gray-600';
+}
 </script>
 
 <template>
@@ -263,6 +294,7 @@ function countdownLabel(days: number): string {
             'bg-green-100 text-green-700': issue.status === 'resolved',
             'bg-orange-100 text-orange-700': issue.status === 'escalated',
             'bg-gray-200 text-gray-500': issue.status === 'cancelled',
+            'bg-rose-100 text-rose-700': issue.status === 'rejected',
           }"
         >
           {{ STATUS_LABELS[issue.status] }}
@@ -290,10 +322,10 @@ function countdownLabel(days: number): string {
         class="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 text-sm font-medium">
         <i class="bi bi-clock-history mr-1"></i> ยืดเวลา
       </button>
-      <!-- ยกเลิก (ผู้แจ้ง — กันส่งผิด) -->
-      <button v-if="canCancel" @click="handleCancel"
+      <!-- ยกเลิก (ผู้แจ้ง — กันส่งผิด) / ปัดตก (ผู้ดูแล) -->
+      <button v-if="canCancel || canReject" @click="handleCancel"
         class="px-4 py-2.5 bg-red-50 text-red-600 border border-red-200 rounded-xl hover:bg-red-100 text-sm font-medium">
-        <i class="bi bi-x-circle mr-1"></i> ยกเลิกเรื่อง
+        <i class="bi bi-x-circle mr-1"></i> {{ isReporter ? 'ยกเลิกเรื่อง' : 'ปัดตก' }}
       </button>
     </div>
 
@@ -358,7 +390,10 @@ function countdownLabel(days: number): string {
       <div v-if="issue.status_history && issue.status_history.length" class="relative pl-5 border-l-2 border-gray-200 space-y-4">
         <div v-for="h in issue.status_history" :key="h.id" class="relative">
           <div class="absolute -left-[25px] top-1 w-3 h-3 rounded-full bg-red-500"></div>
-          <p class="text-sm text-gray-700">{{ h.note }}</p>
+          <span class="px-2 py-0.5 text-[11px] font-medium rounded-full" :class="historyStatusBadge(h.status)">
+            {{ STATUS_LABELS[h.status] || h.status }}
+          </span>
+          <p class="text-sm text-gray-700 mt-1">{{ h.note }}</p>
           <p class="text-xs text-gray-400">{{ fmtDate(h.created_at) }}</p>
         </div>
       </div>
