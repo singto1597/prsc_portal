@@ -5,8 +5,8 @@
 @tailwind utilities;
 
 :root {
-  /* ฟอนต์หลัก Prompt (ไทย) — fallback sans-serif เสมอ กันหลุดไป serif */
-  font-family: 'Prompt', Tahoma, Arial, system-ui, -apple-system, sans-serif;
+  /* ฟอนต์หลัก Noto Sans Thai (ไทย) — fallback sans-serif เสมอ กันหลุดไป serif */
+  font-family: 'Noto Sans Thai', Tahoma, Arial, system-ui, -apple-system, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 }
@@ -14,7 +14,7 @@
 body {
   margin: 0;
   min-height: 100vh;
-  /* ใช้ font-sans จาก Tailwind config (Prompt) + anti-aliasing ตัวหนังสือเรียบ */
+  /* ใช้ font-sans จาก Tailwind config (Noto Sans Thai) + anti-aliasing ตัวหนังสือเรียบ */
   @apply font-sans antialiased;
 }
 

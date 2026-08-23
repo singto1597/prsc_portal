@@ -17,7 +17,7 @@ const route = useRoute();
 body {
   @apply bg-gray-50 text-gray-900;
   margin: 0;
-  /* ฟอนต์หลัก Prompt (ไทย) — fallback sans-serif เสมอ (ตรงกับ tailwind.config + main.css) */
-  font-family: 'Prompt', Tahoma, Arial, system-ui, -apple-system, sans-serif;
+  /* ฟอนต์หลัก Noto Sans Thai (ไทย) — fallback sans-serif เสมอ (ตรงกับ tailwind.config + main.css) */
+  font-family: 'Noto Sans Thai', Tahoma, Arial, system-ui, -apple-system, sans-serif;
 }
 </style>
