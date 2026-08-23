@@ -5,7 +5,8 @@
 @tailwind utilities;
 
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  /* ฟอนต์หลัก Prompt (ไทย) — fallback sans-serif เสมอ กันหลุดไป serif */
+  font-family: 'Prompt', Tahoma, Arial, system-ui, -apple-system, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 }
@@ -13,6 +14,8 @@
 body {
   margin: 0;
   min-height: 100vh;
+  /* ใช้ font-sans จาก Tailwind config (Prompt) + anti-aliasing ตัวหนังสือเรียบ */
+  @apply font-sans antialiased;
 }
 
 /* 🔧 ช่องพิมพ์ข้อความ: พื้นหลังขาว + ตัวหนังสือเข้ม (กัน daisyUI theme ครอบ) */

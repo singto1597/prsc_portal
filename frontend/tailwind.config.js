@@ -5,7 +5,20 @@ export default {
     "./src/**/*.{vue,js,ts,jsx,tsx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        // ฟอนต์หลัก 'Prompt' (รองรับภาษาไทย) — fallback เป็น sans-serif เสมอ
+        // กัน Google Fonts โหลดไม่ทัน/โดน block แล้วหลุดไปเป็น serif
+        sans: [
+          'Prompt',
+          'Tahoma',
+          'Arial',
+          'system-ui',
+          '-apple-system',
+          'sans-serif',
+        ],
+      },
+    },
   },
   plugins: [
     require('daisyui'),
