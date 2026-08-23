@@ -165,6 +165,7 @@ function statusColor(s: string) {
     resolved: 'bg-green-100 text-green-700',
     escalated: 'bg-orange-100 text-orange-700',
     cancelled: 'bg-gray-200 text-gray-500',
+    rejected: 'bg-rose-100 text-rose-700',
   }[s] || 'bg-gray-100 text-gray-600';
 }
 </script>
@@ -209,6 +210,7 @@ function statusColor(s: string) {
         <option value="escalated">ส่งต่อ</option>
         <option value="resolved">เสร็จแล้ว</option>
         <option value="cancelled">ถูกยกเลิก</option>
+        <option value="rejected">ถูกปัดตก</option>
       </select>
       <span class="self-center text-sm text-gray-400 px-1">
         แสดง {{ issues.length }} เรื่อง

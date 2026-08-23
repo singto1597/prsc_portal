@@ -762,8 +762,13 @@ async def resolve_issue(pool: asyncpg.Pool, user_id: int, issue_id: int, note: O
             )
 
 
-async def cancel_issue(pool: asyncpg.Pool, user_id: int, issue_id: int, reason: Optional[str] = None) -> None:
-    """ยกเลิกเรื่อง (เฉพาะผู้แจ้ง หรือ admin) — กันส่งผิด/ไม่ต้องการแล้ว"""
+async def cancel_issue(pool: asyncpg.Pool, user_id: int, issue_id: int, reason: Optional[str] = None) -> str:
+    """
+    ยกเลิก/ปัดตกเรื่อง
+    - ผู้แจ้งกดยกเลิก → status='cancelled' (ถูกยกเลิก)
+    - ผู้ดูแล (ผู้รับ/admin/ครูระดับชั้น) กดปัดตก → status='rejected' (ถูกปัดตก) — แยกหมวดจากผู้แจ้งยกเลิก
+    คืน status ที่ตั้ง เพื่อให้ router ตอบกลับตรงกับสิ่งที่เกิดขึ้น
+    """
     async with pool.acquire() as conn:
         async with conn.transaction():
             issue = await conn.fetchrow(
@@ -773,29 +778,39 @@ async def cancel_issue(pool: asyncpg.Pool, user_id: int, issue_id: int, reason: 
             if not issue:
                 raise NotFoundError("ไม่พบเรื่องนี้")
 
-            # ตรวจว่าเป็นผู้แจ้ง หรือ admin/ครูที่จัดการเรื่องนี้ได้
+            # ตรวจว่าเป็นผู้แจ้ง หรือผู้ดูแลเรื่องนี้ได้ (ผู้รับ/admin/ครูระดับชั้น)
             if issue["reporter_id"] != user_id and not await _can_manage_issue(conn, user_id, issue):
-                raise ForbiddenError("เฉพาะผู้แจ้งเรื่องนี้เท่านั้นที่ยกเลิกได้")
+                raise ForbiddenError("เฉพาะผู้แจ้งหรือผู้ดูแลเรื่องนี้เท่านั้นที่ยกเลิก/ปัดตกได้")
 
             # ถ้าเรื่องเสร็จแล้ว/ปิดแล้ว ยกเลิกไม่ได้
             if issue["status"] in ("resolved",):
                 raise ValidationError("เรื่องนี้ปิดไปแล้ว — ยกเลิกไม่ได้")
 
+            # ผู้แจ้ง → ถูกยกเลิก, ผู้ดูแล → ถูกปัดตก
+            if issue["reporter_id"] == user_id:
+                new_status = "cancelled"
+                default_note = "ผู้แจ้งยกเลิกเรื่อง"
+            else:
+                new_status = "rejected"
+                default_note = "ถูกปัดตก"
+
             await conn.execute(
                 """
                 UPDATE issues
-                SET status = 'cancelled', updated_at = NOW()
-                WHERE id = $1
+                SET status = $1, updated_at = NOW()
+                WHERE id = $2
                 """,
-                issue_id
+                new_status, issue_id
             )
+            note = f"{default_note}" + (f": {reason}" if reason else "")
             await conn.execute(
                 """
                 INSERT INTO issue_status_history (issue_id, status, changed_by, note)
-                VALUES ($1, 'cancelled', $2, $3)
+                VALUES ($1, $2, $3, $4)
                 """,
-                issue_id, user_id, reason or "ผู้แจ้งยกเลิกเรื่อง"
+                issue_id, new_status, user_id, note
             )
+            return new_status
 
 
 # ============================================================

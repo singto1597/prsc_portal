@@ -59,6 +59,7 @@ class DashboardSummary(BaseModel):
     resolved: int
     escalated: int
     cancelled: int
+    rejected: int                          # ผู้ดูแลปัดตก (ถูกปัดตก)
     overdue: int                          # งานกำลังดำเนินการที่เกินกำหนดเวลา
     total_students: int
     total_rooms: int

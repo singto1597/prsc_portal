@@ -394,7 +394,7 @@ async def test_dashboard_main_categories_grouping(client, db_pool, dashboard_wor
             "SELECT status, COUNT(*) AS cnt FROM issues WHERE deleted_at IS NULL GROUP BY status"
         )
     db_by_status = {r["status"]: r["cnt"] for r in db_status_rows}
-    for st in ("pending", "in_progress", "escalated", "resolved", "cancelled"):
+    for st in ("pending", "in_progress", "escalated", "resolved", "cancelled", "rejected"):
         assert all_status[st] == db_by_status.get(st, 0), f"สถานะ {st}: body={all_status[st]} DB={db_by_status.get(st, 0)}"
 
     assert body["total_issues"] == db_total == 7
@@ -403,6 +403,57 @@ async def test_dashboard_main_categories_grouping(client, db_pool, dashboard_wor
     # ---- trend: 7 วัน + รวมเรื่อง 7 (ใช้ sum — กัน flaky ตอนข้ามเที่ยงคืน Asia/Bangkok) ----
     assert len(body["trend"]) == 7
     assert sum(t["count"] for t in body["trend"]) == 7
+
+
+# === Section 2.5: ยกเลิก/ปัดตก (cancelled = ผู้แจ้ง, rejected = ผู้ดูแล) ===
+@pytest.mark.asyncio
+async def test_cancel_by_manager_becomes_rejected(client, db_pool, dashboard_world):
+    """
+    ผู้แจ้งยกเลิก → 'cancelled' (ถูกยกเลิก)
+    ผู้ดูแล (หัวหน้าห้องผู้รับ) ปัดตก → 'rejected' (ถูกปัดตก) + ไทม์ไลน์ note มีคำว่า "ถูกปัดตก"
+    """
+    world = dashboard_world
+
+    # ผู้แจ้ง (s4) ยกเลิกเรื่องของตัวเอง → cancelled
+    r = _mk(client, world, title="ผู้แจ้งยกเลิก")
+    i_reporter = r.json()["id"]
+    assert _cancel(client, world, i_reporter, actor="s4").status_code == 200
+    body = client.get(
+        f"/api/issues/{i_reporter}",
+        headers={"Authorization": f"Bearer {world['s4']['token']}"},
+    ).json()
+    assert body["status"] == "cancelled"
+
+    # ผู้ดูแล (หัวหน้าห้องผู้รับเรื่อง) ปัดตก → rejected
+    r = _mk(client, world, title="ผู้ดูแลปัดตก")
+    i_man = r.json()["id"]
+    assert _accept(client, world, i_man, actor="head").status_code == 200
+    assert _cancel(client, world, i_man, actor="head").status_code == 200
+    body = client.get(
+        f"/api/issues/{i_man}",
+        headers={"Authorization": f"Bearer {world['s4']['token']}"},
+    ).json()
+    assert body["status"] == "rejected"
+    rejected_hist = [h for h in body["status_history"] if h["status"] == "rejected"]
+    assert rejected_hist and "ถูกปัดตก" in (rejected_hist[-1]["note"] or "")
+
+    # Deep DB verify: status + note จริงในฐานข้อมูล
+    async with db_pool.acquire() as conn:
+        db_status = await conn.fetchval("SELECT status FROM issues WHERE id = $1", i_man)
+        db_note = await conn.fetchval(
+            "SELECT note FROM issue_status_history WHERE issue_id = $1 AND status = 'rejected' "
+            "ORDER BY id DESC LIMIT 1",
+            i_man,
+        )
+        db_reporter_status = await conn.fetchval("SELECT status FROM issues WHERE id = $1", i_reporter)
+    assert db_status == "rejected"
+    assert db_note and "ถูกปัดตก" in db_note
+    assert db_reporter_status == "cancelled"
+
+    # คนนอก (ไม่ใช่ผู้แจ้ง/ผู้รับ/admin) → ปัดตกไม่ได้ (403)
+    r = _mk(client, world, title="คนนอกปัดตกไม่ได้")
+    i_out = r.json()["id"]
+    assert _cancel(client, world, i_out, actor="s5").status_code == 403
 
 
 # === Section 3: งานเกินเวลา (overdue) ===

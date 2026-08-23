@@ -1,7 +1,7 @@
 // Issue / Feedback data models
 
 export type IssueLevel = 'room' | 'level' | 'council';
-export type IssueStatus = 'pending' | 'in_progress' | 'resolved' | 'escalated' | 'cancelled';
+export type IssueStatus = 'pending' | 'in_progress' | 'resolved' | 'escalated' | 'cancelled' | 'rejected';
 
 // หมวดหลัก 3 หมวด (ตรงกับ backend config/categories.json)
 export type MainCategory = 'suggestion' | 'wellbeing' | 'report';
@@ -126,6 +126,7 @@ export const STATUS_LABELS: Record<string, string> = {
   resolved: 'แก้ไขเสร็จ',
   escalated: 'ส่งต่อระดับบน',
   cancelled: 'ถูกยกเลิก',
+  rejected: 'ถูกปัดตก',
 };
 
 export const LEVEL_LABELS: Record<IssueLevel, string> = {
