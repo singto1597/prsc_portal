@@ -326,3 +326,13 @@
   3. **วิธีตรวจโดยไม่เห็นภาพ:** playwright `document.elementFromPoint(x,y)` + เปรียบเทียบ `getBoundingClientRect()` ว่าตรงไหนทับกัน แล้วดูว่า element ไหนเป็น topmost (เทียบ class) — หา bug "มี element ทับกัน" ได้แม่นกว่าการเดาจากโค้ด
   - **กฎ: ใน layout ที่ดึง element ด้วย margin ลบ/ซ้อนทับกัน ถ้าเห็นเงา/แถบ/element ตกแต่งวาดทับ content ให้สงสัย painting order ก่อน — element `position` ใดๆ (z-auto) จะทับ in-flow เสมอ ต้องเติม `relative z-*` ที่ content ที่ควรอยู่บนสุด**
 - **Date Added:** 2026-08-18
+
+### 🛠️ SPA หลังล็อกอิน — SEO/Google ต้องใส่เนื้อหาแนะนำไว้ที่หน้า Login + meta/JSON-LD ใน index.html
+- **Context/Problem:** ทั้งเว็บเป็น SPA ที่ต้องล็อกอินก่อนเข้าถึง → Google ไม่มีหน้าสาธารณะให้ crawl เนื้อหา (dashboard/issues โดน guard หมด) — คำค้น "สภานักเรียน พิริยาลัย" ไม่เจอเว็บ
+- **Root Cause:** หน้าเดียวที่เข้าได้ก่อนล็อกอินคือ `/login` ซึ่งเดิมเป็นแค่ฟอร์ม 2 ช่อง ไม่มีข้อความแนะนำ + `index.html` มีแค่ title/description สั้นๆ
+- **Correct Pattern/Solution:**
+  1. **หน้า login = หน้าแนะนำเว็บไซต์:** แบ่งเป็น 2 แผง (desktop `grid lg:grid-cols-2`) — แผงซ้าย gradient แดง = โลโก้ + "PIRIvoice คืออะไร/ทำอะไร" + จุดเด่น (แจ้งเรื่อง/ไต่ระดับ/นับถอยหลัง/dashboard) + ขั้นตอนทำงาน + คีย์เวิร์ดค้นหา (#tags) + ข้อมูลโรงเรียน/ที่อยู่; แผงขวา = ฟอร์มล็อกอิน (มือถือ `lg:hidden` แผงแนะนำมาก่อน ฟอร์มตาม)
+  2. **`index.html` เต็มรูปแบบ:** `title` + `description` + `keywords` (ไทย+อังกฤษ รวมชื่อเก่า PRSC, พรส, piriyalai) + `canonical` + `robots: index,follow` + Open Graph (`og:url/image`) + Twitter Card + `JSON-LD` 2 บล็อก (`WebSite` + `EducationalOrganization` พร้อมที่อยู่) — ใส่ `lang="th"` และ `theme-color` แล้ว
+  3. **`public/robots.txt`** (`Allow: /` + `Sitemap:`) + **`sitemap.xml`** (`/` priority 1.0, `/login` 0.8) — ไฟล์ใน `public/` ถูก copy ไป dist อัตโนมัติตอน build
+  4. **กฎ: SPA ที่ข้อมูลหลังล็อกอิน — เนื้อหา SEO ที่ Google เห็นคือหน้า login + meta tag; อย่าทิ้งหน้า login ให้เป็นแค่ฟอร์มว่าง**
+- **Date Added:** 2026-08-23
