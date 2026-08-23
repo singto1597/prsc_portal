@@ -88,9 +88,14 @@ async function handleLogin() {
     <!-- ⚡ Navbar: Minimalist -->
     <header class="relative z-20 flex items-center justify-between px-6 py-6 mx-auto max-w-7xl lg:px-8 animate-fade-in">
       <div class="flex items-center gap-3">
+        <!-- แก้ไขเรื่องโลโก้บีบ/เพี้ยน ด้วยการสร้างกล่องครอบตายตัวและใช้ object-contain -->
         <div class="flex items-center gap-2">
-          <img src="/logos/school-logo.png" alt="School Logo" class="w-10 h-10 object-cover rounded-xl shadow-sm border border-slate-200/60 transition-transform duration-300 hover:scale-105" />
-          <img src="/logos/council-logo.png" alt="Council Logo" class="w-10 h-10 object-cover rounded-xl shadow-sm border border-slate-200/60 transition-transform duration-300 hover:scale-105" />
+          <div class="w-10 h-10 bg-white rounded-xl shadow-sm border border-slate-200/60 p-1 flex items-center justify-center transition-transform duration-300 hover:scale-105">
+            <img src="/logos/school-logo.png" alt="School Logo" class="w-full h-full object-contain" />
+          </div>
+          <div class="w-10 h-10 bg-white rounded-xl shadow-sm border border-slate-200/60 p-1 flex items-center justify-center transition-transform duration-300 hover:scale-105">
+            <img src="/logos/council-logo.png" alt="Council Logo" class="w-full h-full object-contain" />
+          </div>
         </div>
         <div class="hidden sm:block border-l border-slate-300 h-6 mx-2"></div>
         <a href="/" class="flex items-center gap-1 group">
@@ -124,7 +129,6 @@ async function handleLogin() {
             
             <h1 class="text-4xl font-black tracking-tight text-slate-900 sm:text-5xl lg:text-[3.5rem] leading-[1.15]">
               ให้เสียงของทุกคน <br class="hidden lg:block" />
-              <!-- ใส่ Gradient ที่มีมิติมากขึ้น -->
               <span class="text-transparent bg-clip-text bg-gradient-to-br from-red-600 via-rose-500 to-red-600 drop-shadow-sm">ไม่ถูกมองข้าม</span>
             </h1>
             
@@ -140,7 +144,7 @@ async function handleLogin() {
             </div>
           </div>
 
-          <!-- ฝั่งขวา: Login Card (ปรับตำแหน่ง mx-auto ให้อยู่กึ่งกลาง ไม่ติดขวา) -->
+          <!-- ฝั่งขวา: Login Card -->
           <div class="order-1 lg:order-2 animate-slide-up-fade" style="animation-delay: 100ms;">
             <div class="relative w-full max-w-[420px] mx-auto">
               <!-- การ์ดซ้อนด้านหลัง สร้างมิติที่สวยขึ้นและเรืองแสงนิดๆ -->
@@ -148,9 +152,19 @@ async function handleLogin() {
               
               <div class="relative bg-white/90 backdrop-blur-xl border border-white shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] rounded-[2rem] p-8 sm:p-10">
                 <div class="text-center mb-8">
-                  <div class="inline-flex justify-center items-center w-12 h-12 rounded-xl bg-red-50 text-red-600 mb-4 shadow-sm border border-red-100">
-                    <i class="bi bi-box-arrow-in-right text-2xl"></i>
+                  
+                  <!-- นำโลโก้ทั้ง 2 มาวางแทนไอคอนแบบเก่า พร้อมปรับให้ไม่เพี้ยน -->
+                  <div class="flex items-center justify-center gap-4 mb-5">
+                    <div class="w-16 h-16 bg-white rounded-full shadow-lg ring-2 ring-red-100 ring-offset-2 p-1.5 flex items-center justify-center relative group">
+                      <div class="absolute inset-0 bg-red-400/20 rounded-full blur-md opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                      <img src="/logos/school-logo.png" alt="โลโก้โรงเรียน" class="relative w-full h-full object-contain" />
+                    </div>
+                    <div class="w-16 h-16 bg-white rounded-full shadow-lg ring-2 ring-rose-100 ring-offset-2 p-1.5 flex items-center justify-center relative group">
+                       <div class="absolute inset-0 bg-rose-400/20 rounded-full blur-md opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                      <img src="/logos/council-logo.png" alt="โลโก้สภานักเรียน" class="relative w-full h-full object-contain" />
+                    </div>
                   </div>
+
                   <h2 class="text-2xl font-bold tracking-tight text-slate-900">เข้าสู่ระบบ</h2>
                   <p class="mt-2 text-sm text-slate-500">กรุณากรอกข้อมูลเพื่อเข้าใช้งานระบบ</p>
                 </div>
@@ -238,7 +252,7 @@ async function handleLogin() {
           </div>
 
           <div class="grid grid-cols-1 gap-6 mt-12 sm:grid-cols-2 lg:grid-cols-4 animate-slide-up-fade" style="animation-delay: 300ms;">
-            <!-- Feature Cards (เพิ่ม Hover effect ให้นุ่มนวลขึ้น) -->
+            <!-- Feature Cards -->
             <div v-for="(f, index) in introFeatures" :key="index" class="group p-6 transition-all duration-300 bg-white/80 backdrop-blur-sm border rounded-2xl border-slate-200 hover:border-red-300 hover:shadow-xl hover:shadow-red-100/50 hover:-translate-y-1.5">
               <div class="flex items-center justify-center w-12 h-12 mb-5 rounded-xl bg-slate-50 text-slate-500 group-hover:bg-red-50 group-hover:text-red-600 transition-colors duration-300 border border-slate-100 group-hover:border-red-100">
                 <i :class="['bi', f.icon, 'text-xl']"></i>
@@ -248,7 +262,7 @@ async function handleLogin() {
             </div>
           </div>
 
-          <!-- Flow Steps (อัปเกรดความสวยงามของ Timeline) -->
+          <!-- Flow Steps -->
           <div class="mt-20 pt-16 border-t border-slate-200/60 animate-slide-up-fade" style="animation-delay: 400ms;">
             <div class="text-center mb-10">
               <h3 class="text-lg font-bold text-slate-800">ขั้นตอนการทำงาน</h3>
@@ -258,7 +272,6 @@ async function handleLogin() {
                 <div class="flex flex-col items-center text-center flex-1 w-full group">
                   <div class="relative w-16 h-16 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-400 mb-5 z-10 transition-all duration-300 group-hover:border-rose-300 group-hover:shadow-rose-100 group-hover:text-rose-600 group-hover:-translate-y-1">
                     <i :class="['bi', step.icon, 'text-2xl']"></i>
-                    <!-- ตัวเลขลำดับ (ปรับให้ดู Modern) -->
                     <span class="absolute -top-2 -right-2 w-6 h-6 bg-slate-900 text-white text-[11px] font-bold rounded-lg flex items-center justify-center shadow-md border-2 border-white group-hover:bg-rose-600 transition-colors">
                       {{ idx + 1 }}
                     </span>
