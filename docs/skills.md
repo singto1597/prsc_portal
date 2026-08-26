@@ -362,3 +362,15 @@
   4. **authorization:** แก้เรื่อง = `reporter_id == user_id` หรือ admin (`_is_admin`); คอมเมนต์ = ใครเห็นเรื่องได้ (`_assert_can_view` = visibility เดียวกับ `get_issue`) + แก้/ลบเฉพาะ `user_id` ของตัวเอง
   - **กฎ: (1) dynamic PATCH ต้อง `model_dump(exclude_unset=True)` + จอง `$1` WHERE แล้ว field เริ่ม `len(params)+1`; (2) snapshot ชื่อจาก students ต้อง TRIM + fallback users.full_name เพราะ first/last name ว่างได้; (3) schema ใหม่ต้องเข้าทั้ง init_db + migration + conftest TRUNCATE; (4) เทส audit jsonb ต้อง json.loads**
 - **Date Added:** 2026-08-26
+
+### 🛠️ รับเรื่อง (accept) — ระดับสูงกว่ากดรับแทนหัวหน้าห้องได้เลย แต่ต้องกัน 2 รั่ว: รับเรื่องห้องอื่น + ครูก้าวข้าม scope
+- **Context/Problem:** เดิม `accept_issue` ใช้ `level == current_level` → ประธานระดับ/สภาจะรับเรื่องระดับ room ไม่ได้จนกว่าหัวหน้าห้องจะรับก่อน (ต้องรอไล่ระดับ) — requirement: ผู้ที่อยู่ระดับสูงกว่า (ประธานระดับ/สภา/ประธานสภา/แอดมิน) เห็นเรื่องแล้วอยากรับเลย ให้รับแทนหัวหน้าห้องในระดับนั้นได้
+- **Root Cause:** เปรียบเทียบระดับแบบ equality; และเวลาเปลี่ยนเป็น ">= " (LEVEL_RANK) ระวัง 2 รั่วใหม่: (1) หัวหน้าห้องห้อง A (ระดับ room) รับเรื่องห้อง B ได้ (ทั้งที่ควรรับเฉพาะห้องตัวเอง); (2) ครูทั่วไป `user_level` คืน `"council"` → ถ้าไม่ผูก scope จะรับเรื่องทุกห้องทั้งโรงเรียน
+- **Correct Pattern/Solution:**
+  1. `can_accept = LEVEL_RANK.get(my_level,0) >= LEVEL_RANK.get(current_level,1)` — ระดับสูงกว่าหรือเท่ากันรับได้ (พีระมิดมองลง)
+  2. **กันรั่วห้องอื่น:** ถ้า `current_level == 'room'` และ `LEVEL_RANK[my_level] == LEVEL_RANK['room']` (ผู้รับมีระดับสูงสุดแค่ room) → ต้อง `_user_role_in(user, room_id)` (เป็นสมาชิกห้องเรื่อง) ไม่งั้น 403
+  3. **กันครูก้าวข้าม scope:** `_teacher_scope` (staff_level) บังคับเสมอ — `issue_room_level != teacher_level` → 403; ยกเว้นเรื่องระดับ `council` (เดิมครูรับได้ทุกเรื่อง — กัน regression)
+  4. **frontend** (`canReceive`): admin bypass → rank `>=` → ถ้า `current_level=='room'` และตัวเองระดับ room ตรวจ `authStore.roles.some(r => r.room_id === issue.room_id)`; `getMyLevel()` แผนที่ `council_member/council_president`→council อยู่แล้ว
+  5. **test:** เปลี่ยน `test_cannot_accept_wrong_level` (เคย assert 403) → รับได้ 200 + deep-DB verify assignee; เพิ่ม test head รับห้องอื่น 403 + ประธานสภา รับเรื่อง room 200
+  - **กฎ: เวลาเปลี่ยน permission จาก equality เป็น "ระดับสูงกว่าก็ได้" ให้ตั้งคำถามเสมอว่า "ระดับเท่ากันแต่อยู่คนละ scope" (ห้องอื่น/ระดับชั้นอื่น) จะรั่วไหม — ต้องมี gate แยกตามข้อมูลจริง (room membership / staff_level) ไม่ใช่แค่ระดับพีระมิด**
+- **Date Added:** 2026-08-26

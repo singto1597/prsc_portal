@@ -126,15 +126,68 @@ async def test_pyramid_visibility(client, issue_world):
 
 # === Section 3: Permission checks ===
 @pytest.mark.asyncio
-async def test_cannot_accept_wrong_level(client, issue_world):
-    """ประธานระดับ (level) ไม่สามารถรับเรื่องระดับ room ได้"""
+async def test_level_president_can_accept_room_issue(client, issue_world, db_pool):
+    """ประธานระดับ (level) รับเรื่องระดับ room ได้ — ระดับสูงกว่ากดรับแทนหัวหน้าห้องได้เลย"""
     users = issue_world
     res = _create_issue(client, users, title="สนามบาสไฟไม่พอ", desc="ไฟสลัว")
     issue_id = res.json()["id"]
 
-    # ประธานระดับพยายามรับเรื่องระดับ room → 403
+    # ประธานระดับ (ระดับสูงกว่า) รับเรื่องระดับ room → 200
     res = client.post(f"/api/issues/{issue_id}/accept", json={"estimated_days": 2},
                       headers={"Authorization": f"Bearer {users['level']['token']}"})
+    assert res.status_code == 200, res.text
+
+    # deep-DB verify: ผู้รับต้องเป็นประธานระดับ และสถานะเป็น in_progress
+    async with db_pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT current_assignee_id, status FROM issues WHERE id = $1", issue_id)
+        assert row["current_assignee_id"] == users["level"]["user_id"]
+        assert row["status"] == "in_progress"
+
+
+@pytest.mark.asyncio
+async def test_council_president_can_accept_room_issue(client, issue_world, db_pool):
+    """ประธานสภา/admin รับเรื่องระดับ room ได้ (รับแทนหัวหน้าห้อง)"""
+    users = issue_world
+    res = _create_issue(client, users, title="หลังคารั่ว", desc="น้ำหยด")
+    issue_id = res.json()["id"]
+
+    res = client.post(f"/api/issues/{issue_id}/accept", json={"estimated_days": 3},
+                      headers={"Authorization": f"Bearer {users['council']['token']}"})
+    assert res.status_code == 200, res.text
+
+    async with db_pool.acquire() as conn:
+        assignee = await conn.fetchval(
+            "SELECT current_assignee_id FROM issues WHERE id = $1", issue_id)
+        assert assignee == users["council"]["user_id"]
+
+
+@pytest.mark.asyncio
+async def test_room_head_cannot_accept_other_room(client, issue_world, db_pool):
+    """หัวหน้าห้อง (ระดับ room) รับเรื่องของห้องอื่นไม่ได้ — รับแทนได้เฉพาะระดับที่สูงกว่า"""
+    users = issue_world
+
+    # สร้างห้องที่สอง (ระดับ ม.5) + นักเรียนในห้องนั้น
+    room_code = f"ม.5/{random.randint(1, 90)}"
+    async with db_pool.acquire() as conn:
+        other_room_id = await conn.fetchval(
+            "INSERT INTO rooms (room_code, room_name, level) VALUES ($1,$2,'ม.5') RETURNING id",
+            room_code, room_code
+        )
+    sid = f"O{random.randint(1000, 9999)}"
+    other_uid = await auth_service.register_user(
+        db_pool, sid, "1234", "เด็กห้องอื่น", sid, room_code, 1, "student"
+    )
+
+    # เรื่องในห้องอื่น (ระดับ room)
+    res = _create_issue(client, users, title="เรื่องห้องอื่น", desc="aaa",
+                        room_id=other_room_id, token=auth_service.create_access_token(other_uid))
+    assert res.status_code == 200
+    issue_id = res.json()["id"]
+
+    # หัวหน้าห้อง (ห้องแรก, ระดับ room) รับเรื่องห้องอื่น → 403
+    res = client.post(f"/api/issues/{issue_id}/accept", json={"estimated_days": 2},
+                      headers={"Authorization": f"Bearer {users['head']['token']}"})
     assert res.status_code == 403
 
 
