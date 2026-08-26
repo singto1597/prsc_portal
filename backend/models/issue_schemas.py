@@ -154,3 +154,12 @@ class IssueOut(BaseModel):
     escalations: List[EscalationOut] = []
     status_history: List[StatusHistoryOut] = []
     comments: List[CommentOut] = []
+
+
+class IssueListOut(BaseModel):
+    """รายการเรื่องแบบแบ่งหน้า (Pagination) — total นับก่อน limit/offset"""
+    items: List[IssueOut]
+    total: int          # จำนวนทั้งหมดที่ตรงเงื่อนไข
+    page: int           # 1-based
+    page_size: int
+    pages: int

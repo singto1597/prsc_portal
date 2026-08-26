@@ -543,7 +543,7 @@ async def test_issues_list_main_category_filter(client, dashboard_world):
     res = client.get("/api/issues?main_category=suggestion",
                      headers={"Authorization": f"Bearer {world['admin']['token']}"})
     assert res.status_code == 200
-    issues = res.json()
+    issues = res.json()["items"]
     assert len(issues) == 1
     assert issues[0]["main_category"] == "suggestion"
     assert issues[0]["title"] == "ข้อเสนอ"
@@ -575,7 +575,7 @@ async def test_issues_list_multi_status_filter(client, dashboard_world):
     res = client.get("/api/issues?status=pending,in_progress",
                      headers={"Authorization": f"Bearer {token}"})
     assert res.status_code == 200
-    issues = res.json()
+    issues = res.json()["items"]
     assert {i["status"] for i in issues} == {"pending", "in_progress"}
     ids = {i["id"] for i in issues}
     assert i_a in ids and i_b in ids and i_c not in ids
@@ -628,7 +628,7 @@ async def test_issues_list_subcategory_filter(client, dashboard_world):
     res = client.get("/api/issues?main_category=suggestion&category=academic",
                      headers={"Authorization": f"Bearer {token}"})
     assert res.status_code == 200
-    issues = res.json()
+    issues = res.json()["items"]
     assert len(issues) == 1
     assert issues[0]["category"] == "academic"
     assert issues[0]["main_category"] == "suggestion"
@@ -638,6 +638,6 @@ async def test_issues_list_subcategory_filter(client, dashboard_world):
     res = client.get("/api/issues?category=complaint",
                      headers={"Authorization": f"Bearer {token}"})
     assert res.status_code == 200
-    issues = res.json()
+    issues = res.json()["items"]
     assert len(issues) == 1
     assert issues[0]["category"] == "complaint"

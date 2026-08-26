@@ -12,13 +12,20 @@ import {
   type MainCategory,
 } from '@/types/issue';
 import { useAuthStore } from '@/stores/auth';
+import IssueListToolbar from '@/components/IssueListToolbar.vue';
+import PaginationBar from '@/components/PaginationBar.vue';
 
 const authStore = useAuthStore();
 const route = useRoute();
 const router = useRouter();
 const issues = ref<Issue[]>([]);
+const total = ref(0); // จำนวนทั้งหมดที่ตรงเงื่อนไข (จาก envelope)
 const isLoading = ref(true);
 const error = ref('');
+const q = ref('');           // คำค้นหา
+const sort = ref<'asc' | 'desc'>('desc'); // ใหม่ไปเก่า (default)
+const page = ref(1);
+const pageSize = 20;
 const statusFilter = ref('not_resolved');  // default: ซ่อนเรื่องที่เสร็จแล้ว (ดูเฉพาะยังไม่เสร็จ)
 const levelFilter = ref('');   // '' = ทุกระดับที่มองเห็น, room/level/council
 const mainCategoryFilter = ref('');  // '' = ทุกหมวด, suggestion/wellbeing/report
@@ -26,6 +33,15 @@ const subcategoryFilter = ref('');   // '' = ทุกหมวดย่อย, 
 
 // สถานะ "ยังไม่เสร็จ" = pending + in_progress + escalated (ให้ server กรอง — กันหน้าว่างตอน 100 เรื่องแรกเสร็จหมด)
 const NOT_RESOLVED_STATUSES = 'pending,in_progress,escalated';
+
+// จำนวนตัวกรองที่ active (badge บนปุ่ม filter) — ไม่นับ default 'not_resolved'
+const activeFilters = computed(
+  () =>
+    (statusFilter.value !== 'not_resolved' ? 1 : 0) +
+    (levelFilter.value ? 1 : 0) +
+    (mainCategoryFilter.value ? 1 : 0) +
+    (subcategoryFilter.value ? 1 : 0),
+);
 
 // หาหมวดหลักของหมวดย่อย (แต่ละหมวดย่อยอยู่ใต้หมวดหลักเดียว)
 function mainOfCategory(cat: string): string {
@@ -56,7 +72,7 @@ const availableSubcategories = computed(() => {
   return Object.entries(info.subcategories).map(([value, label]) => ({ value, label }));
 });
 
-// URL เป็น source of truth: แก้ URL เอง / back-forward → ปรับ filter ตาม URL
+// URL เป็น source of truth: แก้ URL เอง / back-forward → ปรับ filter ตาม URL (กลับหน้า 1)
 watch(
   () => [route.query.main_category, route.query.category],
   ([mc, cat]) => {
@@ -72,6 +88,7 @@ watch(
       }
       mainCategoryFilter.value = mainV;
       subcategoryFilter.value = validCat;
+      page.value = 1;
       load();
     }
   },
@@ -89,6 +106,7 @@ function onMainCategoryChange() {
   }
   delete query.category;
   router.replace({ query });
+  page.value = 1;
   load();
 }
 
@@ -100,6 +118,25 @@ function onSubcategoryChange() {
     delete query.category;
   }
   router.replace({ query });
+  page.value = 1;
+  load();
+}
+
+// เปลี่ยน filter ฝั่ง dropdown (ระดับ/สถานะ) → กลับหน้า 1 แล้วโหลด
+function onFilterChange() {
+  page.value = 1;
+  load();
+}
+
+// search / sort เปลี่ยน (จาก Toolbar) → กลับหน้า 1 แล้วโหลด
+function onToolbarChange() {
+  page.value = 1;
+  load();
+}
+
+// เปลี่ยนหน้า (จาก Pagination)
+function onPageChange(n: number) {
+  page.value = n;
   load();
 }
 
@@ -141,16 +178,21 @@ async function load() {
   isLoading.value = true;
   error.value = '';
   try {
-    // "not_resolved" = ส่งสถานะที่ยังไม่เสร็จให้ server กรอง (ไม่โหลดทุกสถานะแล้วตัด client
-    // — เดิมถ้า 100 เรื่องแรกเสร็จหมดจะเห็นหน้าว่างทั้งที่ยังมีเรื่องค้างอยู่)
+    // "not_resolved" = ส่งสถานะที่ยังไม่เสร็จให้ server กรอง (ไม่โหลดทุกสถานะแล้วตัด client)
     const raw = statusFilter.value === 'not_resolved';
-    issues.value = await listIssues({
+    const res = await listIssues({
       received: true,
       status: raw ? NOT_RESOLVED_STATUSES : (statusFilter.value || undefined),
       level: levelFilter.value || undefined,
       main_category: mainCategoryFilter.value || undefined,
       category: subcategoryFilter.value || undefined,
+      q: q.value.trim() || undefined,
+      sort: sort.value,
+      limit: pageSize,
+      offset: (page.value - 1) * pageSize,
     });
+    issues.value = res.items;
+    total.value = res.total;
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'โหลดข้อมูลไม่สำเร็จ';
   } finally {
@@ -179,43 +221,64 @@ function statusColor(s: string) {
       </div>
     </div>
 
-    <!-- Filters (mobile = เรียงแนวตั้งเต็มแถว, sm+ = เรียงแนวนอน) -->
-    <div class="grid grid-cols-1 sm:flex sm:flex-wrap gap-2 sm:gap-3 mb-4">
-      <select v-model="mainCategoryFilter" @change="onMainCategoryChange"
-        class="w-full sm:w-auto px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white">
-        <option value="">ทุกหมวดหลัก</option>
-        <option v-for="mc in mainCategoryOptions" :key="mc.value" :value="mc.value">{{ mc.label }}</option>
-      </select>
-      <select v-model="subcategoryFilter" @change="onSubcategoryChange"
-        :disabled="!mainCategoryFilter"
-        class="w-full sm:w-auto px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white disabled:bg-gray-50 disabled:text-gray-400">
-        <option value="">
-          {{ mainCategoryFilter ? 'ทุกหมวดย่อย' : 'เลือกหมวดหลักก่อน' }}
-        </option>
-        <option v-for="sc in availableSubcategories" :key="sc.value" :value="sc.value">{{ sc.label }}</option>
-      </select>
-      <select v-model="levelFilter" @change="load"
-        class="w-full sm:w-auto px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white">
-        <option value="">ทุกระดับที่ฉันมองเห็น</option>
-        <option v-for="lv in visibleLevels" :key="lv" :value="lv">
-          ระดับ{{ lv === 'room' ? 'ห้อง (หัวหน้าห้อง / รอง)' : lv === 'level' ? 'ชั้น (ประธานระดับ)' : 'สภานักเรียน' }}
-        </option>
-      </select>
-      <select v-model="statusFilter" @change="load"
-        class="w-full sm:w-auto px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white">
-        <option value="not_resolved">ยังไม่เสร็จ (รอรับ / กำลังทำ / ส่งต่อ)</option>
-        <option value="">ทุกสถานะ (รวมเสร็จแล้ว)</option>
-        <option value="pending">รอรับ</option>
-        <option value="in_progress">กำลังดำเนินการ</option>
-        <option value="escalated">ส่งต่อ</option>
-        <option value="resolved">เสร็จแล้ว</option>
-        <option value="cancelled">ถูกยกเลิก</option>
-        <option value="rejected">ถูกปัดตก</option>
-      </select>
-      <span class="self-center text-sm text-gray-400 px-1">
-        แสดง {{ issues.length }} เรื่อง
-      </span>
-    </div>
+    <!-- Toolbar: ค้นหา + ปุ่ม filter (dropdown: ตัวกรอง + เรียงลำดับ) + จำนวน -->
+    <IssueListToolbar
+      v-model:q="q"
+      v-model:sort="sort"
+      :total="total"
+      :count="issues.length"
+      :active-filters="activeFilters"
+      :loading="isLoading"
+      @change="onToolbarChange"
+    >
+      <template #filters>
+        <div class="space-y-3">
+          <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1.5">หมวดหลัก</label>
+            <select v-model="mainCategoryFilter" @change="onMainCategoryChange"
+              class="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm bg-white">
+              <option value="">ทุกหมวดหลัก</option>
+              <option v-for="mc in mainCategoryOptions" :key="mc.value" :value="mc.value">{{ mc.label }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1.5">หมวดย่อย</label>
+            <select v-model="subcategoryFilter" @change="onSubcategoryChange"
+              :disabled="!mainCategoryFilter"
+              class="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm bg-white disabled:bg-gray-50 disabled:text-gray-400">
+              <option value="">
+                {{ mainCategoryFilter ? 'ทุกหมวดย่อย' : 'เลือกหมวดหลักก่อน' }}
+              </option>
+              <option v-for="sc in availableSubcategories" :key="sc.value" :value="sc.value">{{ sc.label }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1.5">ระดับ</label>
+            <select v-model="levelFilter" @change="onFilterChange"
+              class="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm bg-white">
+              <option value="">ทุกระดับที่ฉันมองเห็น</option>
+              <option v-for="lv in visibleLevels" :key="lv" :value="lv">
+                ระดับ{{ lv === 'room' ? 'ห้อง (หัวหน้าห้อง / รอง)' : lv === 'level' ? 'ชั้น (ประธานระดับ)' : 'สภานักเรียน' }}
+              </option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1.5">สถานะ</label>
+            <select v-model="statusFilter" @change="onFilterChange"
+              class="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm bg-white">
+              <option value="not_resolved">ยังไม่เสร็จ (รอรับ / กำลังทำ / ส่งต่อ)</option>
+              <option value="">ทุกสถานะ (รวมเสร็จแล้ว)</option>
+              <option value="pending">รอรับ</option>
+              <option value="in_progress">กำลังดำเนินการ</option>
+              <option value="escalated">ส่งต่อ</option>
+              <option value="resolved">เสร็จแล้ว</option>
+              <option value="cancelled">ถูกยกเลิก</option>
+              <option value="rejected">ถูกปัดตก</option>
+            </select>
+          </div>
+        </div>
+      </template>
+    </IssueListToolbar>
 
     <div v-if="isLoading" class="flex justify-center py-16">
       <div class="animate-spin w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full"></div>
@@ -264,6 +327,9 @@ function statusColor(s: string) {
         </div>
       </RouterLink>
     </TransitionGroup>
+
+    <!-- แบ่งหน้า -->
+    <PaginationBar :total="total" :page="page" :page-size="pageSize" :loading="isLoading" @page-change="onPageChange" />
   </div>
 </template>
 

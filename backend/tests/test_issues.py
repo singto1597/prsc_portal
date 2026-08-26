@@ -117,11 +117,11 @@ async def test_pyramid_visibility(client, issue_world):
     # Council เห็นทุกเรื่อง (พีระมิด)
     res = client.get("/api/issues", headers={"Authorization": f"Bearer {council['token']}"})
     assert res.status_code == 200
-    assert any(i["id"] == issue_id for i in res.json())
+    assert any(i["id"] == issue_id for i in res.json()["items"])
 
     # นักเรียน (คนอื่น) ไม่เห็นเรื่องของคนอื่น
     res = client.get("/api/issues", headers={"Authorization": f"Bearer {student['token']}"})
-    assert all(i["reporter_id"] == student["user_id"] for i in res.json())
+    assert all(i["reporter_id"] == student["user_id"] for i in res.json()["items"])
 
 
 # === Section 3: Permission checks ===
@@ -315,7 +315,7 @@ async def test_teacher_scope_and_staff_full_access(client, db_pool):
     # list เห็นเฉพาะเรื่อง ม.4
     res = client.get("/api/issues", headers={"Authorization": f"Bearer {users['teacher']['token']}"})
     assert res.status_code == 200
-    ids = [i["id"] for i in res.json()]
+    ids = [i["id"] for i in res.json()["items"]]
     assert issue_4 in ids and issue_5 not in ids
     # รับเรื่อง ม.4 ได้ แต่รับเรื่อง ม.5 ไม่ได้
     res = client.post(f"/api/issues/{issue_4}/accept", json={"estimated_days": 2},
@@ -332,7 +332,7 @@ async def test_teacher_scope_and_staff_full_access(client, db_pool):
             res = client.get(f"/api/issues/{iid}", headers={"Authorization": f"Bearer {tok}"})
             assert res.status_code == 200, f"{who} ดูเรื่อง {iid} → {res.status_code}"
         res = client.get("/api/issues", headers={"Authorization": f"Bearer {tok}"})
-        ids = [i["id"] for i in res.json()]
+        ids = [i["id"] for i in res.json()["items"]]
         assert issue_4 in ids and issue_5 in ids, f"{who} ต้องเห็นทั้ง 2 เรื่อง"
 
 
