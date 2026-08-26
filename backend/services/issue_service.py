@@ -50,6 +50,12 @@ def _parse_json(raw, default=None):
         return default if default is not None else []
 
 
+def _escape_like(s: str) -> str:
+    """หนี wildcard ของ LIKE/ILIKE (% _ \\) ให้ค้นหาคำที่เป็นตัวอักษรจริง (กัน %/_ กลายเป็น wildcard)
+    ใช้คู่กับ `ILIKE ... ESCAPE '\\'` ใน query"""
+    return s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 # ============================================================
 # 👩‍🏫 Helpers สำหรับครูทั่วไป (level-scoped teacher)
 # ============================================================
@@ -485,15 +491,21 @@ async def list_issues(
     category: Optional[str] = None,
     main_category: Optional[str] = None,
     level_filter: Optional[str] = None,
+    q: Optional[str] = None,
+    sort: str = "desc",
     limit: int = 100,
     offset: int = 0,
-) -> list:
+) -> dict:
     """
-    รายการปัญหา — filter visibility ตามระดับผู้ใช้
+    รายการปัญหา — filter visibility ตามระดับผู้ใช้ + ค้นหา + แบ่งหน้า
 
     received=True: แสดงทุกเรื่องที่ผู้ใช้มองเห็นได้ (พีระมิด — ระดับสูงมองลงเห็นทุกระดับล่าง)
     main_category: กรองตามหมวดหลัก (suggestion / wellbeing / report) — ใช้จาก Dashboard
     level_filter: จำกัดให้ดูเฉพาะระดับที่เลือก (room/level/council)
+    q: ค้นหาแบบคำต่อคำ (ILIKE partial match) ในชื่อเรื่อง/คำอธิบาย/ห้อง/ชื่อคน —
+       อยู่ในขอบเขต visibility เดียวกับ list ปกติ (ค้นได้เฉพาะที่ตัวเองมองเห็น)
+    sort: 'asc' = เก่าไปใหม่, 'desc' (default) = ใหม่ไปเก่า
+    คืน {"items": [...], "total": N} — total นับก่อน limit/offset (COUNT(*) OVER())
     """
     level = await user_level(pool, user_id)
 
@@ -589,6 +601,28 @@ async def list_issues(
             params.append(level_filter)
             where.append(f"i.current_level = ${len(params)}")
 
+        # ---- 🔍 ค้นหาแบบคำต่อคำ (ILIKE partial match) — ต่อ AFTER visibility กันค้นข้ามระดับ ----
+        # ทุกคำ (แยกด้วยช่องว่าง) ต้องเจออย่างน้อย 1 ใน 6 ฟิลด์: ชื่อเรื่อง / คำอธิบาย / ห้อง / ชื่อคน
+        # ใช้ $n เดียวซ้ำใน OR ได้ — ทุกตำแหน่งเป็น text จึงปลอดภัยกับ asyncpg
+        if q:
+            for token in q.split():
+                esc = _escape_like(token)
+                if not esc:
+                    continue
+                params.append(f"%{esc}%")
+                n = len(params)
+                where.append(
+                    f"(i.title ILIKE ${n} ESCAPE '\\'"
+                    f" OR i.description ILIKE ${n} ESCAPE '\\'"
+                    f" OR r.room_name ILIKE ${n} ESCAPE '\\'"
+                    f" OR reporter_r.room_name ILIKE ${n} ESCAPE '\\'"
+                    f" OR COALESCE(i.reporter_name, '') ILIKE ${n} ESCAPE '\\'"
+                    f" OR COALESCE(u.full_name, '') ILIKE ${n} ESCAPE '\\')"
+                )
+
+        # เก็บ params ของตัวกรองไว้ก่อน (ไม่รวม limit/offset) — ใช้กับ count query ตอนหน้าว่าง
+        filter_params = list(params)
+
         params.append(limit)
         params.append(offset)
         sql = f"""
@@ -599,18 +633,36 @@ async def list_issues(
                 i.is_anonymous, i.resolved_at, i.created_at, i.updated_at,
                 r.room_name,
                 reporter_r.room_name AS reporter_room,
-                u.full_name AS assignee_name
+                u.full_name AS assignee_name,
+                COUNT(*) OVER() AS total_count
             FROM issues i
             JOIN rooms r ON r.id = i.room_id
             LEFT JOIN rooms reporter_r ON reporter_r.id = i.reporter_room_id
             LEFT JOIN users u ON u.id = i.current_assignee_id
             WHERE {' AND '.join(where)}
-            ORDER BY i.created_at DESC
+            ORDER BY i.created_at {'ASC' if sort == 'asc' else 'DESC'}, i.id {'ASC' if sort == 'asc' else 'DESC'}
             LIMIT ${len(params)-1} OFFSET ${len(params)}
         """
         rows = await conn.fetch(sql, *params)
 
-    return [_issue_to_dict(r) for r in rows]
+        # total: ปกติได้จาก COUNT(*) OVER() (แถวแรก) — แต่ถ้า offset เลยข้อมูล (rows ว่าง)
+        # window function อ่านค่าไม่ได้ → นับแยกด้วย query เดียวกัน (ไม่มี limit/offset)
+        if rows:
+            total = rows[0]["total_count"]
+        else:
+            total = await conn.fetchval(
+                f"""
+                SELECT COUNT(*)
+                FROM issues i
+                JOIN rooms r ON r.id = i.room_id
+                LEFT JOIN rooms reporter_r ON reporter_r.id = i.reporter_room_id
+                LEFT JOIN users u ON u.id = i.current_assignee_id
+                WHERE {' AND '.join(where)}
+                """,
+                *filter_params
+            )
+
+    return {"items": [_issue_to_dict(r) for r in rows], "total": total}
 
 
 def _issue_to_dict(row, with_details=False) -> dict:

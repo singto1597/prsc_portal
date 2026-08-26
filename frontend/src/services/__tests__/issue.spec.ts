@@ -1,22 +1,49 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
 // mock axios instance — ทดสอบเฉพาะ service layer ไม่ต้องมี backend จริง
-const { patchMock, postMock, deleteMock } = vi.hoisted(() => ({
+const { getMock, patchMock, postMock, deleteMock } = vi.hoisted(() => ({
+  getMock: vi.fn<(url: string, config?: unknown) => Promise<unknown>>(),
   patchMock: vi.fn<(url: string, data?: unknown) => Promise<unknown>>(),
   postMock: vi.fn<(url: string, data?: unknown) => Promise<unknown>>(),
   deleteMock: vi.fn<(url: string) => Promise<unknown>>(),
 }))
 vi.mock('@/services/api', () => ({
-  default: { patch: patchMock, post: postMock, delete: deleteMock },
+  default: { get: getMock, patch: patchMock, post: postMock, delete: deleteMock },
 }))
 
-import { updateIssue, createComment, updateComment, deleteComment } from '@/services/issue'
+import { listIssues, updateIssue, createComment, updateComment, deleteComment } from '@/services/issue'
 
-describe('issue services (แก้ไขเรื่อง + คอมเมนต์)', () => {
+describe('issue services (รายการ/แก้ไขเรื่อง + คอมเมนต์)', () => {
   beforeEach(() => {
+    getMock.mockReset()
     patchMock.mockReset()
     postMock.mockReset()
     deleteMock.mockReset()
+  })
+
+  it('listIssues → GET /api/issues พร้อม params และ unwrap เป็น IssueListResponse (envelope)', async () => {
+    const fakeRes = {
+      items: [{ id: 1, title: 'เรื่องแรก' }],
+      total: 42,
+      page: 2,
+      page_size: 20,
+      pages: 3,
+    }
+    getMock.mockResolvedValue(fakeRes)
+
+    const result = await listIssues({
+      received: true,
+      q: 'พัดลม',
+      sort: 'asc',
+      limit: 20,
+      offset: 20,
+    })
+
+    expect(getMock).toHaveBeenCalledTimes(1)
+    expect(getMock).toHaveBeenCalledWith('/api/issues', {
+      params: { received: true, q: 'พัดลม', sort: 'asc', limit: 20, offset: 20 },
+    })
+    expect(result).toEqual(fakeRes)
   })
 
   it('updateIssue → PATCH /api/issues/{id} (ต้องมี prefix /api)', async () => {
