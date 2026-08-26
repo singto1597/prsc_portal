@@ -5,8 +5,9 @@ from core.dependencies import get_db_pool, get_current_user
 from core.exceptions import NotFoundError, ForbiddenError, ValidationError, ConflictError
 from core.categories import all_main_category_codes
 from models.issue_schemas import (
-    IssueCreateRequest, IssueOut, IssueStepOut, IssueCountdownOut,
+    IssueCreateRequest, IssueUpdateRequest, IssueOut, IssueStepOut, IssueCountdownOut,
     StepCreateRequest, CountdownSetRequest, EscalateRequest,
+    CommentCreateRequest, CommentOut,
 )
 from services import issue_service
 
@@ -90,6 +91,25 @@ async def get_issue(
     try:
         issue = await issue_service.get_issue(pool, uid, issue_id)
     except (NotFoundError, ForbiddenError) as e:
+        raise _err(e)
+    return IssueOut(**issue)
+
+
+@router.patch("/{issue_id}", response_model=IssueOut)
+async def update_issue(
+    issue_id: int,
+    req: IssueUpdateRequest,
+    user_ctx: dict = Depends(get_current_user),
+    pool: asyncpg.Pool = Depends(get_db_pool),
+):
+    """แก้ไขเรื่อง (ผู้แจ้ง/admin) — ส่งเฉพาะฟิลด์ที่ต้องการแก้"""
+    uid = _ensure_user(user_ctx)
+    try:
+        await issue_service.update_issue(
+            pool, uid, issue_id, **req.model_dump(exclude_unset=True)
+        )
+        issue = await issue_service.get_issue(pool, uid, issue_id)
+    except (NotFoundError, ForbiddenError, ValidationError) as e:
         raise _err(e)
     return IssueOut(**issue)
 
@@ -210,3 +230,55 @@ async def cancel_issue(
     except (NotFoundError, ForbiddenError, ValidationError) as e:
         raise _err(e)
     return {"status": new_status}
+
+
+# ==================== คอมเมนต์ (แบบ YouTube) ====================
+@router.post("/{issue_id}/comments", response_model=CommentOut)
+async def create_comment(
+    issue_id: int,
+    req: CommentCreateRequest,
+    user_ctx: dict = Depends(get_current_user),
+    pool: asyncpg.Pool = Depends(get_db_pool),
+):
+    """เพิ่มคอมเมนต์ในเรื่อง (ต้องมองเห็นเรื่องได้)"""
+    uid = _ensure_user(user_ctx)
+    try:
+        comment_id = await issue_service.add_comment(pool, uid, issue_id, req.body)
+        comment = await issue_service.get_comment(pool, uid, issue_id, comment_id)
+    except (NotFoundError, ForbiddenError, ValidationError) as e:
+        raise _err(e)
+    return CommentOut(**comment)
+
+
+@router.patch("/{issue_id}/comments/{comment_id}", response_model=CommentOut)
+async def update_comment(
+    issue_id: int,
+    comment_id: int,
+    req: CommentCreateRequest,
+    user_ctx: dict = Depends(get_current_user),
+    pool: asyncpg.Pool = Depends(get_db_pool),
+):
+    """แก้คอมเมนต์ของตัวเอง"""
+    uid = _ensure_user(user_ctx)
+    try:
+        await issue_service.update_comment(pool, uid, issue_id, comment_id, req.body)
+        comment = await issue_service.get_comment(pool, uid, issue_id, comment_id)
+    except (NotFoundError, ForbiddenError, ValidationError) as e:
+        raise _err(e)
+    return CommentOut(**comment)
+
+
+@router.delete("/{issue_id}/comments/{comment_id}", response_model=dict)
+async def delete_comment(
+    issue_id: int,
+    comment_id: int,
+    user_ctx: dict = Depends(get_current_user),
+    pool: asyncpg.Pool = Depends(get_db_pool),
+):
+    """ลบคอมเมนต์ของตัวเอง (soft delete)"""
+    uid = _ensure_user(user_ctx)
+    try:
+        await issue_service.delete_comment(pool, uid, issue_id, comment_id)
+    except (NotFoundError, ForbiddenError) as e:
+        raise _err(e)
+    return {"status": "ok"}

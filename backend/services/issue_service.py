@@ -281,6 +281,135 @@ async def create_issue(
             return issue_id
 
 
+async def update_issue(
+    pool: asyncpg.Pool,
+    user_id: int,
+    issue_id: int,
+    *,
+    main_category: Optional[str] = None,
+    category: Optional[str] = None,
+    title: Optional[str] = None,
+    description: Optional[str] = None,
+    is_anonymous: Optional[bool] = None,
+) -> None:
+    """
+    แก้ไขเรื่องโดยผู้แจ้ง (หรือ admin)
+    - แก้ได้เฉพาะตอนสถานะยังไม่ปิด: pending / in_progress / escalated
+      (ปิดแล้ว = resolved / cancelled / rejected → ห้ามแก้)
+    - PATCH: รับเฉพาะฟิลด์ที่ส่งมา (exclude_unset) — อย่าเขียนทับค่าที่ไม่ได้ส่ง
+    - ถ้าเปิดเผยชื่อ (is_anonymous True→False) และ reporter_name ว่าง → re-snapshot จาก students
+    """
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            # SELECT ... FOR UPDATE กัน TOCTOU กับ resolve/cancel/accept (ทุกอัน UPDATE แถวนี้)
+            issue = await conn.fetchrow(
+                "SELECT * FROM issues WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
+                issue_id
+            )
+            if not issue:
+                raise NotFoundError("ไม่พบเรื่องนี้")
+
+            # 1) สิทธิ์: ผู้แจ้งเท่านั้น (+ admin bypass ตาม _is_admin)
+            if issue["reporter_id"] != user_id and not await _is_admin(conn, user_id):
+                raise ForbiddenError("เฉพาะผู้แจ้งเรื่องเท่านั้นที่แก้ไขเรื่องนี้ได้")
+
+            # 2) สถานะปิด → แก้ไม่ได้
+            if issue["status"] in ("resolved", "cancelled", "rejected"):
+                raise ValidationError(
+                    "เรื่องนี้อยู่ในสถานะปิดแล้ว (แก้ไขเสร็จ/ยกเลิก/ถูกปัดตก) — แก้ไขข้อมูลไม่ได้"
+                )
+
+            # 3) เก็บเฉพาะฟิลด์ที่ส่ง
+            changed = {}
+            if main_category is not None:
+                changed["main_category"] = main_category
+            if category is not None:
+                changed["category"] = category
+            if title is not None:
+                changed["title"] = title
+            if description is not None:
+                changed["description"] = description
+            if is_anonymous is not None:
+                changed["is_anonymous"] = is_anonymous
+            if not changed:
+                raise ValidationError("ไม่มีข้อมูลที่ต้องการแก้ไข")
+
+            # 4) re-validate หมวดหมู่กับคู่ที่มีผลจริง (อ้างอิง DB ถ้า field นั้นไม่ส่ง)
+            eff_main = changed.get("main_category", issue["main_category"])
+            eff_cat = changed.get("category", issue["category"])
+            if not is_valid_category(eff_main, eff_cat):
+                raise ValidationError(
+                    f"หมวดหมู่ไม่ถูกต้อง: หมวดหลัก '{eff_main}' ไม่มีหมวดย่อย '{eff_cat}'"
+                )
+
+            # 5) dynamic SET — $1 สงวนไว้ WHERE id, field ถัดไปเริ่ม $len+1
+            params = [issue_id]
+            sets = []
+            for key in ("main_category", "category", "title", "description", "is_anonymous"):
+                if key in changed:
+                    sets.append(f"{key} = ${len(params) + 1}")
+                    params.append(changed[key])
+
+            # 6) is_anonymous True→False: re-snapshot reporter_name ถ้ายังว่าง
+            #    ใช้ reporter_id/reporter_room_id ของเรื่อง (ไม่ใช่ actor — admin แก้แทนได้)
+            new_is_anonymous = changed.get("is_anonymous", issue["is_anonymous"])
+            if issue["is_anonymous"] and not new_is_anonymous and not issue["reporter_name"]:
+                reporter_room_id = issue["reporter_room_id"] or issue["room_id"]
+                reporter_name = await _student_display_name(conn, issue["reporter_id"], reporter_room_id)
+                if reporter_name:
+                    sets.append(f"reporter_name = ${len(params) + 1}")
+                    params.append(reporter_name)
+                    changed["reporter_name"] = reporter_name
+
+            sets.append("updated_at = NOW()")
+            await conn.execute(
+                f"UPDATE issues SET {', '.join(sets)} WHERE id = $1",
+                *params
+            )
+
+            # 7) บันทึกใน status_history ว่าโดนแก้ (mirror create_issue)
+            await conn.execute(
+                """
+                INSERT INTO issue_status_history (issue_id, status, changed_by, note)
+                VALUES ($1, $2, $3, $4)
+                """,
+                issue_id, issue["status"], user_id, "ผู้แจ้งแก้ไขข้อมูลเรื่อง"
+            )
+
+            # 8) audit log ใน transaction เดียวกัน (ตามกฎ backend.md)
+            old = {k: issue[k] for k in changed if k != "reporter_name"}
+            new = {k: changed[k] for k in old}
+            if "reporter_name" in changed:
+                old["reporter_name"] = issue["reporter_name"]
+                new["reporter_name"] = changed["reporter_name"]
+            from core.logger import AuditLogger
+            await AuditLogger("issue_service").log(
+                conn=conn, action="UPDATE_ISSUE",
+                actor_identifier=str(user_id), client_source="web",
+                room_id=issue["room_id"], user_id=user_id,
+                entity_type="issue", entity_id=issue_id,
+                old_values=old, new_values=new,
+            )
+
+
+async def _assert_can_view(conn, pool: asyncpg.Pool, user_id: int, issue_row) -> None:
+    """ตรวจว่า user มองเห็นเรื่องนี้ได้ไหม (พีระมิด + อดีตผู้รับ/ผู้เกี่ยวข้อง + ครูระดับชั้น)
+    ใช้ร่วมกันระหว่าง get_issue และคอมเมนต์ เพื่อไม่ให้ visibility rule เบน"""
+    level = await user_level(pool, user_id)
+    involved = await _is_involved(conn, user_id, issue_row)
+    visible = can_see(level, issue_row["current_level"], issue_row["reporter_id"], user_id, issue_row["is_anonymous"]) or involved
+
+    # ครูทั่วไป: เห็นเฉพาะเรื่องของระดับชั้นตัวเอง (ยกเว้นเรื่องที่เกี่ยวข้อง/จัดการอยู่)
+    teacher_level = await _teacher_scope(conn, user_id)
+    if teacher_level:
+        issue_level = await _room_level(conn, issue_row["room_id"])
+        if issue_level != teacher_level and not involved:
+            visible = False
+
+    if not visible:
+        raise ForbiddenError("คุณไม่มีสิทธิ์ดูเรื่องนี้")
+
+
 async def get_issue(pool: asyncpg.Pool, user_id: int, issue_id: int) -> Optional[dict]:
     """ดึงปัญหาตาม id (ตรวจ visibility)"""
     async with pool.acquire() as conn:
@@ -303,19 +432,7 @@ async def get_issue(pool: asyncpg.Pool, user_id: int, issue_id: int) -> Optional
             raise NotFoundError("ไม่พบเรื่องนี้")
 
         # ตรวจ visibility (พีระมิด + อดีตผู้รับ/ผู้เกี่ยวข้อง)
-        level = await user_level(pool, user_id)
-        involved = await _is_involved(conn, user_id, row)
-        visible = can_see(level, row["current_level"], row["reporter_id"], user_id, row["is_anonymous"]) or involved
-
-        # ครูทั่วไป: เห็นเฉพาะเรื่องของระดับชั้นตัวเอง (ยกเว้นเรื่องที่เกี่ยวข้อง/จัดการอยู่)
-        teacher_level = await _teacher_scope(conn, user_id)
-        if teacher_level:
-            issue_level = await _room_level(conn, row["room_id"])
-            if issue_level != teacher_level and not involved:
-                visible = False
-
-        if not visible:
-            raise ForbiddenError("คุณไม่มีสิทธิ์ดูเรื่องนี้")
+        await _assert_can_view(conn, pool, user_id, row)
 
         # ดึงรายละเอียดเสริม
         steps = await conn.fetch(
@@ -340,12 +457,21 @@ async def get_issue(pool: asyncpg.Pool, user_id: int, issue_id: int) -> Optional
             "SELECT * FROM issue_status_history WHERE issue_id = $1 ORDER BY created_at",
             issue_id
         )
+        comments = await conn.fetch(
+            """
+            SELECT * FROM issue_comments
+            WHERE issue_id = $1 AND deleted_at IS NULL
+            ORDER BY created_at, id
+            """,
+            issue_id
+        )
 
         result = _issue_to_dict(row, with_details=True)
         result["steps"] = [_step_to_dict(s) for s in steps]
         result["countdown"] = _countdown_to_dict(countdown) if countdown else None
         result["escalations"] = [_esc_to_dict(e) for e in escalations]
         result["status_history"] = [_history_to_dict(h) for h in history]
+        result["comments"] = [_comment_to_dict(c) for c in comments]
         return result
 
 
@@ -517,6 +643,7 @@ def _issue_to_dict(row, with_details=False) -> dict:
         d["countdown"] = None
         d["escalations"] = []
         d["status_history"] = []
+        d["comments"] = []
     return d
 
 
@@ -827,6 +954,28 @@ async def _user_role_in(conn, user_id: int, room_id: int) -> Optional[str]:
     )
 
 
+async def _student_display_name(conn, user_id: int, room_id: Optional[int]) -> Optional[str]:
+    """ชื่อแสดงของ user: prefix+first_name+last_name จาก students (fallback users.full_name)
+    — students บางแถว (เช่น register_user/self-signup) มี first/last name ว่าง แต่ full_name อยู่ที่ users"""
+    row = await conn.fetchrow(
+        """
+        SELECT
+            NULLIF(TRIM(CONCAT_WS(' ', s.prefix, s.first_name, s.last_name)), '') AS student_name,
+            u.full_name
+        FROM students s
+        JOIN users u ON u.id = s.user_id
+        WHERE s.user_id = $1
+          AND s.room_id = COALESCE($2, s.room_id)
+          AND s.deleted_at IS NULL AND s.status = 'active'
+        ORDER BY s.id LIMIT 1
+        """,
+        user_id, room_id
+    )
+    if not row:
+        return None
+    return row["student_name"] or row["full_name"]
+
+
 async def _is_involved(conn, user_id: int, issue_row) -> bool:
     """
     เช็คว่า user เกี่ยวข้องกับเรื่องนี้ไหม (เพื่อดูได้แม้ระดับต่ำกว่าปัจจุบัน):
@@ -890,6 +1039,168 @@ async def _ensure_assignee(conn, user_id: int, issue_id: int) -> None:
 
 
 # ============================================================
+# 💬 คอมเมนต์ (แบบ YouTube) — เพิ่ม/แก้/ลบของตัวเอง
+# ============================================================
+async def add_comment(pool: asyncpg.Pool, user_id: int, issue_id: int, body: str) -> int:
+    """เพิ่มคอมเมนต์ — ต้องมองเห็นเรื่องได้ (visibility เดียวกับ get_issue)
+    ชื่อจริง/ห้องของผู้เขียนเป็น snapshot ตอนสร้าง (เสมอ แม้เรื่อง anonymous)"""
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            issue = await conn.fetchrow(
+                "SELECT * FROM issues WHERE id = $1 AND deleted_at IS NULL",
+                issue_id
+            )
+            if not issue:
+                raise NotFoundError("ไม่พบเรื่องนี้")
+            await _assert_can_view(conn, pool, user_id, issue)
+
+            # snapshot ชื่อจริง/ห้องของผู้เขียน (ใช้ primary row ถ้ามีหลายห้อง)
+            c = await conn.fetchrow(
+                """
+                SELECT
+                    NULLIF(TRIM(CONCAT_WS(' ', s.prefix, s.first_name, s.last_name)), '') AS student_name,
+                    u.full_name,
+                    r.room_name
+                FROM students s
+                JOIN users u ON u.id = s.user_id
+                LEFT JOIN rooms r ON r.id = s.room_id
+                WHERE s.user_id = $1 AND s.deleted_at IS NULL AND s.status = 'active'
+                ORDER BY s.id LIMIT 1
+                """,
+                user_id
+            )
+            commenter_name = (c["student_name"] or c["full_name"]) if c else None
+            commenter_room = c["room_name"] if c else None
+
+            comment_id = await conn.fetchval(
+                """
+                INSERT INTO issue_comments (issue_id, user_id, commenter_name, commenter_room, body)
+                VALUES ($1, $2, $3, $4, $5)
+                RETURNING id
+                """,
+                issue_id, user_id,
+                commenter_name, commenter_room,
+                body
+            )
+
+            from core.logger import AuditLogger
+            await AuditLogger("issue_service").log(
+                conn=conn, action="CREATE_COMMENT",
+                actor_identifier=str(user_id), client_source="web",
+                room_id=issue["room_id"], user_id=user_id,
+                entity_type="issue_comment", entity_id=comment_id,
+                new_values={"body": body},
+            )
+            return comment_id
+
+
+async def _get_own_comment(conn, user_id: int, issue_id: int, comment_id: int):
+    """ดึงคอมเมนต์ที่ยังไม่ถูกลบ + ตรวจว่าเป็นของ user เอง (แก้/ลบได้เฉพาะของตัวเอง)"""
+    comment = await conn.fetchrow(
+        """
+        SELECT * FROM issue_comments
+        WHERE id = $1 AND issue_id = $2 AND deleted_at IS NULL
+        """,
+        comment_id, issue_id
+    )
+    if not comment:
+        raise NotFoundError("ไม่พบคอมเมนต์นี้")
+    if comment["user_id"] != user_id:
+        raise ForbiddenError("เฉพาะผู้เขียนคอมเมนต์เท่านั้นที่แก้ไข/ลบได้")
+    return comment
+
+
+async def update_comment(
+    pool: asyncpg.Pool, user_id: int, issue_id: int, comment_id: int, body: str
+) -> None:
+    """แก้คอมเมนต์ของตัวเอง"""
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            issue = await conn.fetchrow(
+                "SELECT * FROM issues WHERE id = $1 AND deleted_at IS NULL",
+                issue_id
+            )
+            if not issue:
+                raise NotFoundError("ไม่พบเรื่องนี้")
+            await _assert_can_view(conn, pool, user_id, issue)
+            comment = await _get_own_comment(conn, user_id, issue_id, comment_id)
+
+            await conn.execute(
+                "UPDATE issue_comments SET body = $1, updated_at = NOW() WHERE id = $2",
+                body, comment_id
+            )
+
+            from core.logger import AuditLogger
+            await AuditLogger("issue_service").log(
+                conn=conn, action="UPDATE_COMMENT",
+                actor_identifier=str(user_id), client_source="web",
+                room_id=issue["room_id"], user_id=user_id,
+                entity_type="issue_comment", entity_id=comment_id,
+                old_values={"body": comment["body"]},
+                new_values={"body": body},
+            )
+
+
+async def delete_comment(
+    pool: asyncpg.Pool, user_id: int, issue_id: int, comment_id: int
+) -> None:
+    """soft delete คอมเมนต์ของตัวเอง (row ยังอยู่ deleted_at = NOW())"""
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            issue = await conn.fetchrow(
+                "SELECT * FROM issues WHERE id = $1 AND deleted_at IS NULL",
+                issue_id
+            )
+            if not issue:
+                raise NotFoundError("ไม่พบเรื่องนี้")
+            await _assert_can_view(conn, pool, user_id, issue)
+            comment = await _get_own_comment(conn, user_id, issue_id, comment_id)
+
+            deleted_id = await conn.fetchval(
+                """
+                UPDATE issue_comments
+                SET deleted_at = NOW()
+                WHERE id = $1 AND issue_id = $2 AND deleted_at IS NULL
+                RETURNING id
+                """,
+                comment_id, issue_id
+            )
+            if deleted_id is None:
+                raise NotFoundError("ไม่พบคอมเมนต์นี้")
+
+            from core.logger import AuditLogger
+            await AuditLogger("issue_service").log(
+                conn=conn, action="DELETE_COMMENT",
+                actor_identifier=str(user_id), client_source="web",
+                room_id=issue["room_id"], user_id=user_id,
+                entity_type="issue_comment", entity_id=comment_id,
+                old_values={"body": comment["body"], "commenter_name": comment["commenter_name"]},
+            )
+
+
+async def get_comment(pool: asyncpg.Pool, user_id: int, issue_id: int, comment_id: int) -> dict:
+    """ดึงคอมเมนต์เดี่ยว (ตรวจ visibility + ยังไม่ถูกลบ) สำหรับตอบ API"""
+    async with pool.acquire() as conn:
+        issue = await conn.fetchrow(
+            "SELECT * FROM issues WHERE id = $1 AND deleted_at IS NULL",
+            issue_id
+        )
+        if not issue:
+            raise NotFoundError("ไม่พบเรื่องนี้")
+        await _assert_can_view(conn, pool, user_id, issue)
+        row = await conn.fetchrow(
+            """
+            SELECT * FROM issue_comments
+            WHERE id = $1 AND issue_id = $2 AND deleted_at IS NULL
+            """,
+            comment_id, issue_id
+        )
+        if not row:
+            raise NotFoundError("ไม่พบคอมเมนต์นี้")
+        return _comment_to_dict(row)
+
+
+# ============================================================
 # 🔄 แปลงผลลัพธ์
 # ============================================================
 def _step_to_dict(row) -> dict:
@@ -930,4 +1241,16 @@ def _history_to_dict(row) -> dict:
         "status": row["status"],
         "note": row["note"],
         "created_at": row["created_at"],
+    }
+
+
+def _comment_to_dict(row) -> dict:
+    return {
+        "id": row["id"],
+        "user_id": row["user_id"],
+        "commenter_name": row["commenter_name"],
+        "commenter_room": row["commenter_room"],
+        "body": row["body"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
     }

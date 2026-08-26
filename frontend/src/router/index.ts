@@ -1,6 +1,6 @@
-import { createRouter, createWebHistory } from 'vue-router';
-import { useAuthStore } from '@/stores/auth';
-import MainLayout from '@/layouts/MainLayout.vue';
+import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+import MainLayout from '@/layouts/MainLayout.vue'
 
 /**
  * หน้าแรกหลัง login ตามบทบาท:
@@ -9,10 +9,10 @@ import MainLayout from '@/layouts/MainLayout.vue';
  * - ระดับอื่น (หัวหน้าห้อง/ประธานระดับ/สภา): ไป "เรื่องที่รับ"
  */
 function getHomeRoute(): { name: string } {
-  const auth = useAuthStore();
-  if (auth.hasPermission('VIEW_DASHBOARD')) return { name: 'dashboard' };
-  if (auth.hasPermission('RECEIVE_ISSUES')) return { name: 'received-issues' };
-  return { name: 'new-issue' }; // นักเรียน → แจ้งปัญหาก่อน
+  const auth = useAuthStore()
+  if (auth.hasPermission('VIEW_DASHBOARD')) return { name: 'dashboard' }
+  if (auth.hasPermission('RECEIVE_ISSUES')) return { name: 'received-issues' }
+  return { name: 'new-issue' } // นักเรียน → แจ้งปัญหาก่อน
 }
 
 const router = createRouter({
@@ -22,7 +22,7 @@ const router = createRouter({
       path: '/login',
       name: 'login',
       component: () => import('@/views/auth/Login.vue'),
-      meta: { requiresAuth: false }
+      meta: { requiresAuth: false },
     },
     {
       path: '/',
@@ -72,6 +72,11 @@ const router = createRouter({
           component: () => import('@/views/issues/IssueDetail.vue'),
         },
         {
+          path: 'issues/:id/edit',
+          name: 'issue-edit',
+          component: () => import('@/views/issues/EditIssue.vue'),
+        },
+        {
           path: 'students',
           name: 'students',
           component: () => import('@/views/students/StudentList.vue'),
@@ -83,44 +88,48 @@ const router = createRouter({
           component: () => import('@/views/students/ImportStudents.vue'),
           meta: { requiresAuth: true, requiresPermission: 'MANAGE_STUDENTS' },
         },
-      ]
-    }
+      ],
+    },
   ],
-});
+})
 
 router.beforeEach(async (to) => {
-  const authStore = useAuthStore();
-  const isAuthenticated = authStore.isAuthenticated;
+  const authStore = useAuthStore()
+  const isAuthenticated = authStore.isAuthenticated
 
   if (to.meta.requiresAuth && !isAuthenticated) {
-    return { name: 'login' };
+    return { name: 'login' }
   }
   if (to.path === '/login' && isAuthenticated) {
-    return { name: 'dashboard' };
+    return { name: 'dashboard' }
   }
 
   if (isAuthenticated) {
     // โหลด user ให้ชัวร์ (ใช้ตรวจ permission + must_change_password)
     if (!authStore.user) {
-      try { await authStore.loadMe(); } catch { /* ignore */ }
+      try {
+        await authStore.loadMe()
+      } catch {
+        /* ignore */
+      }
     }
 
     // 🔐 บัญชีที่ระบบสร้างให้ (seed) ยังไม่ได้เปลี่ยนรหัส → บังคับไปหน้าเปลี่ยนรหัสก่อนใช้ระบบ
     if (authStore.mustChangePassword && to.name !== 'profile-password') {
-      return { name: 'profile-password' };
+      return { name: 'profile-password' }
     }
   }
 
   // ตรวจ permission ถ้า route ต้องการ
-  const needPermission = to.meta.requiresPermission as string | undefined;
+  const needPermission = to.meta.requiresPermission as string | undefined
   if (needPermission && isAuthenticated) {
     if (!authStore.hasPermission(needPermission)) {
       // ไม่มีสิทธิ์ → ไปหน้าแรกที่เข้าได้ตามบทบาท
-      return getHomeRoute();
+      return getHomeRoute()
     }
   }
 
-  return true;
-});
+  return true
+})
 
-export default router;
+export default router
