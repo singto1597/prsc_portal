@@ -36,6 +36,34 @@ class IssueCreateRequest(BaseModel):
         return v
 
 
+class IssueUpdateRequest(BaseModel):
+    """แก้ไขเรื่อง (ผู้แจ้ง) — PATCH: ส่งเฉพาะฟิลด์ที่ต้องการแก้ (exclude_unset)"""
+    main_category: Optional[str] = None
+    category: Optional[str] = None
+    title: Optional[str] = Field(None, min_length=3, max_length=200)
+    description: Optional[str] = Field(None, min_length=3)
+    is_anonymous: Optional[bool] = None
+
+    @field_validator("main_category")
+    @classmethod
+    def _validate_main_category(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in all_main_category_codes():
+            raise ValueError(f"หมวดหลักไม่ถูกต้อง: {v} (ต้องเป็น {', '.join(all_main_category_codes())})")
+        return v
+
+    @field_validator("category")
+    @classmethod
+    def _validate_category(cls, v: Optional[str], info) -> Optional[str]:
+        # ตรวจคู่ main_category+category เฉพาะเมื่อส่งทั้งคู่พร้อมกัน
+        # (ถ้าส่งแค่ category ตัวเดียว ตรวจกับ main_category ปัจจุบันใน service แทน)
+        if v is None:
+            return v
+        main_cat = info.data.get("main_category")
+        if main_cat and not is_valid_category(main_cat, v):
+            raise ValueError(f"หมวดย่อย '{v}' ไม่ได้อยู่ในหมวดหลัก '{main_cat}'")
+        return v
+
+
 class StepCreateRequest(BaseModel):
     step_title: str = Field(..., min_length=1, max_length=200)
     step_detail: Optional[str] = None
@@ -49,7 +77,22 @@ class EscalateRequest(BaseModel):
     reason: Optional[str] = None
 
 
+class CommentCreateRequest(BaseModel):
+    """สร้าง/แก้ไขคอมเมนต์ (แก้ได้เฉพาะ body)"""
+    body: str = Field(..., min_length=1, max_length=1000)
+
+
 # ===================== Response =====================
+class CommentOut(BaseModel):
+    id: int
+    user_id: Optional[int] = None          # ให้ frontend เทียบกับ authStore.user.id (เหมือน reporter_id ใน IssueOut)
+    commenter_name: Optional[str] = None   # ชื่อจริงเสมอ (แม้เรื่อง anonymous)
+    commenter_room: Optional[str] = None
+    body: str
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+
 class IssueStepOut(BaseModel):
     id: int
     step_title: str
@@ -110,3 +153,4 @@ class IssueOut(BaseModel):
     countdown: Optional[IssueCountdownOut] = None
     escalations: List[EscalationOut] = []
     status_history: List[StatusHistoryOut] = []
+    comments: List[CommentOut] = []

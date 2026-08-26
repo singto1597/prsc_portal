@@ -1,4 +1,5 @@
 # === Issue Flow + Escalation Pyramid Tests ===
+import json
 import random
 import pytest
 import pytest_asyncio
@@ -280,3 +281,167 @@ async def test_teacher_scope_and_staff_full_access(client, db_pool):
         res = client.get("/api/issues", headers={"Authorization": f"Bearer {tok}"})
         ids = [i["id"] for i in res.json()]
         assert issue_4 in ids and issue_5 in ids, f"{who} ต้องเห็นทั้ง 2 เรื่อง"
+
+
+# === Section 6: แก้ไขเรื่อง (ผู้แจ้ง/admin) ===
+@pytest.mark.asyncio
+async def test_reporter_can_edit_issue(client, issue_world, db_pool):
+    users = issue_world
+    student = users["student"]
+
+    res = _create_issue(client, users, title="เดิม", desc="รายละเอียดเดิม")
+    assert res.status_code == 200
+    issue_id = res.json()["id"]
+
+    # แก้ title + description + category (เดิม main_category=report, category=complaint → grievance ใช้ได้)
+    res = client.patch(f"/api/issues/{issue_id}",
+                       json={"title": "แก้ไขแล้ว", "description": "รายละเอียดใหม่", "category": "grievance"},
+                       headers={"Authorization": f"Bearer {student['token']}"})
+    assert res.status_code == 200, res.text
+    assert res.json()["title"] == "แก้ไขแล้ว"
+    assert res.json()["category"] == "grievance"
+
+    # deep-DB verify
+    async with db_pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT title, description, category, updated_at FROM issues WHERE id = $1", issue_id)
+        assert row["title"] == "แก้ไขแล้ว"
+        assert row["description"] == "รายละเอียดใหม่"
+        assert row["category"] == "grievance"
+        assert row["updated_at"] is not None
+        # status_history มี note บอกว่าโดนแก้
+        note = await conn.fetchval(
+            "SELECT note FROM issue_status_history WHERE issue_id = $1 ORDER BY id DESC LIMIT 1",
+            issue_id)
+        assert note == "ผู้แจ้งแก้ไขข้อมูลเรื่อง"
+        # audit log บันทึก old/new values (asyncpg คืน jsonb เป็น string → json.loads)
+        audit = await conn.fetchrow(
+            "SELECT old_values, new_values FROM audit_logs WHERE action = 'UPDATE_ISSUE' AND entity_id = $1",
+            str(issue_id))
+        assert audit is not None
+        assert json.loads(audit["old_values"])["title"] == "เดิม"
+        assert json.loads(audit["new_values"])["title"] == "แก้ไขแล้ว"
+
+
+@pytest.mark.asyncio
+async def test_non_reporter_cannot_edit(client, issue_world, db_pool):
+    users = issue_world
+    student, head = users["student"], users["head"]
+
+    res = _create_issue(client, users, title="เดิม", desc="aaa")
+    issue_id = res.json()["id"]
+
+    # หัวหน้าห้อง (ไม่ใช่ผู้แจ้ง) พยายามแก้ → 403
+    res = client.patch(f"/api/issues/{issue_id}", json={"title": "แฮก"},
+                       headers={"Authorization": f"Bearer {head['token']}"})
+    assert res.status_code == 403
+
+    async with db_pool.acquire() as conn:
+        title = await conn.fetchval("SELECT title FROM issues WHERE id = $1", issue_id)
+        assert title == "เดิม"
+
+
+@pytest.mark.asyncio
+async def test_admin_can_edit(client, issue_world):
+    users = issue_world
+    council = users["council"]
+
+    res = _create_issue(client, users, title="เรื่อง student", desc="aaa")
+    issue_id = res.json()["id"]
+
+    # admin (council_president is_admin=True) แก้เรื่องของคนอื่นได้
+    res = client.patch(f"/api/issues/{issue_id}", json={"title": "admin แก้"},
+                       headers={"Authorization": f"Bearer {council['token']}"})
+    assert res.status_code == 200, res.text
+    assert res.json()["title"] == "admin แก้"
+
+
+@pytest.mark.parametrize("terminal_setup", ["resolved", "cancelled", "rejected"])
+@pytest.mark.asyncio
+async def test_edit_blocked_on_terminal_status(client, issue_world, db_pool, terminal_setup):
+    users = issue_world
+    student, head = users["student"], users["head"]
+
+    res = _create_issue(client, users, title="เดิม", desc="aaa")
+    issue_id = res.json()["id"]
+
+    # ทำสถานะให้ปิดก่อน
+    if terminal_setup == "resolved":
+        client.post(f"/api/issues/{issue_id}/accept", json={"estimated_days": 2},
+                    headers={"Authorization": f"Bearer {head['token']}"})
+        client.post(f"/api/issues/{issue_id}/resolve", json={"reason": "เสร็จ"},
+                    headers={"Authorization": f"Bearer {head['token']}"})
+    elif terminal_setup == "cancelled":
+        client.post(f"/api/issues/{issue_id}/cancel", json={"reason": "เลิกเอง"},
+                    headers={"Authorization": f"Bearer {student['token']}"})
+    elif terminal_setup == "rejected":
+        client.post(f"/api/issues/{issue_id}/accept", json={"estimated_days": 2},
+                    headers={"Authorization": f"Bearer {head['token']}"})
+        client.post(f"/api/issues/{issue_id}/cancel", json={"reason": "ปัดตก"},
+                    headers={"Authorization": f"Bearer {head['token']}"})
+
+    # ผู้แจ้งพยายามแก้ → 400 (สถานะปิด)
+    res = client.patch(f"/api/issues/{issue_id}", json={"title": "พยายามแก้"},
+                       headers={"Authorization": f"Bearer {student['token']}"})
+    assert res.status_code == 400
+    assert "ปิดแล้ว" in res.json()["detail"]
+
+    async with db_pool.acquire() as conn:
+        title = await conn.fetchval("SELECT title FROM issues WHERE id = $1", issue_id)
+        assert title == "เดิม"
+
+
+@pytest.mark.asyncio
+async def test_edit_category_validation(client, issue_world):
+    users = issue_world
+    student = users["student"]
+
+    res = _create_issue(client, users, main_category="report", category="complaint", title="หมวด", desc="aaa")
+    assert res.status_code == 200
+    issue_id = res.json()["id"]
+
+    # เปลี่ยน main_category เฉยๆ → category เดิม (complaint) ไม่อยู่ใต้ suggestion → 400
+    res = client.patch(f"/api/issues/{issue_id}", json={"main_category": "suggestion"},
+                       headers={"Authorization": f"Bearer {student['token']}"})
+    assert res.status_code == 400
+
+    # เปลี่ยนคู่ให้ถูกต้อง → 200
+    res = client.patch(f"/api/issues/{issue_id}",
+                       json={"main_category": "suggestion", "category": "academic"},
+                       headers={"Authorization": f"Bearer {student['token']}"})
+    assert res.status_code == 200
+    assert res.json()["main_category"] == "suggestion"
+    assert res.json()["category"] == "academic"
+
+    # เปลี่ยนเฉพาะ category ไม่ตรง main_category ปัจจุบัน (suggestion) → 400
+    res = client.patch(f"/api/issues/{issue_id}", json={"category": "complaint"},
+                       headers={"Authorization": f"Bearer {student['token']}"})
+    assert res.status_code == 400
+
+    # main_category ไม่มีในระบบ → 422 (model validator)
+    res = client.patch(f"/api/issues/{issue_id}", json={"main_category": "invalid_cat"},
+                       headers={"Authorization": f"Bearer {student['token']}"})
+    assert res.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_anonymous_toggle_resnapshots_name(client, issue_world, db_pool):
+    users = issue_world
+    student = users["student"]
+
+    res = _create_issue(client, users, title="นิรนาม", desc="ไม่ระบุชื่อ", anonymous=True)
+    assert res.status_code == 200
+    issue_id = res.json()["id"]
+
+    async with db_pool.acquire() as conn:
+        assert await conn.fetchval("SELECT reporter_name FROM issues WHERE id = $1", issue_id) is None
+
+    # ผู้แจ้งเปิดเผยชื่อ → backend re-snapshot ชื่อจริงให้
+    res = client.patch(f"/api/issues/{issue_id}", json={"is_anonymous": False},
+                       headers={"Authorization": f"Bearer {student['token']}"})
+    assert res.status_code == 200, res.text
+    assert res.json()["reporter_name"] is not None
+
+    async with db_pool.acquire() as conn:
+        name = await conn.fetchval("SELECT reporter_name FROM issues WHERE id = $1", issue_id)
+        assert name is not None and name != ""

@@ -347,3 +347,18 @@
   4. **ไทม์ไลน์:** เพิ่ม chip สีแสดง `STATUS_LABELS[h.status]` ต่อรายการ status_history — ให้เห็นชัดว่าจุดไหน "ถูกปัดตก" ไม่ต้องเดาจาก note อย่างเดียว
   - **กฎ: ถ้า endpoint หนึ่งรองรับหลายบทบาทที่ควรได้ผลต่างกัน อย่า hardcode status ใน router — ให้ service ตัดสินจาก actor แล้วคืนค่าจริง; เวลาเพิ่ม status ใหม่ ไล่ grep `cancelled` ทั้ง frontend+backend (labels/colors/filter/dashboard/test) ให้ครบก่อน**
 - **Date Added:** 2026-08-23
+
+### 🛠️ PATCH แก้ไขเรื่อง + คอมเมนต์ — dynamic SET ต้องจอง `$1` ไว้ WHERE, ชื่อ snapshot ต้อง fallback users.full_name, ตารางใหม่ต้องเข้าครบ 3 ที่
+- **Context/Problem:** เพิ่มฟีเจอร์ (ก) ผู้แจ้งแก้ไขเรื่อง (`PATCH /api/issues/{id}`) และ (ข) คอมเมนต์แบบ YouTube (`issue_comments` + CRUD ของตัวเอง) — เจอ 3 จุดที่พังถ้าไม่ระวัง: asyncpg parameter numbering, ชื่อ snapshot ว่าง, และ schema ใหม่หลุดจาก test isolation
+- **Root Cause:**
+  1. **asyncpg Ambiguous/Indeterminate:** dynamic `UPDATE ... SET` ต้องไม่ reuse `$1` ข้าม type และต้องไม่มี param ค้างที่ไม่ได้ใช้ (มีบทเรียน AmbiguousParameterError/IndeterminateDatatypeError แล้ว) — วิธีคือจอง `$1` ไว้ `WHERE id` แล้ว field แต่ละตัวใช้ `len(params)+1` ก่อน `append`
+  2. **`CONCAT_WS(' ', prefix, first_name, last_name)` กับแถวที่ชื่อว่าง:** register_user/self-signup เก็บชื่อไว้ที่ `users.full_name` แต่ `students.first_name/last_name` เป็น `''` → `CONCAT_WS` ได้ `' '` (space) — `NULLIF(..., '')` จับไม่ออกเพราะไม่ใช่ `''` → ต้อง `TRIM` ก่อน `NULLIF` แล้ว fallback `users.full_name`
+  3. **ตารางใหม่หลุด test isolation:** เพิ่ม `issue_comments` ใน init_db + migration แต่ลืม conftest `TRUNCATE` → คอมเมนต์รัวข้าม test (deep-DB count ผิดเงียบๆ)
+  4. **asyncpg คืน jsonb เป็น string:** เทสที่อ่าน `audit_logs.old_values['title']` ต้อง `json.loads` ก่อน (มีบทเรียนเดิม) — `audit["old_values"]["title"]` = `TypeError: string indices`
+- **Correct Pattern/Solution:**
+  1. **Dynamic SET:** `params = [issue_id]` → `sets.append(f"col = ${len(params)+1}"); params.append(value)` → สุดท้าย sanity check `sql.count('$') == len(params)`; `updated_at = NOW()` ไม่มี param ไม่กระทบเลข
+  2. **ชื่อแสดง:** `NULLIF(TRIM(CONCAT_WS(' ', s.prefix, s.first_name, s.last_name)), '') AS student_name` + `JOIN users u` → ในโค้ด `c["student_name"] or c["full_name"]`; ใช้ `SELECT ... FOR UPDATE` บนแถว issue ตอนเช็คสถานะปิด (กัน TOCTOU กับ resolve/cancel)
+  3. **ตารางใหม่ = เข้าครบ 3 ที่:** init_db (`CREATE TABLE IF NOT EXISTS`) + `migrations/00X_*.py` (`CREATE TABLE IF NOT EXISTS` + index) + `conftest.py` TRUNCATE list — สามที่ต้องมีครบ
+  4. **authorization:** แก้เรื่อง = `reporter_id == user_id` หรือ admin (`_is_admin`); คอมเมนต์ = ใครเห็นเรื่องได้ (`_assert_can_view` = visibility เดียวกับ `get_issue`) + แก้/ลบเฉพาะ `user_id` ของตัวเอง
+  - **กฎ: (1) dynamic PATCH ต้อง `model_dump(exclude_unset=True)` + จอง `$1` WHERE แล้ว field เริ่ม `len(params)+1`; (2) snapshot ชื่อจาก students ต้อง TRIM + fallback users.full_name เพราะ first/last name ว่างได้; (3) schema ใหม่ต้องเข้าทั้ง init_db + migration + conftest TRUNCATE; (4) เทส audit jsonb ต้อง json.loads**
+- **Date Added:** 2026-08-26

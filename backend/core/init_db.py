@@ -174,6 +174,24 @@ async def init_db(pool: asyncpg.Pool):
                 );
                 """)
 
+                # --- 7.5 ตารางคอมเมนต์ในเรื่อง (issue_comments) — แสดงความคิดเห็นแบบ YouTube ---
+                # user_id + commenter_name/commenter_room เป็น snapshot (แบบ reporter_name)
+                # → ผู้ใช้ถูกลบแล้วคอมเมนต์ยังอยู่ (ON DELETE SET NULL)
+                # updated_at: NULL จนกว่าจะแก้ครั้งแรก ; deleted_at: soft delete
+                await conn.execute("""
+                CREATE TABLE IF NOT EXISTS issue_comments (
+                    id SERIAL PRIMARY KEY,
+                    issue_id INTEGER NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+                    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                    commenter_name TEXT,
+                    commenter_room TEXT,
+                    body TEXT NOT NULL,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP WITH TIME ZONE,
+                    deleted_at TIMESTAMP
+                );
+                """)
+
                 # --- 8. audit_logs (โครงสร้างเหมือนโปรเจคเก่า) ---
                 await conn.execute("""
                 CREATE TABLE IF NOT EXISTS audit_logs (
@@ -263,6 +281,7 @@ async def init_db(pool: asyncpg.Pool):
                 CREATE INDEX IF NOT EXISTS idx_issue_steps_issue ON issue_steps(issue_id);
                 CREATE INDEX IF NOT EXISTS idx_issue_countdowns_issue ON issue_countdowns(issue_id);
                 CREATE INDEX IF NOT EXISTS idx_issue_status_history_issue ON issue_status_history(issue_id);
+                CREATE INDEX IF NOT EXISTS idx_issue_comments_issue ON issue_comments(issue_id);
                 CREATE INDEX IF NOT EXISTS idx_students_room_no_active
                     ON students(room_id, student_no)
                     WHERE deleted_at IS NULL;

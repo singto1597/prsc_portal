@@ -91,7 +91,8 @@ async def clean_database(db_pool):
         await conn.execute("""
             TRUNCATE TABLE users, rooms, students, issues,
                 issue_steps, issue_escalations, issue_countdowns,
-                issue_status_history, audit_logs, student_import_jobs
+                issue_status_history, audit_logs, student_import_jobs,
+                issue_comments
             CASCADE
         """)
     yield
