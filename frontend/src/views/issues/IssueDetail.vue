@@ -53,9 +53,18 @@ const canReceive = computed(() => {
   if (!issue.value || !authStore.user) return false
   if (issue.value.current_assignee_id) return false
   if (issue.value.status !== 'pending' && issue.value.status !== 'escalated') return false
-  // ระดับของผู้ใช้ (สูงสุด) == ระดับปัจจุบันของเรื่อง
-  const myLevel = getMyLevel()
-  return myLevel === issue.value.current_level
+  // แอดมินรับเรื่องได้ทุกเรื่อง
+  if (authStore.isAdmin) return true
+  // ระดับของผู้ใช้ (สูงสุด) ต้องสูงกว่าหรือเท่ากับระดับเรื่อง → รับแทนหัวหน้าห้องในระดับนั้นได้เลย
+  const rank = { student: 0, room: 1, level: 2, council: 3 }
+  const myRank = rank[getMyLevel() as keyof typeof rank] ?? 0
+  const issueRank = rank[issue.value.current_level] ?? 1
+  if (myRank < issueRank) return false
+  // เรื่องระดับ 'room' และตัวเองระดับ 'room' → ต้องเป็นสมาชิกห้องของเรื่อง (รับแทนได้เฉพาะระดับที่สูงกว่า)
+  if (issue.value.current_level === 'room' && myRank === 1) {
+    return authStore.roles.some((r) => r.room_id != null && r.room_id === issue.value?.room_id)
+  }
+  return true
 })
 
 const canManage = computed(() => {

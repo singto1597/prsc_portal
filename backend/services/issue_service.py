@@ -713,25 +713,32 @@ async def accept_issue(pool: asyncpg.Pool, user_id: int, issue_id: int, estimate
             if not issue:
                 raise NotFoundError("ไม่พบเรื่องนี้")
 
-            # ตรวจว่าสังกัดระดับเดียวกับ current_level
-            # - สำหรับระดับ room: ต้องเป็นสมาชิกห้องนั้น (หัวหน้าห้อง/รอง)
-            # - สำหรับระดับ level/council: สังกัดระดับชั้น/สภา มองข้ามห้องได้
-            # - ครูทั่วไป: รับเรื่องของระดับชั้นตัวเองได้ทุกระดับพีระมิด (เป็นผู้ดูแลระดับชั้น)
-            in_room_role = await _user_role_in(conn, user_id, issue["room_id"])
-            if in_room_role:
-                level = ROLE_LEVEL.get(in_room_role, "student")
-            else:
-                # ไม่ใช่สมาชิกห้องนั้น — ดูระดับสูงสุดจากทุกตำแหน่ง (รองรับสภา/ประธานระดับ)
-                level = await user_level(pool, user_id, room_id=None)
+            # ตรวจว่า "ระดับสูงกว่าหรือเท่ากัน" กับ current_level (พีระมิดมองลง):
+            # - ระดับที่สูงกว่า (ประธานระดับ/สภา/แอดมิน) กดรับแทนหัวหน้าห้องในระดับนั้นได้เลย
+            #   ไม่ต้องรอให้หัวหน้าห้องรับก่อน (ความต้องการปี 2026-08-26)
+            # - เรื่องระดับ 'room': ถ้าผู้รับมีระดับสูงสุดแค่ 'room' ต้องเป็นสมาชิกห้องของเรื่อง
+            # - ครูทั่วไป: scope จำกัดเฉพาะห้องในระดับชั้นตัวเอง (staff_level) — บังคับเสมอ
+            my_level = await user_level(pool, user_id, room_id=None)
+            can_accept = LEVEL_RANK.get(my_level, 0) >= LEVEL_RANK.get(issue["current_level"], 1)
 
-            can_accept_level = (level == issue["current_level"])
-            if not can_accept_level:
-                teacher_level = await _teacher_scope(conn, user_id)
-                if teacher_level:
-                    issue_room_level = await _room_level(conn, issue["room_id"])
-                    can_accept_level = (issue_room_level == teacher_level)
-                if not can_accept_level:
-                    raise ForbiddenError("เรื่องนี้ไม่อยู่ในระดับของคุณ")
+            # ระดับ 'room' เท่ากัน (หัวหน้าห้อง/รองของห้องอื่น) → ห้ามรับเรื่องห้องอื่น
+            if (
+                can_accept
+                and issue["current_level"] == "room"
+                and LEVEL_RANK.get(my_level, 0) == LEVEL_RANK["room"]
+            ):
+                if not await _user_role_in(conn, user_id, issue["room_id"]):
+                    can_accept = False
+
+            # ครูทั่วไป: รับได้เฉพาะเรื่องที่ห้องอยู่ในระดับชั้นตัวเอง (ยกเว้นเรื่องระดับสภา — เดิมรับได้ทุกเรื่อง)
+            teacher_level = await _teacher_scope(conn, user_id)
+            if teacher_level and issue["current_level"] != "council":
+                issue_room_level = await _room_level(conn, issue["room_id"])
+                if issue_room_level != teacher_level:
+                    can_accept = False
+
+            if not can_accept:
+                raise ForbiddenError("เรื่องนี้ไม่อยู่ในระดับของคุณ")
 
             # ตรวจว่ายังไม่มีคนรับ
             if issue["current_assignee_id"]:
