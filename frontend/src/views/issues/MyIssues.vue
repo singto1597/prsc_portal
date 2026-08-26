@@ -1,22 +1,56 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { RouterLink } from 'vue-router';
 import { listIssues } from '@/services/issue';
 import { MAIN_CATEGORY_LABELS, subcategoryLabel, STATUS_LABELS, LEVEL_LABELS, type Issue } from '@/types/issue';
+import IssueListToolbar from '@/components/IssueListToolbar.vue';
+import PaginationBar from '@/components/PaginationBar.vue';
 
 const issues = ref<Issue[]>([]);
+const total = ref(0); // จำนวนทั้งหมดที่ตรงเงื่อนไข (จาก envelope)
 const isLoading = ref(true);
 const error = ref('');
+const q = ref('');           // คำค้นหา
+const sort = ref<'asc' | 'desc'>('desc'); // ใหม่ไปเก่า (default)
+const page = ref(1);
+const pageSize = 20;
+const statusFilter = ref('');   // '' = ทุกสถานะ
 
-onMounted(async () => {
+const activeFilters = computed(() => (statusFilter.value ? 1 : 0));
+
+onMounted(load);
+
+async function load() {
+  isLoading.value = true;
+  error.value = '';
   try {
-    issues.value = await listIssues({ mine: true });
-  } catch (e: any) {
-    error.value = e.message || 'โหลดข้อมูลไม่สำเร็จ';
+    const res = await listIssues({
+      mine: true,
+      status: statusFilter.value || undefined,
+      q: q.value.trim() || undefined,
+      sort: sort.value,
+      limit: pageSize,
+      offset: (page.value - 1) * pageSize,
+    });
+    issues.value = res.items;
+    total.value = res.total;
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'โหลดข้อมูลไม่สำเร็จ';
   } finally {
     isLoading.value = false;
   }
-});
+}
+
+// search / sort / filter เปลี่ยน → กลับหน้า 1 แล้วโหลด
+function onToolbarChange() {
+  page.value = 1;
+  load();
+}
+
+function onPageChange(n: number) {
+  page.value = n;
+  load();
+}
 
 function statusColor(s: string) {
   return {
@@ -41,6 +75,33 @@ function statusColor(s: string) {
         <i class="bi bi-plus-lg"></i> แจ้งเรื่องใหม่
       </RouterLink>
     </div>
+
+    <!-- Toolbar: ค้นหา + filter (สถานะ) + เรียงลำดับ + จำนวน -->
+    <IssueListToolbar
+      v-model:q="q"
+      v-model:sort="sort"
+      :total="total"
+      :count="issues.length"
+      :active-filters="activeFilters"
+      :loading="isLoading"
+      @change="onToolbarChange"
+    >
+      <template #filters>
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 mb-1.5">สถานะ</label>
+          <select v-model="statusFilter" @change="onToolbarChange"
+            class="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm bg-white">
+            <option value="">ทุกสถานะ</option>
+            <option value="pending">รอรับเรื่อง</option>
+            <option value="in_progress">กำลังดำเนินการ</option>
+            <option value="escalated">ส่งต่อระดับบน</option>
+            <option value="resolved">แก้ไขเสร็จ</option>
+            <option value="cancelled">ถูกยกเลิก</option>
+            <option value="rejected">ถูกปัดตก</option>
+          </select>
+        </div>
+      </template>
+    </IssueListToolbar>
 
     <div v-if="isLoading" class="flex justify-center py-16">
       <div class="animate-spin w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full"></div>
@@ -77,6 +138,9 @@ function statusColor(s: string) {
         </div>
       </RouterLink>
     </TransitionGroup>
+
+    <!-- แบ่งหน้า -->
+    <PaginationBar :total="total" :page="page" :page-size="pageSize" :loading="isLoading" @page-change="onPageChange" />
   </div>
 </template>
 

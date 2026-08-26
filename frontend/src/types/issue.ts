@@ -75,6 +75,15 @@ export interface UpdateIssuePayload {
   is_anonymous?: boolean
 }
 
+// รายการเรื่องแบบแบ่งหน้า (จาก GET /api/issues) — total นับก่อน limit/offset
+export interface IssueListResponse {
+  items: Issue[]
+  total: number
+  page: number
+  page_size: number
+  pages: number
+}
+
 export interface Issue {
   id: number
   room_id: number | null

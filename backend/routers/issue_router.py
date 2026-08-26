@@ -7,7 +7,7 @@ from core.categories import all_main_category_codes
 from models.issue_schemas import (
     IssueCreateRequest, IssueUpdateRequest, IssueOut, IssueStepOut, IssueCountdownOut,
     StepCreateRequest, CountdownSetRequest, EscalateRequest,
-    CommentCreateRequest, CommentOut,
+    CommentCreateRequest, CommentOut, IssueListOut,
 )
 from services import issue_service
 
@@ -55,7 +55,7 @@ async def create_issue(
     return IssueOut(**issue)
 
 
-@router.get("", response_model=list[IssueOut])
+@router.get("", response_model=IssueListOut)
 async def list_issues(
     mine: bool = Query(False, description="เฉพาะเรื่องที่ฉันแจ้ง"),
     received: bool = Query(False, description="เรื่องที่ฉันรับ/อยู่ในระดับฉัน (มองเห็นได้ทั้งหมด)"),
@@ -63,21 +63,29 @@ async def list_issues(
     category: str | None = Query(None),
     main_category: str | None = Query(None, description="กรองตามหมวดหลัก: suggestion/wellbeing/report"),
     level: str | None = Query(None, description="กรองตามระดับ: room/level/council"),
+    q: str | None = Query(None, max_length=100, description="ค้นหาแบบคำต่อคำ: ชื่อเรื่อง/คำอธิบาย/ห้อง/ชื่อคน"),
+    sort: str = Query("desc", pattern="^(asc|desc)$", description="เรียงตามวันที่สร้าง: asc=เก่าไปใหม่, desc=ใหม่ไปเก่า"),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
     user_ctx: dict = Depends(get_current_user),
     pool: asyncpg.Pool = Depends(get_db_pool),
 ):
-    """รายการปัญหา (visibility ตามพีระมิด + ตัวกรอง)"""
+    """รายการปัญหา (visibility ตามพีระมิด + ตัวกรอง + ค้นหา + แบ่งหน้า)"""
     uid = _ensure_user(user_ctx)
     if main_category and main_category not in all_main_category_codes():
         raise HTTPException(status_code=400, detail=f"หมวดหลักไม่ถูกต้อง: {main_category}")
-    issues = await issue_service.list_issues(
+    result = await issue_service.list_issues(
         pool, uid, only_mine=mine, received=received,
         status_filter=status, category=category, main_category=main_category,
-        level_filter=level, limit=limit, offset=offset,
+        level_filter=level, q=q, sort=sort, limit=limit, offset=offset,
     )
-    return [IssueOut(**i) for i in issues]
+    total = result["total"]
+    page = offset // limit + 1
+    pages = (total + limit - 1) // limit if total else 0
+    return IssueListOut(
+        items=[IssueOut(**i) for i in result["items"]],
+        total=total, page=page, page_size=limit, pages=pages,
+    )
 
 
 @router.get("/{issue_id}", response_model=IssueOut)

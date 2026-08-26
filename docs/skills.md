@@ -362,3 +362,17 @@
   4. **authorization:** แก้เรื่อง = `reporter_id == user_id` หรือ admin (`_is_admin`); คอมเมนต์ = ใครเห็นเรื่องได้ (`_assert_can_view` = visibility เดียวกับ `get_issue`) + แก้/ลบเฉพาะ `user_id` ของตัวเอง
   - **กฎ: (1) dynamic PATCH ต้อง `model_dump(exclude_unset=True)` + จอง `$1` WHERE แล้ว field เริ่ม `len(params)+1`; (2) snapshot ชื่อจาก students ต้อง TRIM + fallback users.full_name เพราะ first/last name ว่างได้; (3) schema ใหม่ต้องเข้าทั้ง init_db + migration + conftest TRUNCATE; (4) เทส audit jsonb ต้อง json.loads**
 - **Date Added:** 2026-08-26
+
+### 🛠️ List แบบแบ่งหน้า — `COUNT(*) OVER()` อ่าน total จากแถวที่ return → หน้าว่าง (offset เลย) ได้ total=0 ผิดต้องนับแยก + ค้นหา ILIKE ต้องหนี wildcard
+- **Context/Problem:** Phase 2 เพิ่ม Pagination + Search + Sort ให้ `GET /api/issues` — เจอ 2 กับดัก: (ก) เทส `offset` เลยข้อมูลหน้าแล้ว `total` กลับเป็น 0 ทั้งที่ยังมีเรื่องอยู่; (ข) search คล้ายคำต้องไม่ให้ `%`/`_` กลายเป็น wildcard
+- **Root Cause:**
+  1. **`COUNT(*) OVER()` กับ LIMIT/OFFSET:** window function นับแถวที่ตรง WHERE ก่อน LIMIT — ได้ total ถูกต้องเฉพาะเมื่อมีแถว return; ถ้า `offset` เลยข้อมูล `rows` ว่าง → อ่านค่า total จากแถวแรกไม่ได้ → ต้องคืน 0 ผิดพลาด
+  2. **เทสต์เดิม assert รูปแบบ list ตรงๆ:** เปลี่ยน response จาก `list[IssueOut]` เป็น envelope `{items,total,page,page_size,pages}` → เทสต์ 6 จุดที่ใช้ `res.json()` เป็น list โดยตรง fail (ต้อง `res.json()["items"]`)
+  3. **`q` เข้า ILIKE โดยไม่หนี:** `%`/`_`/`\` ในคำค้นกลายเป็น wildcard/escape → `q=%` จับทุกเรื่อง
+- **Correct Pattern/Solution:**
+  1. **total:** `SELECT ... COUNT(*) OVER() AS total_count` ใส่ใน query หลัก (ได้ total ใน query เดียวเมื่อมีแถว); **ถ้า `rows` ว่าง (offset เลย) → นับแยกด้วย `SELECT COUNT(*) ... WHERE {' AND '.join(where)}` โดยใช้ params เดิมก่อน append limit/offset (`filter_params = list(params)`)**
+  2. **search:** `_escape_like(s)` = `s.replace("\\","\\\\").replace("%","\\%").replace("_","\\_")` + `ILIKE $n ESCAPE '\'`; `q.split()` ทุกคำ (AND ระหว่างคำ) OR ข้าม 6 ฟิลด์ (title/description/room/reporter_room/reporter_name/assignee_name) — ต่อ AFTER visibility cond กันค้นข้ามระดับ; reuse `$n` ใน OR ปลอดภัยเพราะทุกตำแหน่งเป็น text
+  3. **sort:** `ORDER BY i.created_at {ASC|DESC}, i.id {ASC|DESC}` — เพิ่ม `i.id` รองกันหน้าไม่เสถียร (timestamp ซ้ำกัน); router ใช้ `Query(pattern="^(asc|desc)$")` → ค่าแปลกได้ 422 อัตโนมัติ
+  4. **เทสต์:** เปลี่ยนทุกจุดที่ assert list ตรงๆ เป็น `["items"]` พร้อมกัน; เพิ่มเทสต์ search หนี wildcard (`q=%` เจอเฉพาะเรื่องที่มี `%` จริง) + search ไม่รั่วข้ามระดับ (student ค้นแล้วไม่เจอเรื่องคนอื่น) + pagination หน้าเลย (`offset` เกิน → items=[] แต่ total ยังเท่าเดิม)
+  - **กฎ: (1) อย่าใช้ `COUNT(*) OVER()` เป็น total แบบลอยๆ เมื่อมี LIMIT/OFFSET — หน้าว่างต้องมี fallback count; (2) เปลี่ยน response shape ของ list ต้องไล่แก้เทสต์ที่ assert list ตรงๆ ทุกจุด; (3) ILIKE search ทุกครั้งต้องหนี `%`/`_`/`\` + `ESCAPE '\'`; (4) เติม `i.id` ใน ORDER BY เสมอเพื่อให้ pagination กำหนดทิศทางได้**
+- **Date Added:** 2026-08-26

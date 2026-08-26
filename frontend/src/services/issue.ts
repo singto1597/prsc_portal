@@ -1,5 +1,5 @@
 import api from './api'
-import type { Issue, IssueComment, UpdateIssuePayload } from '@/types/issue'
+import type { Issue, IssueComment, IssueListResponse, IssueStep, UpdateIssuePayload } from '@/types/issue'
 
 // Issue API
 
@@ -13,6 +13,8 @@ export interface CreateIssuePayload {
   start_level?: string
 }
 
+export type IssueSort = 'asc' | 'desc'
+
 export async function listIssues(params: {
   mine?: boolean
   received?: boolean
@@ -20,21 +22,20 @@ export async function listIssues(params: {
   category?: string
   main_category?: string
   level?: string
+  q?: string
+  sort?: IssueSort
   limit?: number
   offset?: number
-}): Promise<Issue[]> {
-  const res = (await api.get('/api/issues', { params })) as Issue[]
-  return res
+}): Promise<IssueListResponse> {
+  return (await api.get('/api/issues', { params })) as IssueListResponse
 }
 
 export async function getIssue(id: number): Promise<Issue> {
-  const res: any = await api.get(`/api/issues/${id}`)
-  return res
+  return (await api.get(`/api/issues/${id}`)) as Issue
 }
 
 export async function createIssue(payload: CreateIssuePayload): Promise<Issue> {
-  const res: any = await api.post('/api/issues', payload)
-  return res
+  return (await api.post('/api/issues', payload)) as Issue
 }
 
 export async function updateIssue(id: number, payload: UpdateIssuePayload): Promise<Issue> {
@@ -49,9 +50,12 @@ export async function updateCountdown(id: number, estimated_days: number): Promi
   await api.patch(`/api/issues/${id}/countdown`, { estimated_days })
 }
 
-export async function addStep(id: number, step_title: string, step_detail?: string): Promise<any> {
-  const res: any = await api.post(`/api/issues/${id}/steps`, { step_title, step_detail })
-  return res
+export async function addStep(
+  id: number,
+  step_title: string,
+  step_detail?: string,
+): Promise<IssueStep> {
+  return (await api.post(`/api/issues/${id}/steps`, { step_title, step_detail })) as IssueStep
 }
 
 export async function completeStep(id: number, stepId: number): Promise<void> {
