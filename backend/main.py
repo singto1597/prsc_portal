@@ -3,15 +3,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import asyncpg
 import logging
+import uuid
 
 from core.config import settings
 from core.init_db import init_db
+from core.request_context import set_audit_context, clear_audit_context
 
 from routers import auth_router
 from routers import issue_router
 from routers import dashboard_router
 from routers import student_router
 from routers import import_router
+from routers import audit_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -77,11 +80,30 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def audit_context_middleware(request: Request, call_next):
+    """📡 ตั้ง request context (ip / user-agent / trace_id) ให้ AuditLogger เก็บอัตโนมัติ
+    (contextvar — services ไม่ต้องรับ param เพิ่ม; ล้างหลัง request จบกัน leak ข้าม request)
+    """
+    set_audit_context(
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+        trace_id=str(uuid.uuid4()),
+    )
+    try:
+        response = await call_next(request)
+    finally:
+        clear_audit_context()
+    return response
+
+
 app.include_router(auth_router.router, prefix="/api")
 app.include_router(issue_router.router, prefix="/api")
 app.include_router(dashboard_router.router, prefix="/api")
 app.include_router(student_router.router, prefix="/api")
 app.include_router(import_router.router, prefix="/api")
+app.include_router(audit_router.router, prefix="/api")
 
 
 @app.get("/health", tags=["Health"])

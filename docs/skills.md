@@ -388,3 +388,26 @@
   4. **เทสต์:** เปลี่ยนทุกจุดที่ assert list ตรงๆ เป็น `["items"]` พร้อมกัน; เพิ่มเทสต์ search หนี wildcard (`q=%` เจอเฉพาะเรื่องที่มี `%` จริง) + search ไม่รั่วข้ามระดับ (student ค้นแล้วไม่เจอเรื่องคนอื่น) + pagination หน้าเลย (`offset` เกิน → items=[] แต่ total ยังเท่าเดิม)
   - **กฎ: (1) อย่าใช้ `COUNT(*) OVER()` เป็น total แบบลอยๆ เมื่อมี LIMIT/OFFSET — หน้าว่างต้องมี fallback count; (2) เปลี่ยน response shape ของ list ต้องไล่แก้เทสต์ที่ assert list ตรงๆ ทุกจุด; (3) ILIKE search ทุกครั้งต้องหนี `%`/`_`/`\` + `ESCAPE '\'`; (4) เติม `i.id` ใน ORDER BY เสมอเพื่อให้ pagination กำหนดทิศทางได้**
 - **Date Added:** 2026-08-26
+
+### 🛠️ Role สายสภา (council_member) ได้ scope 'all' แต่ต้องไม่ใช่ admin — scope แยกจาก permission
+- **Context/Problem:** สภานักเรียน (council_member) มี `VIEW_DASHBOARD` แต่ติด error "ยังไม่ได้กำหนดระดับชั้นที่รับผิดชอบ" — `get_access_scope` ให้ scope 'all' เฉพาะ `SCOPE_ALL_ROLES = {admin, teacher_council, council_president}` → council_member ตกไป 'pyramid' → dashboard แมป fail-closed เป็น 'none' (เลข 0 + ข้อความสำหรับครู)
+- **Root Cause:** `council_member` เป็น role ระดับโรงเรียน (ยอดพีระมิด — import_service.SCHOOL_WIDE_ROLES มีอยู่แล้ว, ROLE_LEVEL['council_member']='council') แต่ scope ยังไม่รวม → ไม่สอดคล้องกัน
+- **Correct Pattern/Solution:**
+  1. `get_access_scope`: เพิ่ม branch `if r["class_role"] == "council_member": return {"scope": "all", "level": None, "is_admin": False}` — ได้ scope 'all' **แต่ is_admin=False**
+  2. **scope ≠ permission:** ให้ scope 'all' แค่ทำให้เห็นข้อมูลทั้งโรงเรียน — สิทธิ์จัดการ (MANAGE_STUDENTS/VIEW_AUDIT_LOG) ยังถูกกันโดย `require_permission_anywhere` (เช็ค is_admin + permissions แยกต่างหาก) → test ต้องยืนยันทั้ง 2 ด้าน: council_member เรียก `/dashboard/summary` 200 + เห็นเลขทั้งโรงเรียน **และ** เรียก `/students` 403
+  3. dashboard_service: `_usage()` ต้องนับเฉพาะ `action='login' AND status='success'` (failed login ที่บันทึกใหม่ status='error' ต้องไม่ปนยอด)
+  - **กฎ: เวลาให้ role ใหม่เห็นทั้งโรงเรียน ให้เพิ่ม branch scope 'all' แยก (is_admin=False) แทนการยัดเข้า SCOPE_ALL_ROLES — เพราะ SCOPE_ALL_ROLES คืน is_admin=True ซึ่งอาจไปเปิดสิทธิ์อื่น; และทุกครั้งที่ scope ขยาย ให้ test ทั้ง "เห็นข้อมูลได้" + "สิทธิ์จัดการยังโดนกันอยู่"**
+- **Date Added:** 2026-08-27
+
+### 🛠️ Audit เก็บทุก action อย่างละเอียด — request context (contextvar) สำหรับ ip/user_agent + failed login ต้อง status='error' + read audit เป็น best-effort
+- **Context/Problem:** ต้องการ audit_logs เก็บ "ทุกอย่าง" (login/read/create/update/delete) แบบละเอียด แต่ service ไม่มี `request` object → จะส่ง ip/user_agent ต้องแก้ signature ทุกฟังก์ชัน; login ล้มเหลวไม่เคยถูกบันทึก; read/GET ไม่มี audit เลย
+- **Root Cause:** AuditLogger รับแค่ค่าที่ส่งตรงๆ; บันทึก login เฉพาะตอนสำเร็จ (failure raise ไปก่อน); ไม่มีกลไกบันทึก action ประเภทอ่าน
+- **Correct Pattern/Solution:**
+  1. **Request context:** ใหม่ `core/request_context.py` — `ContextVar` เก็บ `{ip_address, user_agent, trace_id}`; middleware ใน main.py (`@app.middleware("http")`) ตั้ง context จาก `request.client.host` + `request.headers.get("user-agent")` + `uuid4()` ก่อน `call_next` แล้ว clear หลังจบ → `AuditLogger.log` ดึงจาก context ถ้าไม่ได้ส่งตรงๆ → **service ทุกตัวได้ ip/user_agent/trace อัตโนมัติโดยไม่แก้ signature** (worker/background ที่ไม่ผ่าน HTTP → context ว่าง → None)
+  2. **AuditLogger:** เพิ่มคอลัมน์ `user_agent` ใน INSERT (คอลัมน์มีอยู่แต่ไม่เคย insert — จับตารางที่มี column เกินจากที่ logger ใช้)
+  3. **Failed login:** ครอบ 2 จุด raise ใน `authenticate_user` → `AuditLogger.log(action="login", status="error", error_detail=..., actor_identifier=username, user_id=...)` (ไม่เจอชื่อ → user_id=None, ผิดรหัส → รู้ user_id) → re-raise; dashboard `_usage()`/traffic ต้อง filter `status='success'`
+  4. **Read audit:** ใหม่ `services/audit_service.log_read(pool, user_id, action, entity_type, ...)` เรียกจาก routers หลัง GET สำเร็จ (action='READ_ISSUES'/'READ_DASHBOARD'...) — **best-effort: try/except เงียบ อย่าทำ main flow พัง**
+  5. **Index:** audit_logs โตเร็ว → migration `006_audit_logs_indexes` (action,created_at / user_id / entity / created_at) + ใส่ block เดียวกันใน init_db
+  6. **เทสต์ Gotcha:** (a) insert audit ตรงๆ อย่า reuse `$1` ข้าม type (INTEGER user_id vs VARCHAR entity_id → AmbiguousParameterError — บทเรียนเดิม); (b) `register_user(pool, username, password, full_name, student_id, room_code, student_no, class_role)` มี `student_no` เป็น positional — ลืมแล้ว class_role ตกไปที่ student_no → `DataError: $4: 'teacher'`
+  - **กฎ: (1) ข้อมูล network ของทุก audit เก็บผ่าน request context กลาง ไม่ใช่แก้ signature ทุก service; (2) audit ทุกชนิดมี status/success-error — ตัวนับ "การเข้าใช้งาน" ต้อง filter success; (3) read audit ต้องไม่ทำให้ request หลักพัง (best-effort); (4) ตาราง audit ต้องมี index ที่ตรงกับ query (group by day + filter action) ก่อนจะ "เก็บทุกอย่าง"**
+- **Date Added:** 2026-08-27

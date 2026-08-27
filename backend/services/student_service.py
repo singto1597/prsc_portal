@@ -50,7 +50,7 @@ async def create_room(pool: asyncpg.Pool, room_code: str, room_name: str, level:
             )
             if existing:
                 return existing
-            return await conn.fetchval(
+            room_id = await conn.fetchval(
                 """
                 INSERT INTO rooms (room_code, room_name, level, room_number)
                 VALUES ($1, $2, $3, $4)
@@ -58,6 +58,19 @@ async def create_room(pool: asyncpg.Pool, room_code: str, room_name: str, level:
                 """,
                 room_code, room_name, level, room_number
             )
+            # 🛡️ Audit log (ทุก create ต้องบันทึก — ตามกฎ backend.md)
+            from core.logger import AuditLogger
+            await AuditLogger("student_service").log(
+                conn=conn, action="CREATE_ROOM",
+                actor_identifier="system", client_source="system",
+                entity_type="room", entity_id=room_id,
+                new_values={
+                    "room_code": room_code, "room_name": room_name,
+                    "level": level, "room_number": room_number,
+                },
+                endpoint_or_command="create_room",
+            )
+            return room_id
 
 
 async def list_students(pool: asyncpg.Pool, room_id: Optional[int] = None, search: Optional[str] = None, level: Optional[str] = None, limit: int = 500) -> list:
@@ -275,4 +288,23 @@ async def update_my_profile(pool: asyncpg.Pool, user_id: int, *, prefix=None, fi
                     f"UPDATE users SET {', '.join(user_fields)}, updated_at = NOW() WHERE id = $1",
                     *user_params
                 )
+
+            # 🛡️ Audit log (ทุก UPDATE ต้องบันทึกใน transaction เดียวกัน)
+            from core.logger import AuditLogger
+            await AuditLogger("student_service").log(
+                conn=conn, action="UPDATE_PROFILE",
+                actor_identifier=str(user_id), client_source="web",
+                user_id=user_id, entity_type="user", entity_id=user_id,
+                old_values={
+                    "prefix": old["prefix"], "first_name": old["first_name"],
+                    "last_name": old["last_name"], "nickname": old["nickname"],
+                    "phone_number": None, "email": None,
+                },
+                new_values={
+                    "prefix": new_prefix, "first_name": new_first,
+                    "last_name": new_last, "nickname": new_nick,
+                    "phone_number": phone_number, "email": email,
+                },
+                endpoint_or_command="PATCH /students/me/profile",
+            )
 

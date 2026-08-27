@@ -17,6 +17,7 @@ from core.rbac import require_permission_anywhere, get_access_scope
 from core.exceptions import NotFoundError, ForbiddenError, ValidationError, ConflictError, ServiceUnavailableError
 from models.import_schemas import ImportJobOut
 from services import import_service
+from services import audit_service
 
 router = APIRouter(tags=["Student Import"])
 
@@ -174,4 +175,6 @@ async def list_import_jobs(
         access_scope=scope["scope"],
         access_level=scope.get("level") if scope["scope"] == "level" else None,
     )
+    # 🛡️ Audit: ดูงานนำเข้า (best-effort)
+    await audit_service.log_read(pool, uid, "READ_IMPORT_JOBS", "student_import_job", endpoint="GET /api/import-jobs")
     return [ImportJobOut.from_db_row(j) for j in jobs]

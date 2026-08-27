@@ -40,9 +40,27 @@ async def authenticate_user(pool: asyncpg.Pool, username: str, password: str) ->
             username
         )
         if not row:
+            # 🛡️ Audit: login ล้มเหลว (หาชื่อไม่เจอ) — เก็บทุกครั้ง (dashboard นับเฉพาะ status='success')
+            from core.logger import AuditLogger
+            await AuditLogger("auth_service").log(
+                conn=conn, action="login", status="error",
+                error_detail="ไม่พบชื่อผู้ใช้นี้ หรือรหัสผ่านไม่ถูกต้อง",
+                actor_identifier=username, client_source="web",
+                entity_type="user",
+                endpoint_or_command="POST /auth/login",
+            )
             raise NotFoundError("ไม่พบชื่อผู้ใช้นี้ หรือรหัสผ่านไม่ถูกต้อง")
 
         if not verify_password(password, row["password_hash"]):
+            # 🛡️ Audit: login ล้มเหลว (รหัสผิด) — รู้ user_id แล้ว
+            from core.logger import AuditLogger
+            await AuditLogger("auth_service").log(
+                conn=conn, action="login", status="error",
+                error_detail="ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง",
+                actor_identifier=username, client_source="web",
+                user_id=row["id"], entity_type="user", entity_id=row["id"],
+                endpoint_or_command="POST /auth/login",
+            )
             raise ForbiddenError("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง")
 
         # 🛡️ Audit log: บันทึกการเข้าใช้งาน (dashboard ใช้นับ "การเข้าใช้งาน")
@@ -82,6 +100,15 @@ async def change_password(pool: asyncpg.Pool, user_id: int, old_password: str, n
             WHERE id = $2
             """,
             new_hash, user_id
+        )
+
+        # 🛡️ Audit: เปลี่ยนรหัสผ่าน (ไม่เก็บ hash ลง audit — แค่บอกว่าเกิด action นี้)
+        from core.logger import AuditLogger
+        await AuditLogger("auth_service").log(
+            conn=conn, action="CHANGE_PASSWORD",
+            actor_identifier=str(user_id), client_source="web",
+            user_id=user_id, entity_type="user", entity_id=user_id,
+            endpoint_or_command="POST /auth/change-password",
         )
 
 
@@ -241,6 +268,19 @@ async def register_user(
                     room_id, user_id, student_id, student_no,
                     class_role, staff_level, role_is_admin, json.dumps(role_perms)
                 )
+
+            # 🛡️ Audit: สร้างผู้ใช้ (ทุก create ต้องบันทึก — ตามกฎ backend.md)
+            from core.logger import AuditLogger
+            await AuditLogger("auth_service").log(
+                conn=conn, action="CREATE_USER",
+                actor_identifier=str(user_id), client_source="web",
+                user_id=user_id, entity_type="user", entity_id=user_id,
+                new_values={
+                    "username": username, "full_name": full_name,
+                    "student_id": student_id, "class_role": class_role,
+                },
+                endpoint_or_command="register_user",
+            )
 
             return user_id
 

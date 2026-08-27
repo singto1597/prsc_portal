@@ -3,6 +3,9 @@ import uuid
 import asyncpg
 from typing import Optional, Dict, Any
 
+from core.request_context import get_audit_context
+
+
 class AuditLogger:
     """บันทึก Audit Log ทุกการ CREATE/UPDATE/DELETE ภายใน Transaction เดียวกับข้อมูลหลัก."""
 
@@ -25,23 +28,29 @@ class AuditLogger:
         new_values: Optional[Dict] = None,
         endpoint_or_command: Optional[str] = None,
         ip_address: Optional[str] = None,
+        user_agent: Optional[str] = None,
         execution_time_ms: Optional[int] = None,
         trace_id: Optional[str] = None
     ):
-        current_trace_id = trace_id or str(uuid.uuid4())
+        # 📡 ถ้าไม่ได้ส่ง ip/user_agent/trace ตรงๆ → ดึงจาก request context (middleware ตั้งไว้)
+        #    ทำให้ทุก service บันทึกข้อมูล network ได้โดยไม่ต้องรับ param เพิ่ม
+        ctx = get_audit_context()
+        current_ip = ip_address or ctx.get("ip_address")
+        current_ua = user_agent or ctx.get("user_agent")
+        current_trace_id = trace_id or ctx.get("trace_id") or str(uuid.uuid4())
 
         await conn.execute("""
             INSERT INTO audit_logs (
                 trace_id, room_id, user_id, actor_identifier, client_source,
                 service_name, action, entity_type, entity_id, status,
                 error_detail, old_values, new_values, endpoint_or_command,
-                ip_address, execution_time_ms
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13::jsonb, $14, $15, $16)
+                ip_address, user_agent, execution_time_ms
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13::jsonb, $14, $15, $16, $17)
         """,
             current_trace_id, room_id, user_id, actor_identifier, client_source,
             self.service_name, action, entity_type, str(entity_id) if entity_id else None,
             status, error_detail,
             json.dumps(old_values, default=str) if old_values else None,
             json.dumps(new_values, default=str) if new_values else None,
-            endpoint_or_command, ip_address, execution_time_ms
+            endpoint_or_command, current_ip, current_ua, execution_time_ms
         )

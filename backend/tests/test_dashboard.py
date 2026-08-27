@@ -211,15 +211,15 @@ async def test_dashboard_teacher_without_level_scope(client, db_pool, dashboard_
 
 
 @pytest.mark.asyncio
-async def test_dashboard_council_member_scope_fail_closed(client, db_pool, dashboard_world):
+async def test_dashboard_council_member_sees_whole_school(client, db_pool, dashboard_world):
     """
-    council_member (สภานักเรียน) มี VIEW_DASHBOARD แต่อยู่นอก SCOPE_ALL_ROLES / SCOPE_LEVEL_ROLES
-    → ต้อง fail-closed เป็น scope 'none' (ไม่เห็นตัวเลขทั้งโรงเรียน + ข้อมูลเข้าระบบ)
-    (เดิม scope 'pyramid' รั่วไปเป็น 'all' — เห็น total_issues ทั้งโรงเรียน + recent_logins)
+    council_member (สภานักเรียน) มี VIEW_DASHBOARD + scope 'all' (ยอดพีระมิด)
+    → เห็นตัวเลขทั้งโรงเรียน (ไม่ติด error "ยังไม่ได้กำหนดระดับชั้นที่รับผิดชอบ")
+    แต่ไม่ใช่ admin — ยังเรียก /students (MANAGE_STUDENTS) ไม่ได้
     """
     world = dashboard_world
 
-    # ให้ระบบมีข้อมูล (1 เรื่องใน ม.4) — สภานักเรียนต้องไม่เห็น
+    # ให้ระบบมีข้อมูล (1 เรื่องใน ม.4)
     assert _mk(client, world, title="เรื่องใน ม.4").status_code == 200
 
     sid = f"CM{random.randint(1000, 9999)}"
@@ -229,14 +229,101 @@ async def test_dashboard_council_member_scope_fail_closed(client, db_pool, dashb
                      headers={"Authorization": f"Bearer {council_member['token']}"})
     assert res.status_code == 200, f"→ {res.status_code}: {res.text}"
     body = res.json()
-    assert body["scope"] == "none", f"ต้อง fail-closed เป็น none แต่ได้ {body['scope']}"
+    assert body["scope"] == "all", f"ต้องเป็น all แต่ได้ {body['scope']}"
     assert body["scope_label"] is None
-    assert body["total_issues"] == 0
-    assert body["total_students"] == 0
-    assert body["total_rooms"] == 0
-    assert body["usage_count"] == 0, "ห้ามเห็นข้อมูลการเข้าระบบ (ข้อมูลส่วนบุคคลข้ามระดับ)"
-    assert body["recent_logins"] == []
-    assert all(c["total"] == 0 for c in body["main_categories"])
+    assert body["total_issues"] >= 1, "สภานักเรียนต้องเห็นเรื่องทั้งโรงเรียน"
+    assert body["total_students"] >= 1
+    assert body["total_rooms"] >= 1
+    assert all(c["total"] >= 0 for c in body["main_categories"])
+
+    # 🛡️ scope 'all' ต้องไม่ grant สิทธิ์จัดการนักเรียน (ต้องยัง 403)
+    res_students = client.get("/api/students",
+                              headers={"Authorization": f"Bearer {council_member['token']}"})
+    assert res_students.status_code == 403, (
+        f"สภานักเรียนต้องไม่มี MANAGE_STUDENTS แต่ได้ {res_students.status_code}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_dashboard_traffic_access(client, db_pool, dashboard_world):
+    """/dashboard/traffic: admin/ครูสภา/สภานักเรียนเห็น, ครู (level/none) → 403"""
+    world = dashboard_world
+
+    # admin → 200 + daily arrays 30 วัน
+    res = client.get("/api/dashboard/traffic",
+                     headers={"Authorization": f"Bearer {world['admin']['token']}"})
+    assert res.status_code == 200, f"→ {res.status_code}: {res.text}"
+    body = res.json()
+    assert len(body["daily_logins"]) == 30
+    assert len(body["daily_actions"]) == 30
+    assert len(body["daily_active_users"]) == 30
+    assert isinstance(body["action_breakdown"], list)
+
+    # teacher_council → 200
+    res = client.get("/api/dashboard/traffic",
+                     headers={"Authorization": f"Bearer {world['teacher_council']['token']}"})
+    assert res.status_code == 200
+
+    # council_member (scope all ใหม่) → 200
+    sid = f"CM{random.randint(1000, 9999)}"
+    cm = await _register(db_pool, sid, "1234", "สภานักเรียน", sid, "", "council_member")
+    res = client.get("/api/dashboard/traffic",
+                     headers={"Authorization": f"Bearer {cm['token']}"})
+    assert res.status_code == 200, f"สภานักเรียนต้องดู traffic ได้ → {res.status_code}: {res.text}"
+
+    # ครู (level scope) → 403 (ข้อมูลข้ามระดับ)
+    res = client.get("/api/dashboard/traffic",
+                     headers={"Authorization": f"Bearer {world['teacher']['token']}"})
+    assert res.status_code == 403
+
+    # ครูไม่มี staff_level (none) → 403
+    sid2 = f"TN{random.randint(1000, 9999)}"
+    tn = await _register(db_pool, sid2, "1234", "ครูยังไม่ตั้งระดับ", sid2, "", "teacher")
+    res = client.get("/api/dashboard/traffic",
+                     headers={"Authorization": f"Bearer {tn['token']}"})
+    assert res.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_dashboard_traffic_counts_logins(client, db_pool, dashboard_world):
+    """deep-DB: insert login success 2 + failed 1 → total_logins=2, failed_logins=1, daily ถูกต้อง"""
+    world = dashboard_world
+    async with db_pool.acquire() as conn:
+        for _ in range(2):
+            # ⚠️ อย่าใช้ $1 ซ้ำ 2 คอลัมน์คนละ type (INTEGER user_id vs VARCHAR entity_id) — ใช้ $1/$2 แยก
+            await conn.execute(
+                """
+                INSERT INTO audit_logs
+                    (action, actor_identifier, client_source, service_name, user_id, entity_type, entity_id, status)
+                VALUES ('login', 's4', 'web', 'test', $1, 'user', $2, 'success')
+                """,
+                world["s4"]["user_id"], str(world["s4"]["user_id"])
+            )
+        # failed login 1 อัน (ไม่มี user) — ต้องไม่นับใน total_logins/daily_logins
+        await conn.execute(
+            """
+            INSERT INTO audit_logs
+                (action, actor_identifier, client_source, service_name, status, error_detail)
+            VALUES ('login', 'nobody', 'web', 'test', 'error', 'wrong password')
+            """
+        )
+
+    res = client.get("/api/dashboard/traffic",
+                     headers={"Authorization": f"Bearer {world['admin']['token']}"})
+    assert res.status_code == 200, f"→ {res.status_code}: {res.text}"
+    body = res.json()
+    assert body["total_logins"] == 2, f"failed login ต้องไม่นับ แต่ได้ {body['total_logins']}"
+    assert body["failed_logins"] == 1
+    assert body["daily_logins"][-1]["count"] >= 2
+    assert body["daily_actions"][-1]["count"] >= 3
+    # unique_users นับเฉพาะ user_id ที่ไม่ NULL — มี s4 (login) + admin (read audit เอง) = 2
+    assert body["unique_users"] >= 1
+
+    # ตัวเลขใน summary (usage_count) ก็ไม่นับ failed login เช่นกัน
+    res_sum = client.get("/api/dashboard/summary",
+                         headers={"Authorization": f"Bearer {world['admin']['token']}"})
+    assert res_sum.status_code == 200
+    assert res_sum.json()["usage_count"] == 2
 
 
 @pytest.mark.asyncio

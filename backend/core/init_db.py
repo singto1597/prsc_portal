@@ -282,6 +282,11 @@ async def init_db(pool: asyncpg.Pool):
                 CREATE INDEX IF NOT EXISTS idx_issue_countdowns_issue ON issue_countdowns(issue_id);
                 CREATE INDEX IF NOT EXISTS idx_issue_status_history_issue ON issue_status_history(issue_id);
                 CREATE INDEX IF NOT EXISTS idx_issue_comments_issue ON issue_comments(issue_id);
+                -- audit_logs โตเร็ว (Phase 3: เก็บทุก action + read) — ต้องมี index ครบ
+                CREATE INDEX IF NOT EXISTS idx_audit_logs_action_created ON audit_logs(action, created_at);
+                CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
+                CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON audit_logs(entity_type, entity_id);
+                CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at);
                 CREATE INDEX IF NOT EXISTS idx_students_room_no_active
                     ON students(room_id, student_no)
                     WHERE deleted_at IS NULL;

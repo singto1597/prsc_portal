@@ -5,6 +5,7 @@ from core.dependencies import get_db_pool, get_current_user
 from core.exceptions import ForbiddenError, NotFoundError, ConflictError, ValidationError
 from models.auth_schemas import LoginRequest, LoginResponse, UserOut, ChangePasswordRequest
 from services import auth_service
+from services import audit_service
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -44,6 +45,9 @@ async def get_me(
         raise HTTPException(status_code=404, detail="ไม่พบผู้ใช้")
 
     roles = await auth_service.get_user_roles(pool, user_ctx["user_id"])
+    # 🛡️ Audit: ดูข้อมูลตัวเอง (refresh session — best-effort)
+    await audit_service.log_read(pool, user_ctx["user_id"], "READ_ME", "user",
+                                 entity_id=user_ctx["user_id"], endpoint="GET /api/auth/me")
     return UserOut(**auth_service.make_user_out(user, roles))
 
 
