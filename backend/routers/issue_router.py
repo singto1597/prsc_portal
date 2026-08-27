@@ -10,6 +10,7 @@ from models.issue_schemas import (
     CommentCreateRequest, CommentOut, IssueListOut,
 )
 from services import issue_service
+from services import audit_service
 
 router = APIRouter(prefix="/issues", tags=["Issues"])
 
@@ -79,6 +80,8 @@ async def list_issues(
         status_filter=status, category=category, main_category=main_category,
         level_filter=level, q=q, sort=sort, limit=limit, offset=offset,
     )
+    # 🛡️ Audit: ดึงรายการเรื่อง (best-effort)
+    await audit_service.log_read(pool, uid, "READ_ISSUES", "issue", endpoint="GET /api/issues")
     total = result["total"]
     page = offset // limit + 1
     pages = (total + limit - 1) // limit if total else 0
@@ -100,6 +103,12 @@ async def get_issue(
         issue = await issue_service.get_issue(pool, uid, issue_id)
     except (NotFoundError, ForbiddenError) as e:
         raise _err(e)
+    # 🛡️ Audit: ดูรายละเอียดเรื่อง (best-effort)
+    await audit_service.log_read(
+        pool, uid, "READ_ISSUE", "issue", entity_id=issue_id,
+        endpoint=f"GET /api/issues/{issue_id}",
+        room_id=issue.get("room_id") if hasattr(issue, "get") else None,
+    )
     return IssueOut(**issue)
 
 

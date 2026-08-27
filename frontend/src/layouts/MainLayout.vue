@@ -92,6 +92,9 @@ const menuItems = computed(() => {
     items.push({ name: 'นักเรียน', path: '/students', icon: 'bi-people' });
     items.push({ name: 'นำเข้า Excel', path: '/students/import', icon: 'bi-file-earmark-arrow-up' });
   }
+  if (authStore.hasPermission('VIEW_AUDIT_LOG')) {
+    items.push({ name: 'บันทึกการใช้งาน', path: '/audit-logs', icon: 'bi-clock-history' });
+  }
   return items;
 });
 

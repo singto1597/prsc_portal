@@ -284,6 +284,20 @@ async def create_issue(
                     issue_id, start_level, user_id
                 )
 
+            # 🛡️ Audit log (ภายใน transaction เดียว — ตามกฎ backend.md)
+            from core.logger import AuditLogger
+            await AuditLogger("issue_service").log(
+                conn=conn, action="CREATE_ISSUE",
+                actor_identifier=str(user_id), client_source="web",
+                room_id=room_id, user_id=user_id,
+                entity_type="issue", entity_id=issue_id,
+                new_values={
+                    "title": title, "main_category": main_category,
+                    "category": category, "status": "pending",
+                    "current_level": start_level, "is_anonymous": is_anonymous,
+                },
+            )
+
             return issue_id
 
 
@@ -786,19 +800,39 @@ async def accept_issue(pool: asyncpg.Pool, user_id: int, issue_id: int, estimate
                 issue_id, user_id, f"รับเรื่อง (ตั้งเวลา {estimated_days} วัน)"
             )
 
+            # 🛡️ Audit log (ภายใน transaction เดียว)
+            from core.logger import AuditLogger
+            await AuditLogger("issue_service").log(
+                conn=conn, action="ACCEPT_ISSUE",
+                actor_identifier=str(user_id), client_source="web",
+                room_id=issue["room_id"], user_id=user_id,
+                entity_type="issue", entity_id=issue_id,
+                old_values={"current_assignee_id": None, "status": issue["status"]},
+                new_values={
+                    "current_assignee_id": user_id, "current_assignee_role": role,
+                    "status": "in_progress", "estimated_days": estimated_days,
+                },
+            )
+
 
 async def update_countdown(pool: asyncpg.Pool, user_id: int, issue_id: int, estimated_days: int) -> None:
     """แก้ไข countdown (ยืดเวลา) — ผู้รับเรื่อง หรือ admin/ครูที่จัดการเรื่องได้"""
     async with pool.acquire() as conn:
         async with conn.transaction():
             cd = await conn.fetchrow(
-                "SELECT id, issue_id FROM issue_countdowns WHERE issue_id = $1 AND assignee_id = $2 ORDER BY id DESC LIMIT 1",
+                """
+                SELECT cd.id, cd.issue_id, cd.estimated_days, cd.deadline, i.room_id
+                FROM issue_countdowns cd
+                JOIN issues i ON i.id = cd.issue_id
+                WHERE cd.issue_id = $1 AND cd.assignee_id = $2
+                ORDER BY cd.id DESC LIMIT 1
+                """,
                 issue_id, user_id
             )
             if not cd:
                 # ผู้รับเรื่องคนอื่น (admin/ครูระดับชั้นของเรื่อง) → แก้ countdown ล่าสุดได้
                 issue = await conn.fetchrow(
-                    "SELECT id FROM issues WHERE id = $1 AND deleted_at IS NULL",
+                    "SELECT id, room_id FROM issues WHERE id = $1 AND deleted_at IS NULL",
                     issue_id
                 )
                 if not issue:
@@ -806,7 +840,13 @@ async def update_countdown(pool: asyncpg.Pool, user_id: int, issue_id: int, esti
                 if not await _can_manage_issue(conn, user_id, issue):
                     raise NotFoundError("ไม่พบ countdown ของเรื่องนี้")
                 cd = await conn.fetchrow(
-                    "SELECT id FROM issue_countdowns WHERE issue_id = $1 ORDER BY id DESC LIMIT 1",
+                    """
+                    SELECT cd.id, cd.estimated_days, cd.deadline, i.room_id
+                    FROM issue_countdowns cd
+                    JOIN issues i ON i.id = cd.issue_id
+                    WHERE cd.issue_id = $1
+                    ORDER BY cd.id DESC LIMIT 1
+                    """,
                     issue_id
                 )
                 if not cd:
@@ -823,6 +863,17 @@ async def update_countdown(pool: asyncpg.Pool, user_id: int, issue_id: int, esti
                 estimated_days, deadline, cd["id"]
             )
 
+            # 🛡️ Audit log (ภายใน transaction เดียว)
+            from core.logger import AuditLogger
+            await AuditLogger("issue_service").log(
+                conn=conn, action="UPDATE_COUNTDOWN",
+                actor_identifier=str(user_id), client_source="web",
+                room_id=cd["room_id"], user_id=user_id,
+                entity_type="issue", entity_id=issue_id,
+                old_values={"estimated_days": cd["estimated_days"], "deadline": cd["deadline"]},
+                new_values={"estimated_days": estimated_days, "deadline": deadline},
+            )
+
 
 # ============================================================
 # 🪜 ขั้นตอนการดำเนินงาน (Steps)
@@ -836,7 +887,7 @@ async def add_step(pool: asyncpg.Pool, user_id: int, issue_id: int, step_title: 
                 "SELECT COALESCE(MAX(step_order), 0) + 1 FROM issue_steps WHERE issue_id = $1",
                 issue_id
             )
-            return await conn.fetchval(
+            step_id = await conn.fetchval(
                 """
                 INSERT INTO issue_steps (issue_id, step_title, step_detail, step_order, created_by)
                 VALUES ($1, $2, $3, $4, $5)
@@ -844,6 +895,17 @@ async def add_step(pool: asyncpg.Pool, user_id: int, issue_id: int, step_title: 
                 """,
                 issue_id, step_title, step_detail, step_order, user_id
             )
+
+            # 🛡️ Audit log (ภายใน transaction เดียว)
+            from core.logger import AuditLogger
+            await AuditLogger("issue_service").log(
+                conn=conn, action="CREATE_STEP",
+                actor_identifier=str(user_id), client_source="web",
+                user_id=user_id,
+                entity_type="issue_step", entity_id=step_id,
+                new_values={"issue_id": issue_id, "step_title": step_title, "step_order": step_order},
+            )
+            return step_id
 
 
 async def complete_step(pool: asyncpg.Pool, user_id: int, issue_id: int, step_id: int) -> None:
@@ -865,6 +927,17 @@ async def complete_step(pool: asyncpg.Pool, user_id: int, issue_id: int, step_id
                 WHERE id = $1
                 """,
                 step_id
+            )
+
+            # 🛡️ Audit log (ภายใน transaction เดียว)
+            from core.logger import AuditLogger
+            await AuditLogger("issue_service").log(
+                conn=conn, action="UPDATE_STEP",
+                actor_identifier=str(user_id), client_source="web",
+                user_id=user_id,
+                entity_type="issue_step", entity_id=step_id,
+                old_values={"is_completed": False},
+                new_values={"is_completed": True},
             )
 
 
@@ -915,6 +988,23 @@ async def escalate_issue(pool: asyncpg.Pool, user_id: int, issue_id: int, reason
                 issue_id, user_id, f"ส่งต่อไปยังระดับ {next_level}" + (f": {reason}" if reason else "")
             )
 
+            # 🛡️ Audit log (ภายใน transaction เดียว)
+            from core.logger import AuditLogger
+            await AuditLogger("issue_service").log(
+                conn=conn, action="ESCALATE_ISSUE",
+                actor_identifier=str(user_id), client_source="web",
+                room_id=issue["room_id"], user_id=user_id,
+                entity_type="issue", entity_id=issue_id,
+                old_values={
+                    "current_level": issue["current_level"], "status": issue["status"],
+                    "current_assignee_id": issue["current_assignee_id"],
+                },
+                new_values={
+                    "current_level": next_level, "status": "escalated",
+                    "current_assignee_id": None, "reason": reason,
+                },
+            )
+
 
 async def resolve_issue(pool: asyncpg.Pool, user_id: int, issue_id: int, note: Optional[str] = None) -> None:
     """ปิดเรื่อง (แก้ไขเสร็จ)"""
@@ -945,6 +1035,17 @@ async def resolve_issue(pool: asyncpg.Pool, user_id: int, issue_id: int, note: O
                 VALUES ($1, 'resolved', $2, $3)
                 """,
                 issue_id, user_id, note or "แก้ไขเสร็จสิ้น"
+            )
+
+            # 🛡️ Audit log (ภายใน transaction เดียว)
+            from core.logger import AuditLogger
+            await AuditLogger("issue_service").log(
+                conn=conn, action="RESOLVE_ISSUE",
+                actor_identifier=str(user_id), client_source="web",
+                room_id=issue["room_id"], user_id=user_id,
+                entity_type="issue", entity_id=issue_id,
+                old_values={"status": issue["status"]},
+                new_values={"status": "resolved", "note": note},
             )
 
 
@@ -995,6 +1096,18 @@ async def cancel_issue(pool: asyncpg.Pool, user_id: int, issue_id: int, reason: 
                 VALUES ($1, $2, $3, $4)
                 """,
                 issue_id, new_status, user_id, note
+            )
+
+            # 🛡️ Audit log — แยก action ตามผลจริง: ผู้แจ้งยกเลิก → CANCEL_ISSUE, ผู้ดูแลปัดตก → REJECT_ISSUE
+            from core.logger import AuditLogger
+            await AuditLogger("issue_service").log(
+                conn=conn,
+                action="CANCEL_ISSUE" if new_status == "cancelled" else "REJECT_ISSUE",
+                actor_identifier=str(user_id), client_source="web",
+                room_id=issue["room_id"], user_id=user_id,
+                entity_type="issue", entity_id=issue_id,
+                old_values={"status": issue["status"]},
+                new_values={"status": new_status, "note": note},
             )
             return new_status
 

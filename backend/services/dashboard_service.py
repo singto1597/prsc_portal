@@ -7,6 +7,7 @@ from core.categories import (
     get_subcategory_label,
 )
 from core.rbac import get_access_scope, require_permission_anywhere
+from core.exceptions import ForbiddenError
 
 STATUS_LABELS = {
     "pending": "รอรับเรื่อง",
@@ -22,6 +23,52 @@ STATUS_ORDER = ["pending", "in_progress", "escalated", "rejected", "resolved", "
 
 # เขตเวลาโรงเรียน (ทุกที่ในระบบ)
 BKK = timezone(timedelta(hours=7))
+
+# ป้ายชื่อ action สำหรับกราฟสัดส่วนการใช้งาน (action → ภาษาไทย)
+ACTION_LABELS = {
+    "login": "เข้าสู่ระบบ",
+    "CREATE_ISSUE": "แจ้งเรื่องใหม่",
+    "UPDATE_ISSUE": "แก้ไขเรื่อง",
+    "ACCEPT_ISSUE": "รับเรื่อง",
+    "UPDATE_COUNTDOWN": "ตั้งเวลาแก้",
+    "CREATE_STEP": "เพิ่มขั้นตอน",
+    "UPDATE_STEP": "ทำขั้นตอนเสร็จ",
+    "ESCALATE_ISSUE": "ส่งต่อระดับบน",
+    "RESOLVE_ISSUE": "ปิดเรื่อง",
+    "CANCEL_ISSUE": "ยกเลิกเรื่อง",
+    "REJECT_ISSUE": "ปัดตกเรื่อง",
+    "CREATE_COMMENT": "คอมเมนต์",
+    "UPDATE_COMMENT": "แก้คอมเมนต์",
+    "DELETE_COMMENT": "ลบคอมเมนต์",
+    "CREATE_USER": "สร้างผู้ใช้",
+    "CHANGE_PASSWORD": "เปลี่ยนรหัสผ่าน",
+    "UPDATE_STUDENT": "แก้ไขนักเรียน",
+    "CREATE_ROOM": "สร้างห้อง",
+    "UPDATE_PROFILE": "แก้โปรไฟล์",
+    "UPLOAD_IMPORT_EXCEL": "อัปโหลด Excel",
+    "START_IMPORT_JOB": "เริ่มนำเข้า",
+    "PROCESS_IMPORT_JOB": "กำลังนำเข้า",
+    "COMPLETE_IMPORT_JOB": "นำเข้าสำเร็จ",
+    "FAIL_IMPORT_JOB": "นำเข้าล้มเหลว",
+    "RECOVER_IMPORT_JOB": "กู้คืนงานนำเข้า",
+    "READ_ME": "ดูข้อมูลตัวเอง",
+    "READ_PROFILE": "ดูโปรไฟล์",
+    "READ_ISSUES": "ดูรายการเรื่อง",
+    "READ_ISSUE": "ดูรายละเอียดเรื่อง",
+    "READ_ROOMS": "ดูห้องเรียน",
+    "READ_STUDENTS": "ดูรายชื่อนักเรียน",
+    "READ_IMPORT_JOBS": "ดูงานนำเข้า",
+    "READ_DASHBOARD": "ดูแดชบอร์ด",
+    "READ_DASHBOARD_TRAFFIC": "ดูสถิติการใช้งาน",
+    "READ_AUDIT_LOGS": "ดูบันทึกการใช้งาน",
+}
+
+
+def _action_label(action: str) -> str:
+    """action string → ป้ายภาษาไทย (action ใหม่ที่ยังไม่มี label → แสดงค่าเดิม)"""
+    if action in ACTION_LABELS:
+        return ACTION_LABELS[action]
+    return action
 
 
 def _status_stats(counts: dict) -> list:
@@ -62,9 +109,9 @@ async def get_dashboard(pool: asyncpg.Pool, user_id: int) -> dict:
         level_where, level_params = _scope_clause(scope)
 
         # scope ที่ส่งให้ frontend: 'level' = เฉพาะระดับชั้น, 'none' = ไม่มีข้อมูล, 'all' = ทั้งโรงเรียน
-        # ⚠️ fail-closed: scope ที่ไม่ได้ระบุไว้ (เช่น 'pyramid' ของ council_member — มี VIEW_DASHBOARD
-        #    แต่อยู่นอก SCOPE_ALL_ROLES/SCOPE_LEVEL_ROLES) ต้องไม่ถูกเลื่อนเป็น 'all'
-        #    เดิม scope แปลกๆ รั่วไปเป็น 'all' → เห็นตัวเลขทั้งโรงเรียน + ข้อมูลเข้าระบบ (audit_logs)
+        # ⚠️ fail-closed: scope ที่ไม่ได้ระบุไว้ (เช่น 'pyramid' ของบทบาทที่ยังไม่มี scope กำหนด)
+        #    ต้องไม่ถูกเลื่อนเป็น 'all' — เดิม scope แปลกๆ รั่วไปเป็น 'all' → เห็นตัวเลขทั้งโรงเรียน
+        # (สภานักเรียน council_member ได้ scope 'all' จาก get_access_scope แล้ว — เห็นทั้งโรงเรียนตามสิทธิ์)
         if scope["scope"] == "level":
             dashboard_scope = "level"
         elif scope["scope"] in ("super", "all"):
@@ -171,9 +218,8 @@ async def get_dashboard(pool: asyncpg.Pool, user_id: int) -> dict:
         # ── 10. แนวโน้ม 7 วัน (เทียบวันตาม Asia/Bangkok) ──
         trend = await _trend_7days(conn, level_where, level_params, category_codes)
 
-        # ── 11. การเข้าใช้งาน (audit_logs) — เฉพาะ scope 'super'/'all' (admin/ครูสภา/ประธานสภา) ──
-        # (ข้อมูลการเข้าระบบ = ข้อมูลส่วนบุคคลข้ามระดับ — ดูจาก scope เดิม ไม่ใช่ dashboard_scope
-        #  เผื่ออนาคตมี scope ใหม่โดนแมปเป็น 'all' ข้อมูลเข้าระบบจะยังถูกจำกัดที่บทบาทระดับโรงเรียน)
+        # ── 11. การเข้าใช้งาน (audit_logs) — เฉพาะ scope 'super'/'all' (admin/ครูสภา/ประธานสภา/สภานักเรียน) ──
+        # (ข้อมูลการเข้าระบบ = ข้อมูลข้ามระดับ — เฉพาะบทบาทระดับโรงเรียนที่เห็นทั้งโรงเรียน)
         if scope["scope"] in ("super", "all"):
             usage_count, recent_logins = await _usage(conn)
         else:
@@ -277,6 +323,97 @@ async def get_dashboard(pool: asyncpg.Pool, user_id: int) -> dict:
     }
 
 
+async def get_dashboard_traffic(pool: asyncpg.Pool, user_id: int) -> dict:
+    """
+    สถิติการเข้าใช้งานละเอียด (30 วัน) จาก audit_logs:
+    daily_logins / daily_actions / daily_active_users / action_breakdown + สรุปสะสม
+    - เฉพาะ scope 'super'/'all' (admin/ครูสภา/ประธานสภา/สภานักเรียน) — ครู (level/none) → 403
+    - กลุ่มวันตาม Asia/Bangkok (แบบ _trend_7days) + เติมวันที่ไม่มีข้อมูลด้วย 0
+    """
+    async with pool.acquire() as conn:
+        await require_permission_anywhere(conn, user_id, "VIEW_DASHBOARD")
+        scope = await get_access_scope(conn, user_id)
+        if scope["scope"] not in ("super", "all"):
+            raise ForbiddenError("คุณไม่มีสิทธิ์ดูข้อมูลการใช้งานของระบบ")
+
+        today = datetime.now(timezone.utc).astimezone(BKK).date()
+        start = today - timedelta(days=29)
+
+        # ── 1. เข้าสู่ระบบสำเร็จต่อวัน ──
+        login_rows = await conn.fetch(
+            """
+            SELECT (created_at AT TIME ZONE 'Asia/Bangkok')::date AS day, COUNT(*) AS cnt
+            FROM audit_logs
+            WHERE action = 'login' AND status = 'success'
+              AND (created_at AT TIME ZONE 'Asia/Bangkok')::date >= $1
+            GROUP BY day
+            """,
+            start
+        )
+        # ── 2. กิจกรรมทั้งหมดต่อวัน (ทุก action) ──
+        action_rows = await conn.fetch(
+            """
+            SELECT (created_at AT TIME ZONE 'Asia/Bangkok')::date AS day, COUNT(*) AS cnt
+            FROM audit_logs
+            WHERE (created_at AT TIME ZONE 'Asia/Bangkok')::date >= $1
+            GROUP BY day
+            """,
+            start
+        )
+        # ── 3. ผู้ใช้ที่ใช้งานต่อวัน (distinct user_id) ──
+        active_rows = await conn.fetch(
+            """
+            SELECT (created_at AT TIME ZONE 'Asia/Bangkok')::date AS day, COUNT(DISTINCT user_id) AS cnt
+            FROM audit_logs
+            WHERE user_id IS NOT NULL
+              AND (created_at AT TIME ZONE 'Asia/Bangkok')::date >= $1
+            GROUP BY day
+            """,
+            start
+        )
+        # ── 4. สรุปสะสม + สัดส่วนราย action (top 10) ──
+        total_logins = await conn.fetchval(
+            "SELECT COUNT(*) FROM audit_logs WHERE action = 'login' AND status = 'success'"
+        ) or 0
+        failed_logins = await conn.fetchval(
+            "SELECT COUNT(*) FROM audit_logs WHERE action = 'login' AND status = 'error'"
+        ) or 0
+        unique_users = await conn.fetchval(
+            "SELECT COUNT(DISTINCT user_id) FROM audit_logs WHERE user_id IS NOT NULL"
+        ) or 0
+        breakdown_rows = await conn.fetch(
+            """
+            SELECT action, COUNT(*) AS cnt
+            FROM audit_logs
+            GROUP BY action
+            ORDER BY cnt DESC
+            LIMIT 10
+            """
+        )
+
+        def _fill_days(rows: list) -> list:
+            """เติม 30 วันที่ต่อเนื่อง (ใหม่→เก่า) วันที่ไม่มีข้อมูล = 0"""
+            counts = {r["day"]: r["cnt"] for r in rows}
+            out = []
+            for i in range(29, -1, -1):
+                day = today - timedelta(days=i)
+                out.append({"date": day.isoformat(), "count": counts.get(day, 0)})
+            return out
+
+        return {
+            "daily_logins": _fill_days(login_rows),
+            "daily_actions": _fill_days(action_rows),
+            "daily_active_users": _fill_days(active_rows),
+            "action_breakdown": [
+                {"action": r["action"], "label": _action_label(r["action"]), "count": r["cnt"]}
+                for r in breakdown_rows
+            ],
+            "total_logins": total_logins,
+            "unique_users": unique_users,
+            "failed_logins": failed_logins,
+        }
+
+
 async def _count_people(conn: asyncpg.Connection, scope: dict) -> tuple:
     """
     จำนวนนักเรียน/ห้อง
@@ -344,17 +481,18 @@ async def _trend_7days(conn: asyncpg.Connection, level_where: str, level_params:
 
 
 async def _usage(conn: asyncpg.Connection) -> tuple:
-    """จำนวนการเข้าใช้งาน + ผู้เข้าใช้ล่าสุด (จาก audit_logs — ถ้ายังไม่มีข้อมูลให้เป็น 0)"""
+    """จำนวนการเข้าใช้งาน + ผู้เข้าใช้ล่าสุด (จาก audit_logs — ถ้ายังไม่มีข้อมูลให้เป็น 0)
+    ⚠️ นับเฉพาะ login ที่สำเร็จ (status='success') — failed login ถูกบันทึกเป็น action='login' status='error' แล้ว"""
     usage_count = 0
     recent_logins = []
     try:
         usage_count = await conn.fetchval(
-            "SELECT COUNT(*) FROM audit_logs WHERE action = 'login'"
+            "SELECT COUNT(*) FROM audit_logs WHERE action = 'login' AND status = 'success'"
         ) or 0
         login_rows = await conn.fetch(
             """
             SELECT actor_identifier, created_at FROM audit_logs
-            WHERE action = 'login'
+            WHERE action = 'login' AND status = 'success'
             ORDER BY created_at DESC LIMIT 10
             """
         )

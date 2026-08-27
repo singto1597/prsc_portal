@@ -17,6 +17,7 @@ AVAILABLE_PERMISSIONS = [
     "MANAGE_STUDENTS",       # จัดการนักเรียน (import Excel)
     "VIEW_DASHBOARD",        # ดู dashboard/รายงาน
     "MANAGE_SETTINGS",       # ตั้งค่าระบบ
+    "VIEW_AUDIT_LOG",        # ดูบันทึกการใช้งาน (audit_logs) — admin/ครูสภา/ประธานสภา
 ]
 
 # 🎯 บทบาทที่เห็น/จัดการข้อมูลทั้งโรงเรียน (สิทธิ์เทียบเท่า is_admin)
@@ -120,7 +121,7 @@ async def get_access_scope(conn: asyncpg.Connection, user_id: int) -> dict:
 
     คืนค่า: {"scope": str, "level": Optional[str], "is_admin": bool}
       - scope='super'  : SUPER_ADMIN_ID — เห็นทุกอย่างทั้งระบบ
-      - scope='all'    : admin / ครูสภา (teacher_council) / ประธานสภา — เห็นทุกอย่าง
+      - scope='all'    : admin / ครูสภา (teacher_council) / ประธานสภา / สภานักเรียน (council_member) — เห็นทุกอย่าง
       - scope='level'  : ครูทั่วไป (teacher) — เห็นเฉพาะระดับชั้น (staff_level เช่น 'ม.4')
       - scope='none'   : ครูทั่วไปที่ยังไม่มี staff_level — ไม่มีขอบเขตข้อมูล (ห้ามมองทั้งโรงเรียน)
       - scope='pyramid': ปกติ — มองตามพีระมิด (ใช้กับเรื่อง/issue เท่านั้น)
@@ -155,6 +156,10 @@ async def get_access_scope(conn: asyncpg.Connection, user_id: int) -> dict:
         # scope 'all': is_admin หรือ role ที่เห็นทั้งโรงเรียน
         if r["is_admin"] or r["class_role"] in SCOPE_ALL_ROLES:
             return {"scope": "all", "level": None, "is_admin": True}
+        # 🆕 scope 'all' สำหรับ สภานักเรียน (council_member) — ยอดพีระมิด เห็นทั้งโรงเรียน
+        # แต่ไม่ใช่ admin (is_admin=False — ไม่ได้สิทธิ์จัดการ/import/audit ที่ require_permission_anywhere กันไว้)
+        if r["class_role"] == "council_member":
+            return {"scope": "all", "level": None, "is_admin": False}
         # scope 'level': ครูทั่วไป (ต้องมี staff_level ระบุระดับชั้น)
         if r["class_role"] in SCOPE_LEVEL_ROLES:
             if r["staff_level"]:

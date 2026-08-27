@@ -9,6 +9,7 @@ from models.student_schemas import (
     MyProfileOut, UpdateProfileRequest,
 )
 from services import student_service
+from services import audit_service
 
 router = APIRouter(tags=["Students"])
 
@@ -28,6 +29,8 @@ async def get_my_profile(
         profile = await student_service.get_my_profile(pool, uid)
     except NotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    # 🛡️ Audit: ดูโปรไฟล์ตัวเอง (best-effort)
+    await audit_service.log_read(pool, uid, "READ_PROFILE", "user", entity_id=uid, endpoint="GET /api/students/me/profile")
     return MyProfileOut(**profile)
 
 
@@ -61,6 +64,8 @@ async def list_rooms(
 ):
     """รายการห้องเรียนทั้งหมด (สำหรับ dropdown)"""
     rooms = await student_service.list_rooms(pool)
+    # 🛡️ Audit: ดูรายการห้อง (best-effort)
+    await audit_service.log_read(pool, user_ctx.get("user_id"), "READ_ROOMS", "room", endpoint="GET /api/rooms")
     return [RoomOut(**r) for r in rooms]
 
 
@@ -85,6 +90,8 @@ async def list_students(
 
     level = scope.get("level") if scope["scope"] == "level" else None
     students = await student_service.list_students(pool, room_id=room_id, search=search, level=level)
+    # 🛡️ Audit: ดูรายชื่อนักเรียน (best-effort)
+    await audit_service.log_read(pool, user_ctx["user_id"], "READ_STUDENTS", "student", endpoint="GET /api/students")
     return [StudentOut(**s) for s in students]
 
 

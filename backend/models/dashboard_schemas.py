@@ -48,6 +48,30 @@ class MainCategoryDashboard(BaseModel):
     recent_issues: List[RecentIssueOut] = []
 
 
+class TrafficDaily(BaseModel):
+    """ตัวเลขรายวัน (วันที่: YYYY-MM-DD ตาม Asia/Bangkok)"""
+    date: str
+    count: int
+
+
+class TrafficAction(BaseModel):
+    """สัดส่วนการใช้งานราย action (สำหรับ doughnut/bar chart)"""
+    action: str
+    label: str
+    count: int
+
+
+class DashboardTraffic(BaseModel):
+    """สถิติการเข้าใช้งาน (30 วัน) — จาก audit_logs (admin/ครูสภา/ประธานสภา/สภานักเรียน)"""
+    daily_logins: List[TrafficDaily] = []        # เข้าสู่ระบบสำเร็จต่อวัน
+    daily_actions: List[TrafficDaily] = []       # กิจกรรมทั้งระบบต่อวัน (ทุก action)
+    daily_active_users: List[TrafficDaily] = []  # ผู้ใช้ที่ใช้งาน (distinct user_id) ต่อวัน
+    action_breakdown: List[TrafficAction] = []   # top 10 action รวมสะสม
+    total_logins: int = 0                        # เข้าสู่ระบบสำเร็จสะสม
+    unique_users: int = 0                        # ผู้ใช้ที่เคยทำ action (distinct)
+    failed_logins: int = 0                       # ครั้งที่ล็อกอินล้มเหลว
+
+
 class DashboardSummary(BaseModel):
     # ขอบเขตข้อมูล: 'all' = ทั้งโรงเรียน, 'level' = เฉพาะระดับชั้น (ครูทั่วไป)
     scope: str

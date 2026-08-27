@@ -8,16 +8,24 @@ import {
   LinearScale,
   PointElement,
   LineElement,
+  BarElement,
+  ArcElement,
   Tooltip,
   Legend,
   Filler,
 } from 'chart.js';
-import { Line } from 'vue-chartjs';
-import { getDashboardSummary, type DashboardSummary, type MainCategoryDashboard } from '@/services/dashboard';
+import { Line, Bar, Doughnut } from 'vue-chartjs';
+import {
+  getDashboardSummary,
+  getDashboardTraffic,
+  type DashboardSummary,
+  type MainCategoryDashboard,
+  type DashboardTraffic,
+} from '@/services/dashboard';
 import StatusStackedBar from '@/components/StatusStackedBar.vue';
 import { STATUS_DOT, STATUS_BADGE, statusShort } from '@/constants/status';
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, Filler);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, ArcElement, Tooltip, Legend, Filler);
 
 // ===== ข้อมูล + การโหลด =====
 const data = ref<DashboardSummary | null>(null);
@@ -25,12 +33,33 @@ const isLoading = ref(true);
 const error = ref('');
 const lastUpdated = ref<string | null>(null);
 
+// ===== Traffic (สถิติการเข้าใช้งาน 30 วัน) — เฉพาะ scope 'all' =====
+const traffic = ref<DashboardTraffic | null>(null);
+const isLoadingTraffic = ref(false);
+const trafficError = ref('');
+
+async function loadTraffic() {
+  if (!data.value || data.value.scope !== 'all') return;
+  isLoadingTraffic.value = true;
+  trafficError.value = '';
+  try {
+    traffic.value = await getDashboardTraffic();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'เกิดข้อผิดพลาด';
+    trafficError.value = msg;
+    Swal.fire({ icon: 'error', title: 'โหลดสถิติการใช้งานไม่สำเร็จ', text: msg });
+  } finally {
+    isLoadingTraffic.value = false;
+  }
+}
+
 async function loadDashboard() {
   isLoading.value = true;
   error.value = '';
   try {
     data.value = await getDashboardSummary();
     lastUpdated.value = new Date().toISOString();
+    await loadTraffic(); // โหลดกราฟการเข้าใช้งาน (เฉพาะ scope 'all')
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'เกิดข้อผิดพลาด';
     error.value = msg;
@@ -195,6 +224,58 @@ const trendChart = computed(() => ({
 }));
 
 const chartOptions = { responsive: true, maintainAspectRatio: false };
+
+// ===== 📊 กราฟการเข้าใช้งาน (30 วัน) =====
+const trafficLoginsChart = computed(() => ({
+  labels: (traffic.value?.daily_logins || []).map((t) => fmtDay(t.date)),
+  datasets: [
+    {
+      label: 'ผู้เข้าใช้/วัน',
+      data: (traffic.value?.daily_logins || []).map((t) => t.count),
+      borderColor: '#2563eb',
+      backgroundColor: 'rgba(37,99,235,0.10)',
+      fill: true,
+      tension: 0.3,
+      pointBackgroundColor: '#2563eb',
+    },
+  ],
+}));
+
+const trafficActionsChart = computed(() => ({
+  labels: (traffic.value?.daily_actions || []).map((t) => fmtDay(t.date)),
+  datasets: [
+    {
+      label: 'กิจกรรม/วัน',
+      data: (traffic.value?.daily_actions || []).map((t) => t.count),
+      backgroundColor: 'rgba(220,38,38,0.75)',
+      borderRadius: 4,
+    },
+  ],
+}));
+
+const trafficBreakdownChart = computed(() => ({
+  labels: (traffic.value?.action_breakdown || []).map((a) => a.label),
+  datasets: [
+    {
+      label: 'การใช้งาน',
+      data: (traffic.value?.action_breakdown || []).map((a) => a.count),
+      backgroundColor: [
+        '#dc2626', '#2563eb', '#059669', '#d97706', '#7c3aed',
+        '#db2777', '#0891b2', '#65a30d', '#ea580c', '#475569',
+      ],
+      borderWidth: 1,
+    },
+  ],
+}));
+
+const trafficTotalActions = computed(() =>
+  (traffic.value?.action_breakdown || []).reduce((sum, a) => sum + a.count, 0),
+);
+
+const hasTrafficData = computed(
+  () =>
+    (traffic.value?.total_logins ?? 0) + (traffic.value?.failed_logins ?? 0) + trafficTotalActions.value > 0,
+);
 </script>
 
 <template>
@@ -493,6 +574,78 @@ const chartOptions = { responsive: true, maintainAspectRatio: false };
               </RouterLink>
             </div>
             <p v-else class="text-sm text-gray-400 py-4 text-center">ยังไม่มีเรื่องล่าสุด</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== การเข้าใช้งาน (30 วัน) — เฉพาะบทบาทระดับโรงเรียน (scope 'all') ===== -->
+      <section v-if="data.scope === 'all'" class="bg-white rounded-2xl shadow-sm overflow-hidden">
+        <div class="flex items-center justify-between gap-3 px-5 py-4 border-b border-gray-100">
+          <h3 class="font-semibold text-gray-800">
+            <i class="bi bi-activity mr-1 text-red-500"></i> การเข้าใช้งาน (30 วัน)
+          </h3>
+          <button
+            type="button"
+            @click="loadTraffic"
+            :disabled="isLoadingTraffic"
+            title="รีเฟรชสถิติการใช้งาน"
+            class="w-8 h-8 rounded-lg bg-gray-100 text-gray-500 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition disabled:opacity-50"
+          >
+            <i class="bi bi-arrow-clockwise" :class="{ 'animate-spin': isLoadingTraffic }"></i>
+          </button>
+        </div>
+
+        <!-- Traffic loading skeleton -->
+        <div v-if="isLoadingTraffic && !traffic" class="p-5 space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div v-for="i in 3" :key="i" class="h-16 bg-gray-100 animate-pulse rounded-xl"></div>
+          </div>
+          <div class="grid lg:grid-cols-3 gap-4">
+            <div v-for="i in 3" :key="'c' + i" class="h-56 bg-gray-100 animate-pulse rounded-xl"></div>
+          </div>
+        </div>
+
+        <!-- Traffic error (ยังไม่มีข้อมูลเดิม) -->
+        <div v-else-if="trafficError && !traffic" class="p-5 text-center text-sm text-gray-500">
+          <i class="bi bi-exclamation-triangle mr-1 text-rose-500"></i> {{ trafficError }}
+        </div>
+
+        <!-- Traffic ไม่มีข้อมูล -->
+        <div v-else-if="traffic && !hasTrafficData" class="p-5 text-center">
+          <i class="bi bi-person-check text-3xl text-gray-300"></i>
+          <p class="text-sm text-gray-500 mt-2">ยังไม่มีข้อมูลการใช้งาน — ระบบจะเริ่มเก็บสถิติตั้งแต่วันนี้</p>
+        </div>
+
+        <!-- Traffic charts -->
+        <div v-else-if="traffic" class="p-5 space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div class="bg-gray-50 rounded-xl p-4">
+              <p class="text-2xl font-black text-gray-900 tabular-nums">{{ fmtNum(traffic.total_logins) }}</p>
+              <p class="text-xs text-gray-500"><i class="bi bi-box-arrow-in-right mr-1"></i> เข้าสู่ระบบสะสม</p>
+            </div>
+            <div class="bg-gray-50 rounded-xl p-4">
+              <p class="text-2xl font-black text-gray-900 tabular-nums">{{ fmtNum(traffic.unique_users) }}</p>
+              <p class="text-xs text-gray-500"><i class="bi bi-people mr-1"></i> ผู้ใช้ที่ใช้งาน</p>
+            </div>
+            <div class="bg-gray-50 rounded-xl p-4">
+              <p class="text-2xl font-black text-gray-900 tabular-nums">{{ fmtNum(traffic.failed_logins) }}</p>
+              <p class="text-xs text-gray-500"><i class="bi bi-x-circle mr-1"></i> ล็อกอินล้มเหลว</p>
+            </div>
+          </div>
+
+          <div class="grid lg:grid-cols-3 gap-4">
+            <div>
+              <h4 class="text-sm font-semibold text-gray-700 mb-2"><i class="bi bi-box-arrow-in-right mr-1 text-blue-600"></i> ผู้เข้าใช้ต่อวัน</h4>
+              <div class="h-56"><Line :data="trafficLoginsChart" :options="chartOptions" /></div>
+            </div>
+            <div>
+              <h4 class="text-sm font-semibold text-gray-700 mb-2"><i class="bi bi-lightning-charge mr-1 text-red-600"></i> กิจกรรมทั้งระบบต่อวัน</h4>
+              <div class="h-56"><Bar :data="trafficActionsChart" :options="chartOptions" /></div>
+            </div>
+            <div>
+              <h4 class="text-sm font-semibold text-gray-700 mb-2"><i class="bi bi-pie-chart mr-1 text-emerald-600"></i> สัดส่วนการใช้งาน</h4>
+              <div class="h-56"><Doughnut :data="trafficBreakdownChart" :options="chartOptions" /></div>
+            </div>
           </div>
         </div>
       </section>

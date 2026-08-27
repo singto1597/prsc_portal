@@ -88,6 +88,12 @@ const router = createRouter({
           component: () => import('@/views/students/ImportStudents.vue'),
           meta: { requiresAuth: true, requiresPermission: 'MANAGE_STUDENTS' },
         },
+        {
+          path: 'audit-logs',
+          name: 'audit-logs',
+          component: () => import('@/views/audit/AuditLogs.vue'),
+          meta: { requiresAuth: true, requiresPermission: 'VIEW_AUDIT_LOG' },
+        },
       ],
     },
   ],
