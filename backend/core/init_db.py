@@ -335,6 +335,17 @@ async def init_db(pool: asyncpg.Pool):
                 );
                 """)
 
+                # piri_board_views: dedup "การเข้าชม" ต่อ user (Phase 6 — กัน F5 ปั่น view_count)
+                #   PRIMARY KEY (board_id, user_id) → user 1 คน นับ view 1 ครั้งต่อ VIEW_DEDUP_WINDOW ต่อ board
+                await conn.execute("""
+                CREATE TABLE IF NOT EXISTS piri_board_views (
+                    board_id INTEGER NOT NULL REFERENCES piri_boards(id) ON DELETE CASCADE,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    viewed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (board_id, user_id)
+                );
+                """)
+
                 # --- 8. audit_logs (โครงสร้างเหมือนโปรเจคเก่า) ---
                 await conn.execute("""
                 CREATE TABLE IF NOT EXISTS audit_logs (

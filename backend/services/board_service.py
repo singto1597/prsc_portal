@@ -233,14 +233,33 @@ async def get_board_detail(pool: asyncpg.Pool, user_id: int, board_id: int) -> d
             )
             detail["comments"] = _thread_comments(comment_rows)
 
-        # 👁️ นับ view_count (บอร์ดมี column view_count แต่เดิมไม่เคยมี path ที่เพิ่ม — เติมให้ทำงานจริง)
-        # raw counter (ไม่ dedup ต่อ user/session — ตั้งใจ; นับทุกครั้งที่เปิด board รวม refresh/เจ้าของเอง
-        # เหมือน "ยอดเข้าชม" แบบหยาบ — design decision จาก adversarial review, severity ต่ำ)
+        # 👁️ นับ view_count — dedup ต่อ user (กัน F5 ปั่นยอด): user 1 คน นับ 1 ครั้ง
+        # ต่อ VIEW_DEDUP_WINDOW ต่อ board ผ่าน piri_board_views (board_id,user_id PK)
+        # INSERT..ON CONFLICT..WHERE viewed_at < NOW()-window → คืน 1 เฉพาะ "ยังไม่เคยดู" หรือ
+        # "เลย window แล้ว" → ถึงจะ +1; ภายใน window (refresh รัวๆ) ไม่นับ
         # ไม่ audit (กัน noise — การดู board ถูก audit ผ่าน log_read ใน router แล้ว)
-        await conn.execute(
-            "UPDATE piri_boards SET view_count = view_count + 1 WHERE id = $1 AND deleted_at IS NULL",
-            board_id
+        VIEW_DEDUP_WINDOW = "10 minutes"
+        # ⚠️ ต้องเป็น data-modifying CTE (WITH ... INSERT ... RETURNING) —
+        # วาง INSERT ตรงๆ ใน FROM ของ subquery → PostgresSyntaxError 'syntax error at or near INTO'
+        counted = await conn.fetchval(
+            f"""
+            WITH ins AS (
+                INSERT INTO piri_board_views (board_id, user_id, viewed_at)
+                VALUES ($1, $2, NOW())
+                ON CONFLICT (board_id, user_id)
+                DO UPDATE SET viewed_at = NOW()
+                WHERE piri_board_views.viewed_at < NOW() - INTERVAL '{VIEW_DEDUP_WINDOW}'
+                RETURNING 1
+            )
+            SELECT COUNT(*) FROM ins
+            """,
+            board_id, user_id
         )
+        if counted:
+            await conn.execute(
+                "UPDATE piri_boards SET view_count = view_count + 1, updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL",
+                board_id
+            )
 
     return detail
 

@@ -729,15 +729,22 @@ async def test_migration_reconcile_repairs_drifted_counters(client, board_world,
         )
         await conn.execute("UPDATE piri_boards SET comment_count = 99 WHERE id = $1", board_id)
 
-        # รัน reconcile SQL เดียวกับ migration 008 (comment_count = นับที่ยังแสดงจริง)
+        # รัน reconcile SQL เดียวกับ migration 008 (aggregate+JOIN — comment_count = นับที่ยังแสดงจริง)
         await conn.execute(
             """
             UPDATE piri_boards b
-            SET comment_count = (
-                SELECT COUNT(*) FROM piri_board_comments c
-                WHERE c.board_id = b.id AND c.deleted_at IS NULL AND c.is_hidden_by_admin = FALSE
-            ),
-            updated_at = NOW()
+            SET comment_count = COALESCE(cnt.c, 0), updated_at = NOW()
+            FROM (
+                SELECT pb.id AS bid, agg.c
+                FROM piri_boards pb
+                LEFT JOIN (
+                    SELECT board_id, COUNT(*) AS c
+                    FROM piri_board_comments
+                    WHERE deleted_at IS NULL AND is_hidden_by_admin = FALSE
+                    GROUP BY board_id
+                ) agg ON agg.board_id = pb.id
+            ) cnt
+            WHERE cnt.bid = b.id
             """
         )
         cnt = await conn.fetchval("SELECT comment_count FROM piri_boards WHERE id = $1", board_id)

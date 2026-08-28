@@ -126,7 +126,7 @@ async function handleHide() {
 </script>
 
 <template>
-  <div class="pl-4 border-l-2 border-gray-100">
+  <div data-testid="comment-node" class="pl-4 border-l-2 border-gray-100">
     <!-- ตัวคอมเมนต์ -->
     <div class="flex gap-2.5">
       <div
@@ -145,6 +145,7 @@ async function handleHide() {
         <div class="mt-1 flex items-center gap-3 text-xs">
           <button
             type="button"
+            data-testid="reply-btn"
             @click="replying = !replying"
             class="text-gray-400 hover:text-red-600 font-medium flex items-center gap-1"
           >
@@ -153,6 +154,7 @@ async function handleHide() {
           <button
             v-if="!isOwn"
             type="button"
+            data-testid="report-btn"
             @click="handleReport"
             :disabled="acting"
             class="text-gray-400 hover:text-amber-600 font-medium flex items-center gap-1 disabled:opacity-40"
@@ -162,6 +164,7 @@ async function handleHide() {
           <button
             v-if="authStore.isCouncilAuthority"
             type="button"
+            data-testid="hide-btn"
             @click="handleHide"
             :disabled="acting"
             class="text-gray-400 hover:text-red-600 font-medium flex items-center gap-1 disabled:opacity-40"

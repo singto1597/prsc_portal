@@ -125,6 +125,7 @@ async function handleConfirm() {
               <input
                 v-model="voteChoices[idx]"
                 type="text"
+                :data-testid="'choice-input-' + idx"
                 :placeholder="`ตัวเลือกที่ ${idx + 1}`"
                 maxlength="200"
                 class="flex-1 px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-red-500"
@@ -162,6 +163,7 @@ async function handleConfirm() {
           <button
             type="button"
             :disabled="submitting"
+            data-testid="approve-confirm"
             @click="handleConfirm"
             class="flex-1 py-2.5 rounded-xl bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 text-sm font-medium"
           >

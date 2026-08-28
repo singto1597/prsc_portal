@@ -141,6 +141,7 @@ async function handleSubmit() {
           v-for="(info, key) in MAIN_CATEGORIES"
           :key="key"
           type="button"
+          :data-testid="'cat-' + key"
           @click="mainCategory = key as MainCategory; category = ''"
           class="p-3 sm:p-4 min-h-[88px] sm:min-h-0 rounded-xl border-2 text-center transition flex flex-col items-center justify-center"
           :class="mainCategory === key
@@ -184,6 +185,7 @@ async function handleSubmit() {
           v-for="opt in DESTINATION_OPTIONS"
           :key="opt.value"
           type="button"
+          :data-testid="'dest-' + opt.value"
           @click="requestedDestination = opt.value"
           class="p-3 sm:p-4 rounded-xl border-2 text-left transition flex flex-col"
           :class="requestedDestination === opt.value
@@ -209,6 +211,7 @@ async function handleSubmit() {
         <input
           v-model="title"
           type="text"
+          data-testid="issue-title"
           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
           placeholder="สรุปสั้นๆ ว่าเรื่องอะไร"
           maxlength="200"
@@ -219,6 +222,7 @@ async function handleSubmit() {
         <textarea
           v-model="description"
           rows="5"
+          data-testid="issue-desc"
           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
           placeholder="อธิบายปัญหาหรือความคิดเห็นให้ละเอียด..."
         ></textarea>
@@ -251,6 +255,7 @@ async function handleSubmit() {
       <button
         type="submit"
         :disabled="isLoading"
+        data-testid="issue-submit"
         class="w-full py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 font-medium"
       >
         {{ isLoading ? 'กำลังส่ง...' : 'ส่งเรื่อง' }}

@@ -206,6 +206,7 @@ async function handleResolve(r: ReportItem, action: 'hide' | 'dismiss') {
         <div
           v-for="r in reports"
           :key="r.id"
+          :data-testid="'report-card-' + r.id"
           class="bg-white rounded-xl shadow-sm p-4 border-l-4"
           :class="r.status === 'open' ? 'border-amber-400' : r.status === 'resolved' ? 'border-emerald-400' : 'border-gray-200'"
         >
@@ -239,6 +240,7 @@ async function handleResolve(r: ReportItem, action: 'hide' | 'dismiss') {
               <button
                 type="button"
                 :disabled="actingId === r.id"
+                data-testid="dismiss-btn"
                 @click="handleResolve(r, 'dismiss')"
                 class="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40"
               >
@@ -247,6 +249,7 @@ async function handleResolve(r: ReportItem, action: 'hide' | 'dismiss') {
               <button
                 type="button"
                 :disabled="actingId === r.id"
+                data-testid="hide-btn"
                 @click="handleResolve(r, 'hide')"
                 class="px-3 py-1.5 text-xs font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-40"
               >

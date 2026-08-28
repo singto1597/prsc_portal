@@ -160,6 +160,7 @@ const rootComments = computed(() => board.value?.comments ?? [])
             type="button"
             @click="handleHideBoard"
             :disabled="hidingBoard"
+            data-testid="hide-board-btn"
             class="px-2.5 py-1 text-[11px] font-medium rounded-lg border border-red-200 text-red-500 hover:bg-red-50 disabled:opacity-40"
             title="ซ่อนบอร์ดนี้ (สภา/แอดมิน)"
           >
@@ -183,7 +184,7 @@ const rootComments = computed(() => board.value?.comments ?? [])
       </div>
 
       <!-- แบนเนอร์: โหวตแล้ว → เปลี่ยนตัวเลือกไม่ได้ -->
-      <div v-if="myVoted" class="mb-4 px-3 py-2 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm rounded-xl">
+      <div v-if="myVoted" data-testid="my-vote-banner" class="mb-4 px-3 py-2 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm rounded-xl">
         <i class="bi bi-check-circle-fill mr-1"></i> คุณส่งเสียงโหวตแล้ว — แต่ละคนโหวตได้ 1 ครั้ง
       </div>
 
@@ -192,6 +193,7 @@ const rootComments = computed(() => board.value?.comments ?? [])
           v-for="c in board.choices"
           :key="c.id"
           type="button"
+          :data-testid="'vote-choice-' + c.id"
           :disabled="myVoted"
           @click="selectedChoice = c.id"
           class="w-full text-left p-4 rounded-xl border-2 transition"
@@ -229,6 +231,7 @@ const rootComments = computed(() => board.value?.comments ?? [])
         v-if="!myVoted"
         type="button"
         :disabled="selectedChoice === null || voting"
+        data-testid="vote-submit"
         @click="handleVote"
         class="mt-4 w-full py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 disabled:opacity-50 font-medium"
       >
@@ -253,6 +256,7 @@ const rootComments = computed(() => board.value?.comments ?? [])
         <input
           v-model="commentBody"
           type="text"
+          data-testid="comment-input"
           placeholder="ร่วมแสดงความเห็น..."
           maxlength="1000"
           class="flex-1 px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-red-500"
@@ -261,6 +265,7 @@ const rootComments = computed(() => board.value?.comments ?? [])
         <button
           type="button"
           :disabled="postingComment || !commentBody.trim()"
+          data-testid="comment-submit"
           @click="submitComment"
           class="px-4 py-2.5 bg-red-600 text-white rounded-xl text-sm hover:bg-red-700 disabled:opacity-50"
         >

@@ -460,3 +460,46 @@
     5. **`add_comment` → `get_comment` TOCTOU:** moderator ซ่อนคอมเมนต์คั่นระหว่าง add (commit) กับ get (อ่าน) → get_comment filter `is_hidden_by_admin=FALSE` → 404 ทั้งที่ insert ไปแล้ว → client retry = คอมเมนต์ซ้ำ → `get_comment` (ใช้หลัง add เท่านั้น) ไม่ filter hidden
     6. **hide vs reply ที่ insert คั่น (TOCTOU):** re-walk subtree สูงสุด `MAX_HIDE_PASSES=3` รอบ — reply ที่ insert คั่นระหว่างนับกับซ่อนจะถูกซ่อนรอบถัดไป (ยังไม่ atomic 100% แต่แคบลงมาก)
     7. **Test gap ที่ต้องปิด:** plain student แจ้งได้ 200, cross-board report 404, soft-deleted report 404, migration reconcile repair, reason filter + pagination envelope, descendant report auto-close
+
+### 🧯 Rehearsal Migration: correlated subquery reconcile ช้า 100 เท่า → lock ค้าง 2.4 นาที (ต้อง aggregate+JOIN)
+- **Context/Problem:** จำลอง Production DB (5k boards / 100k comments / 20k choices / 200k votes) รัน migration 008 reconcile (`UPDATE ... SET comment_count = (SELECT COUNT(*) ...)` แบบ correlated subquery) เพื่อประเมิน lock window ก่อน deploy จริง — พบว่า **vote_count reconcile ใช้เวลา 142.5 วินาที** (correlated subquery รัน 20k ครั้ง ต่างคนละ snapshot + planner เลือก scan) → Postgres ถือ ROW EXCLUSIVE บน piri_vote_choices ตลอด 2.4 นาที → writer ฝั่งนั้นรอค้าง
+- **Root Cause:** correlated subquery `SET x = (SELECT COUNT(*) FROM child WHERE child.fk = parent.id)` รัน subquery ต่อ 1 แถวแม่ — O(rows_แม่ × scan) ระดับข้อมูลจริง ระเบิด
+- **Correct Pattern/Solution:** เปลี่ยนเป็น **aggregate+JOIN** (อ่านตารางลูกผ่านเดียว + GROUP BY + LEFT JOIN) — ได้ผลลัพธ์เดียวกันแต่เร็ว ~280 เท่า:
+  ```sql
+  UPDATE piri_boards b
+  SET comment_count = COALESCE(cnt.c, 0), updated_at = NOW()
+  FROM (
+      SELECT pb.id AS bid, agg.c
+      FROM piri_boards pb
+      LEFT JOIN (
+          SELECT board_id, COUNT(*) AS c
+          FROM piri_board_comments
+          WHERE deleted_at IS NULL AND is_hidden_by_admin = FALSE
+          GROUP BY board_id
+      ) agg ON agg.board_id = pb.id
+  ) cnt
+  WHERE cnt.bid = b.id
+  ```
+  LEFT JOIN ต้องใช้ (ไม่งั้น board ที่ไม่มีคอมเมนต์เลยไม่ถูก zero)
+- **ผล rehearsal:** correlated subquery → comment_count 2.5s / vote_count 142.5s; aggregate+JOIN → 0.25s / 0.51s (รวม 762ms) — **lock window จาก 2.4 นาที เหลือ <1 วินาที** ปลอดภัยต่อ deploy จริง
+- **กฎ: (1) ก่อนเขียน UPDATE reconcile ระดับ prod ให้ rehearsal บนข้อมูลขนาดจริงก่อนเสมอ (สคริปต์ `backend/scripts/migration_rehearsal.py` มีให้ใช้); (2) ห้าม correlated subquery ใน UPDATE ที่วิ่งทั้งตาราง — ใช้ aggregate+GROUP BY+JOIN; (3) ตารางแม่ที่ต้อง zero ค่าให้ใช้ LEFT JOIN เก็บกรณีไม่มีลูก; (4) lock window ที่ยอมรับได้ ~<1s; ถ้าตารางยักษ์จริงให้แบ่ง batch + NOWAIT**
+- **Date Added:** 2026-08-28
+
+### 🛠️ View-count dedup (Phase 6) — กัน F5 ปั่นยอด + asyncpg gotcha: INSERT ใน FROM ของ subquery → SyntaxError
+- **Context/Problem:** เดิม `get_board_detail` บวก `view_count+1` ทุกครั้งที่เปิด board (adversarial review จับว่า F5/refresh รัวๆ ปั่นยอดได้) → ต้อง dedup ต่อ user ภายใน window (10 นาที) ผ่านตาราง `piri_board_views (board_id, user_id, viewed_at)` PK (board_id,user_id)
+- **Pattern (dedup atomic — ไม่มี TOCTOU ระหว่าง check กับ insert):**
+  ```sql
+  WITH ins AS (
+      INSERT INTO piri_board_views (board_id, user_id, viewed_at)
+      VALUES ($1, $2, NOW())
+      ON CONFLICT (board_id, user_id)
+      DO UPDATE SET viewed_at = NOW()
+      WHERE piri_board_views.viewed_at < NOW() - INTERVAL '10 minutes'
+      RETURNING 1
+  )
+  SELECT COUNT(*) FROM ins
+  ```
+  คืน 1 เฉพาะ "ยังไม่เคยดู" หรือ "เลย window แล้ว" → ถึงจะ +1; ภายใน window (refresh รัวๆ) `WHERE` เท็จ → ไม่คืน row → COUNT 0 → ไม่นับ
+- **⚠️ asyncpg/Postgres gotcha:** เขียนเป็น `SELECT COUNT(*) FROM (INSERT ... RETURNING ...) t` **ไม่ได้** — Postgres ห้าม DML ตรงใน FROM ของ subquery → `PostgresSyntaxError: syntax error at or near "INTO"` → GET detail พังทุกตัว → ต้องใช้ **data-modifying CTE** (`WITH ins AS (INSERT ...) SELECT COUNT(*) FROM ins`) เท่านั้น (เป็นบทเรียนเดียวกับ phase3 เรื่อง DML-CTE ที่ใช้ count ได้ แต่เลือกผิดฝั่งวาง)
+- **กฎ: ถ้าอยาก "INSERT ที่ไม่ซ้ำแล้วนับว่าแทรก/อัปเดตจริงไหม" ให้ใช้ WITH data-modifying CTE + RETURNING + COUNT(*) — ห้ามวาง INSERT ใน FROM; และ dedup แบบนี้ฟรี (ไม่ต้อง Redis) เพราะเป็น atomic UPSERT ในตารางเดียว**
+- **Date Added:** 2026-08-28

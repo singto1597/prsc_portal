@@ -477,6 +477,7 @@ function historyStatusBadge(s: string): string {
       <button
         v-if="canApprove"
         @click="approveOpen = true"
+        data-testid="approve-public-btn"
         class="px-4 py-2.5 bg-violet-600 text-white rounded-xl hover:bg-violet-700 text-sm font-medium"
       >
         <i class="bi bi-people-fill mr-1"></i> อนุมัติเผยแพร่สาธารณะ
@@ -485,6 +486,7 @@ function historyStatusBadge(s: string): string {
       <button
         v-if="publishedBoardId"
         @click="router.push({ name: 'board-detail', params: { id: publishedBoardId } })"
+        data-testid="board-link"
         class="px-4 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 text-sm font-medium"
       >
         <i class="bi bi-box-arrow-up-right mr-1"></i> ดู PIRI Board สาธารณะ

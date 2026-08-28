@@ -52,21 +52,37 @@ async def upgrade(conn) -> None:
     """)
 
     # 3) 🔧 Reconcile counter drift — ให้ comment_count/vote_count ตรงกับข้อมูลจริงก่อน feature hide
+    # ⚠️ ใช้แบบ aggregate+JOIN (อ่านตารางลูกผ่านเดียว + GROUP BY) — ห้ามใช้ correlated subquery:
+    # rehearsal บนข้อมูลระดับ prod (5k boards/100k comments/20k choices/200k votes) พบ
+    # correlated subquery ช้า 100 เท่า (vote_count ~142s → lock piri_vote_choices ค้าง 2.4 นาที
+    # ระหว่าง deploy จริง) ส่วนแบบ aggregate+JOIN ใช้เวลา <1s
     await conn.execute("""
         UPDATE piri_boards b
-        SET comment_count = (
-                SELECT COUNT(*) FROM piri_board_comments c
-                WHERE c.board_id = b.id
-                  AND c.deleted_at IS NULL
-                  AND c.is_hidden_by_admin = FALSE
-            ),
-            updated_at = NOW()
+        SET comment_count = COALESCE(cnt.c, 0), updated_at = NOW()
+        FROM (
+            SELECT pb.id AS bid, agg.c
+            FROM piri_boards pb
+            LEFT JOIN (
+                SELECT board_id, COUNT(*) AS c
+                FROM piri_board_comments
+                WHERE deleted_at IS NULL AND is_hidden_by_admin = FALSE
+                GROUP BY board_id
+            ) agg ON agg.board_id = pb.id
+        ) cnt
+        WHERE cnt.bid = b.id
     """)
     await conn.execute("""
         UPDATE piri_vote_choices vc
-        SET vote_count = (
-                SELECT COUNT(*) FROM piri_votes v
-                WHERE v.choice_id = vc.id AND v.deleted_at IS NULL
-            ),
-            updated_at = NOW()
+        SET vote_count = COALESCE(cnt.c, 0), updated_at = NOW()
+        FROM (
+            SELECT vc2.id AS cid, agg.c
+            FROM piri_vote_choices vc2
+            LEFT JOIN (
+                SELECT choice_id, COUNT(*) AS c
+                FROM piri_votes
+                WHERE deleted_at IS NULL
+                GROUP BY choice_id
+            ) agg ON agg.choice_id = vc2.id
+        ) cnt
+        WHERE cnt.cid = vc.id
     """)
