@@ -92,7 +92,8 @@ async def clean_database(db_pool):
             TRUNCATE TABLE users, rooms, students, issues,
                 issue_steps, issue_escalations, issue_countdowns,
                 issue_status_history, audit_logs, student_import_jobs,
-                issue_comments
+                issue_comments, piri_boards, piri_board_comments,
+                piri_vote_choices, piri_votes, piri_board_reactions
             CASCADE
         """)
     yield
