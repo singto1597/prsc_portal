@@ -9,7 +9,17 @@ vi.mock('@/services/api', () => ({
   default: { get: getMock, post: postMock },
 }))
 
-import { listBoards, getBoard, submitVote, addComment } from '@/services/board'
+import {
+  listBoards,
+  getBoard,
+  submitVote,
+  addComment,
+  reportComment,
+  hideComment,
+  hideBoard,
+  listReports,
+  resolveReport,
+} from '@/services/board'
 import { approveToPublic } from '@/services/issue'
 
 describe('board services (PIRI Vote + PIRI Talk)', () => {
@@ -91,5 +101,67 @@ describe('board services (PIRI Vote + PIRI Talk)', () => {
       allow_comments: false,
     })
     expect(result.board_id).toBe(12)
+  })
+
+  it('reportComment → POST /api/boards/{id}/comments/{cid}/report ส่งเหตุผล + detail', async () => {
+    postMock.mockResolvedValue({ id: 9, board_id: 7, comment_id: 3, status: 'open' })
+
+    const result = await reportComment(7, 3, { reason: 'bullying', detail: 'ด่าซ้ำๆ' })
+
+    expect(postMock).toHaveBeenCalledWith('/api/boards/7/comments/3/report', {
+      reason: 'bullying',
+      detail: 'ด่าซ้ำๆ',
+    })
+    expect(result.status).toBe('open')
+  })
+
+  it('hideComment → POST /api/boards/{id}/comments/{cid}/hide ส่งเหตุผล', async () => {
+    postMock.mockResolvedValue({ status: 'hidden', board_id: 7, comment_id: 3, hidden_count: 1 })
+
+    const result = await hideComment(7, 3, 'กลั่นแกล้ง')
+
+    expect(postMock).toHaveBeenCalledWith('/api/boards/7/comments/3/hide', { reason: 'กลั่นแกล้ง' })
+    expect(result.hidden_count).toBe(1)
+  })
+
+  it('hideBoard → POST /api/boards/{id}/hide', async () => {
+    postMock.mockResolvedValue({ status: 'hidden', board_id: 7 })
+
+    const result = await hideBoard(7, 'สแปม')
+
+    expect(postMock).toHaveBeenCalledWith('/api/boards/7/hide', { reason: 'สแปม' })
+    expect(result.status).toBe('hidden')
+  })
+
+  it('listReports → GET /api/boards/reports พร้อม params (status/reason/q/แบ่งหน้า)', async () => {
+    const fake = { items: [{ id: 1, board_title: 'บอร์ด' }], total: 5, page: 1, page_size: 15, pages: 1 }
+    getMock.mockResolvedValue(fake)
+
+    const result = await listReports({ status: 'open', reason: 'spam', q: 'ลิงก์', limit: 15, offset: 0 })
+
+    expect(getMock).toHaveBeenCalledWith('/api/boards/reports', {
+      params: { status: 'open', reason: 'spam', q: 'ลิงก์', limit: 15, offset: 0 },
+    })
+    expect(result).toEqual(fake)
+  })
+
+  it('resolveReport → POST /api/boards/reports/{id}/resolve (hide ส่ง note)', async () => {
+    postMock.mockResolvedValue({ report_id: 4, status: 'resolved', hidden_count: 1 })
+
+    const result = await resolveReport(4, 'hide', 'ยืนยันว่าผิดจริง')
+
+    expect(postMock).toHaveBeenCalledWith('/api/boards/reports/4/resolve', {
+      action: 'hide',
+      note: 'ยืนยันว่าผิดจริง',
+    })
+    expect(result.status).toBe('resolved')
+  })
+
+  it('resolveReport → dismiss ไม่ส่ง note ถ้าไม่มี', async () => {
+    postMock.mockResolvedValue({ report_id: 4, status: 'dismissed' })
+
+    await resolveReport(4, 'dismiss')
+
+    expect(postMock).toHaveBeenCalledWith('/api/boards/reports/4/resolve', { action: 'dismiss', note: undefined })
   })
 })

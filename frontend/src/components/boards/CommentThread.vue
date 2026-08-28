@@ -1,22 +1,29 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import Swal from 'sweetalert2'
-import { addComment } from '@/services/board'
-import type { BoardComment } from '@/types/board'
+import { addComment, reportComment, hideComment } from '@/services/board'
+import { REPORT_REASON_LABELS, type BoardComment, type ReportReason } from '@/types/board'
+import { useAuthStore } from '@/stores/auth'
 
 /**
  * 💬 คอมเมนต์ 1 อัน + รีพลายซ้อน (recursive — อ้างอิงตัวเองด้วยชื่อไฟล์)
  * - แสดง avatar/ชื่อ/เวลา/ข้อความ + ปุ่ม "ตอบกลับ"
  * - reply → เปิดช่องพิมพ์ใต้คอมเมนต์ → addComment(parent_id) → emit refresh ให้ parent โหลดใหม่
+ * - 🚩 "แจ้ง" (ทุกคน ยกเว้นคอมเมนต์ตัวเอง) → reportComment — สภานักเรียนตรวจสอบ
+ * - 🛡️ "ซ่อน" (สภา/แอดมิน) → hideComment (backend ซ่อนทั้ง subtree + ลด counter) → refresh
  * ความลึกถูกจำกัดฝั่ง backend แล้ว (MAX_DISPLAY_DEPTH) — recursive ปลอดภัย
  */
 const props = defineProps<{ boardId: number; comment: BoardComment }>()
 
 const emit = defineEmits<{ refresh: [] }>()
 
+const authStore = useAuthStore()
 const replying = ref(false)
 const replyBody = ref('')
 const posting = ref(false)
+const acting = ref(false) // กันกดซ้ำระหว่าง report/hide ทำงาน
+
+const isOwn = computed(() => props.comment.user_id != null && props.comment.user_id === authStore.user?.id)
 
 function fmtTime(iso: string): string {
   return new Date(iso).toLocaleString('th-TH', {
@@ -44,6 +51,78 @@ async function submitReply() {
     posting.value = false
   }
 }
+
+// 🚩 แจ้งความไม่เหมาะสม (2 ขั้น: เลือกเหตุผล → รายละเอียดเสริม) — ทุกคนยกเว้นคอมเมนต์ตัวเอง
+async function handleReport() {
+  if (acting.value || isOwn.value) return
+  const { value: reason } = await Swal.fire({
+    title: 'แจ้งความไม่เหมาะสม',
+    text: 'คอมเมนต์นี้ผิดกฎ/ไม่เหมาะสมอย่างไร?',
+    icon: 'question',
+    input: 'select',
+    inputOptions: REPORT_REASON_LABELS,
+    inputPlaceholder: 'เลือกเหตุผล',
+    showCancelButton: true,
+    confirmButtonText: 'ถัดไป',
+    cancelButtonText: 'ยกเลิก',
+  })
+  if (!reason) return
+
+  const { value: detail, isConfirmed } = await Swal.fire({
+    title: 'รายละเอียดเพิ่มเติม',
+    input: 'textarea',
+    inputPlaceholder: 'อธิบายเพิ่มเติม (ไม่บังคับ)',
+    inputAttributes: { maxlength: '500' },
+    showCancelButton: true,
+    confirmButtonText: 'ส่งรายงาน',
+    cancelButtonText: 'ยกเลิก',
+  })
+  if (!isConfirmed) return
+
+  acting.value = true
+  try {
+    await reportComment(props.boardId, props.comment.id, {
+      reason: reason as ReportReason,
+      detail: detail ? String(detail).trim() : undefined,
+    })
+    Swal.fire({ icon: 'success', title: 'แจ้งแล้ว', text: 'สภานักเรียนจะตรวจสอบให้เร็วที่สุด', timer: 1600, showConfirmButton: false })
+  } catch (e) {
+    Swal.fire({ icon: 'error', title: 'แจ้งไม่สำเร็จ', text: e instanceof Error ? e.message : String(e) })
+  } finally {
+    acting.value = false
+  }
+}
+
+// 🛡️ ซ่อนคอมเมนต์ (สภา/แอดมิน) — ต้องระบุเหตุผล
+async function handleHide() {
+  if (acting.value) return
+  const { value } = await Swal.fire({
+    title: 'ซ่อนคอมเมนต์นี้?',
+    text: 'คอมเมนต์ + รีพลายทั้งหมดจะถูกซ่อน (ผู้แจ้ง/คนอื่นมองไม่เห็น)',
+    icon: 'warning',
+    input: 'text',
+    inputPlaceholder: 'เหตุผลที่ซ่อน (จำเป็น)',
+    inputAttributes: { maxlength: '200' },
+    showCancelButton: true,
+    confirmButtonText: 'ซ่อนคอมเมนต์',
+    confirmButtonColor: '#ef4444',
+    cancelButtonText: 'ยกเลิก',
+  })
+  if (!value || !String(value).trim()) {
+    if (value !== undefined) Swal.fire({ icon: 'warning', title: 'ต้องระบุเหตุผล', text: 'กรุณากรอกเหตุผลที่ซ่อน' })
+    return
+  }
+  acting.value = true
+  try {
+    await hideComment(props.boardId, props.comment.id, String(value).trim())
+    Swal.fire({ icon: 'success', title: 'ซ่อนคอมเมนต์แล้ว', timer: 1200, showConfirmButton: false })
+    emit('refresh')
+  } catch (e) {
+    Swal.fire({ icon: 'error', title: 'ซ่อนไม่สำเร็จ', text: e instanceof Error ? e.message : String(e) })
+  } finally {
+    acting.value = false
+  }
+}
 </script>
 
 <template>
@@ -62,13 +141,34 @@ async function submitReply() {
           <span v-if="comment.is_edited" class="text-[11px] text-gray-400">· แก้ไขแล้ว</span>
         </div>
         <p class="text-sm text-gray-700 mt-0.5 whitespace-pre-wrap break-words">{{ comment.body }}</p>
-        <button
-          type="button"
-          @click="replying = !replying"
-          class="mt-1 text-xs text-gray-400 hover:text-red-600 font-medium flex items-center gap-1"
-        >
-          <i class="bi bi-reply"></i> ตอบกลับ
-        </button>
+        <!-- action: ตอบกลับ / แจ้ง (ทุกคน ยกเว้นตัวเอง) / ซ่อน (สภา/แอดมิน) -->
+        <div class="mt-1 flex items-center gap-3 text-xs">
+          <button
+            type="button"
+            @click="replying = !replying"
+            class="text-gray-400 hover:text-red-600 font-medium flex items-center gap-1"
+          >
+            <i class="bi bi-reply"></i> ตอบกลับ
+          </button>
+          <button
+            v-if="!isOwn"
+            type="button"
+            @click="handleReport"
+            :disabled="acting"
+            class="text-gray-400 hover:text-amber-600 font-medium flex items-center gap-1 disabled:opacity-40"
+          >
+            <i class="bi bi-flag"></i> แจ้ง
+          </button>
+          <button
+            v-if="authStore.isCouncilAuthority"
+            type="button"
+            @click="handleHide"
+            :disabled="acting"
+            class="text-gray-400 hover:text-red-600 font-medium flex items-center gap-1 disabled:opacity-40"
+          >
+            <i class="bi bi-eye-slash"></i> ซ่อน
+          </button>
+        </div>
 
         <!-- ช่องตอบกลับ -->
         <div v-if="replying" class="mt-2 flex gap-2">

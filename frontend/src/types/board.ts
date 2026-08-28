@@ -79,3 +79,57 @@ export const BOARD_TYPE_LABELS: Record<BoardType, string> = {
 export function boardTypeIcon(t: BoardType): string {
   return t === 'vote' ? 'bi bi-bar-chart-fill' : 'bi bi-chat-dots-fill'
 }
+
+// ===== Report (แจ้งความไม่เหมาะสม) — ตรงกับ backend piri_board_reports =====
+export type ReportReason = 'bullying' | 'profanity' | 'spam' | 'privacy' | 'other'
+export type ReportStatus = 'open' | 'resolved' | 'dismissed'
+
+// รายงาน 1 รายการในคิวโมเดอเรชัน (สภา/แอดมิน)
+export interface ReportItem {
+  id: number
+  board_id: number
+  board_title: string
+  comment_id: number
+  comment_body: string
+  reporter_id: number | null
+  reporter_name: string | null
+  reason: ReportReason
+  detail: string | null
+  status: ReportStatus
+  resolved_by: number | null
+  resolved_at: string | null
+  resolution_note: string | null
+  created_at: string
+}
+
+export interface ReportListResponse {
+  items: ReportItem[]
+  total: number
+  page: number
+  page_size: number
+  pages: number
+}
+
+export const REPORT_REASONS: ReportReason[] = ['bullying', 'profanity', 'spam', 'privacy', 'other']
+
+export const REPORT_REASON_LABELS: Record<ReportReason, string> = {
+  bullying: 'กลั่นแกล้ง/คุกคาม',
+  profanity: 'คำหยาบคาย',
+  spam: 'สแปม/โฆษณา',
+  privacy: 'เปิดเผยข้อมูลส่วนตัว',
+  other: 'อื่นๆ',
+}
+
+export const REPORT_STATUS_LABELS: Record<ReportStatus, string> = {
+  open: 'รอจัดการ',
+  resolved: 'ซ่อนแล้ว',
+  dismissed: 'ปัดตก',
+}
+
+export function reportStatusBadge(s: ReportStatus): string {
+  return {
+    open: 'bg-amber-100 text-amber-700',
+    resolved: 'bg-emerald-100 text-emerald-700',
+    dismissed: 'bg-gray-100 text-gray-600',
+  }[s]
+}

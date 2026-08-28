@@ -2,9 +2,12 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Swal from 'sweetalert2'
-import { getBoard, submitVote, addComment } from '@/services/board'
+import { getBoard, submitVote, addComment, hideBoard } from '@/services/board'
 import { BOARD_TYPE_LABELS, boardTypeIcon, type BoardDetail } from '@/types/board'
+import { useAuthStore } from '@/stores/auth'
 import CommentThread from '@/components/boards/CommentThread.vue'
+
+const authStore = useAuthStore()
 
 /**
  * 📄 PIRI Board — รองรับ 2 เลย์เอาต์:
@@ -76,6 +79,39 @@ async function load() {
   }
 }
 
+// 🛡️ สภา/แอดมิน ซ่อน board ทั้งบอร์ด (หลุดจากฟีด + detail 404) — ต้องระบุเหตุผล
+const hidingBoard = ref(false)
+async function handleHideBoard() {
+  if (!board.value || hidingBoard.value) return
+  const { value } = await Swal.fire({
+    title: 'ซ่อนบอร์ดนี้?',
+    text: 'บอร์ดจะหายจากฟีดและรายละเอียดทันที (ผู้ใช้ทั่วไปมองไม่เห็น)',
+    icon: 'warning',
+    input: 'text',
+    inputPlaceholder: 'เหตุผลที่ซ่อน (จำเป็น)',
+    inputAttributes: { maxlength: '200' },
+    showCancelButton: true,
+    confirmButtonText: 'ซ่อนบอร์ด',
+    confirmButtonColor: '#ef4444',
+    cancelButtonText: 'ยกเลิก',
+  })
+  if (!value || !String(value).trim()) {
+    if (value !== undefined) Swal.fire({ icon: 'warning', title: 'ต้องระบุเหตุผล', text: 'กรุณากรอกเหตุผลที่ซ่อน' })
+    return
+  }
+  hidingBoard.value = true
+  try {
+    await hideBoard(board.value.id, String(value).trim())
+    Swal.fire({ icon: 'success', title: 'ซ่อนบอร์ดแล้ว', text: 'ย้ายกลับไปยังฟีด PIRI Boards', timer: 1500, showConfirmButton: false }).then(() => {
+      router.push({ name: 'boards' })
+    })
+  } catch (e) {
+    Swal.fire({ icon: 'error', title: 'ซ่อนไม่สำเร็จ', text: e instanceof Error ? e.message : String(e) })
+  } finally {
+    hidingBoard.value = false
+  }
+}
+
 onMounted(load)
 
 function fmtDate(iso: string): string {
@@ -117,7 +153,19 @@ const rootComments = computed(() => board.value?.comments ?? [])
           :class="board.board_type === 'vote' ? 'text-violet-600' : 'text-sky-600'">
           <i :class="boardTypeIcon(board.board_type)"></i> บอร์ด{{ BOARD_TYPE_LABELS[board.board_type] }}
         </span>
-        <span class="text-xs text-gray-400">{{ fmtDate(board.created_at) }}</span>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-gray-400">{{ fmtDate(board.created_at) }}</span>
+          <button
+            v-if="authStore.isCouncilAuthority"
+            type="button"
+            @click="handleHideBoard"
+            :disabled="hidingBoard"
+            class="px-2.5 py-1 text-[11px] font-medium rounded-lg border border-red-200 text-red-500 hover:bg-red-50 disabled:opacity-40"
+            title="ซ่อนบอร์ดนี้ (สภา/แอดมิน)"
+          >
+            <i class="bi bi-eye-slash mr-1"></i> ซ่อนบอร์ด
+          </button>
+        </div>
       </div>
       <h1 class="text-lg sm:text-xl font-bold text-gray-900 leading-snug break-words">{{ board.title }}</h1>
       <p class="text-gray-500 text-sm mt-1">โดย {{ board.is_anonymous ? 'ไม่ระบุชื่อ' : board.author_name || 'สภานักเรียน' }}</p>
