@@ -6,6 +6,7 @@
 - **Context/Problem:** `INSERT INTO rooms (room_code, room_name) VALUES ($1,$1)` → `AmbiguousParameterError: inconsistent types deduced for parameter $1` (VARCHAR vs TEXT) และ `INSERT has more expressions than target columns` เมื่อ parameter count ไม่ตรงคอลัมน์
 - **Root Cause:** asyncpg อนุมาน type ของ parameter จากบริบท — ใช้ `$1` ตัวเดียวกับ 2 คอลัมน์ที่ type ต่างกัน (หรือ count ผิด) จะพังทั้งตอน runtime และตอน seed
 - **Correct Pattern/Solution:** ใช้ parameter แยกเสมอ `VALUES ($1,$2,$3)`; นับจำนวน `$n` ให้ตรงกับคอลัมน์+values ก่อนรัน; โดยเฉพาะใน `seed_data.py`/script ที่มือเขียน SQL ตรงๆ — อาการเดาได้จาก error `INSERT has more expressions`
+- **ขยาย (recursive CTE):** `WITH RECURSIVE chain(...) AS (SELECT 1, $1 UNION ALL SELECT ...)` → `UndefinedFunctionError: operator does not exist: integer = text` — asyncpg อนุมาน type ของ `$1` ใน non-recursive term ไม่ได้ (บริบทยังไม่รู้ column type) → ตอน JOIN `chain.cid` กับ `c.id` เจอ text=integer. **Fix: cast เสมอ `SELECT 1, $1::integer`** ใน non-recursive term ของ recursive CTE (เจอจริง 2026-08-28 ตอนวัด depth ของ comment chain)
 - **Date Added:** 2026-08-08
 
 ### 🛠️ FastAPI Router + asyncpg — ต้องมี `python-multipart` สำหรับ `UploadFile`/Form
@@ -421,4 +422,17 @@
   3. `start_level` bypass: เรื่องขอสาธารณะ (vote/talk) ตั้ง `start_level='council'` อัตโนมัติ — ต้อง **ข้าม** เช็ค `user_level >= start_level` (ไม่งั้นนักเรียนขอโหวตไม่ได้) เพราะผู้แจ้งแค่ "ขอ" — สภาเป็นคนอนุมัติทีหลัง
   4. test: council_member (ไม่ใช่ admin) อนุมัติได้ 200 / student อนุมัติ 403 + deep-DB ตรวจไม่มี board ถูกสร้างตอน 403; teacher ควรได้ 403 ด้วย
   - **กฎ: อย่าใช้ฟังก์ชันที่ออกแบบเพื่อ "เห็นข้อมูล" มาอนุมัติ "กระทำการ" — visibility scope กับ authority ต้องเป็นคนละเช็ค; เวลาเปิดฟีเจอร์ที่ "ใครก็ขอได้แต่สภาอนุมัติ" ให้ข้าม level-check ตอนสร้าง แต่บังคับ authority-check ตอนอนุมัติ**
+- **Date Added:** 2026-08-28
+
+### 🛠️ Board สาธารณะ (PIRI Boards) — anonymous ต้องซ่อน author_id ด้วย (ไม่ใช่แค่ชื่อ) + Denormalized counter drift เป็น known limitation
+- **Context/Problem:** สร้าง PIRI Boards (Phase 3: feed board สาธารณะ + vote + คอมเมนต์) — ผู้แจ้งขอ "anonymous" ตอนสร้าง issue → board ควรไม่ระบุตัวตน; และพึ่ง Denormalized counter (`vote_count`/`comment_count`) สำหรับโชว์ยอด
+- **Root Cause/สิ่งที่เจอ:**
+  1. **Anonymous รั่ว author_id:** `_board_to_dict()` ซ่อนแค่ `author_name` แต่ยังคืน `author_id` (users.id ลำดับต่อเนื่อง) → ใครก็ตามที่ล็อกอินเทียบ id กับ endpoint อื่น (student/commenter) ได้ = deanonymize — board สาธารณะเห็นทั้งโรงเรียน ยิ่งรั่ววงกว้าง
+  2. **Denormalized counter drift:** `submit_vote` เพิ่ม `vote_count` อย่างเดียว, `add_comment` เพิ่ม `comment_count` อย่างเดียว — ไม่มี path ลด; schema ตั้งใจให้ soft-delete vote แล้วโหวตใหม่ได้ (partial unique `uq_piri_votes_board_user_active WHERE deleted_at IS NULL`) แต่ counter เก่าไม่ถูกลด → ยอดลอย
+- **Correct Pattern/Solution:**
+  1. **anonymous board:** ซ่อน `author_id` + `author_name` เป็น None ทั้งคู่ (ไม่ได้แค่ชื่อ) + test ตรวจ response ทั้ง feed และ detail (`assert detail["author_id"] is None`)
+  2. **Counter drift:** ยังไม่มี API soft-delete vote/comment ใน Phase 3 → drift เกิดได้เฉพาะ direct SQL (test) — บันทึกเป็น **known limitation**: ตอนเพิ่ม revoke/delete/moderate ใน Phase หลัง ต้องลด counter ใน transaction เดียว หรือ derive ยอดจาก `COUNT(*) FROM piri_votes WHERE deleted_at IS NULL` แทนการอ่าน counter (กันยอดลอยแบบถาวร)
+  3. **ปิดช่อง moderation:** `add_comment` reply ต้องตรวจ `is_hidden_by_admin = FALSE` บน parent ด้วย (ไม่ใช่แค่ `deleted_at IS NULL`) — ไม่งั้น reply ต่อคอมเมนต์ที่แอดมินซ่อนแล้ว โดน `_thread_comments` ย้ายขึ้น root (bypass moderation)
+  4. **Defensive (จาก adversarial review):** (a) comment fetch ใส่ `LIMIT 1000`; (b) **Pydantic recursive model ระเบิดได้ — `BoardCommentOut` ซ้อนตัวเอง: reply chain ~256 ชั้น → `BoardDetailOut(**detail)` เกิด `ValidationError: recursion_loop` → HTTP 500** ทุก GET detail; ผู้ใช้ธรรมดาสร้าง chain นี้ได้ (โพสต์ reply ต่อ reply ซ้ำๆ ไม่มี throttle) → DoS จริง → ต้อง (i) พับความลึก tree ที่ส่ง client (`MAX_DISPLAY_DEPTH=8` — reply เกินถูกย้ายใต้บรรพบุรุษที่ยังใต้ลิมิต, ไม่หาย) + (ii) guard ตอนสร้าง reply (`MAX_REPLY_DEPTH=30` — recursive CTE นับความยาว chain ถึง root แล้ว 400) + (iii) parent ที่ soft delete → ลูกขึ้น root ต้องรีเซ็ต `parent_comment_id=None` (กัน frontend เจอ id แขวน); (c) `my_vote_choice_id` ต้อง JOIN choice ที่ยัง active (กันชี้ choice ที่ soft-delete แล้ว)
+  - **กฎ: (1) ฟีเจอร์ anonymous ต้องซ่อนทุก field ที่ระบุตัวตนได้ (ไม่ใช่แค่ชื่อ — id ต่อเนื่องก็ระบุตัวได้); (2) ก่อนใช้ denormalized counter ดู schema ว่ามี path soft-delete/revote ไหม — ถ้ามี ต้องมี path ลด counter มิฉะนั้นบันทึกเป็น limitation + ให้ derive จาก base table; (3) moderation flag (is_hidden) ต้องถูกเช็คทุกที่ที่ "อ้างอิง" object ที่ถูก moderate — write side ด้วย ไม่ใช่แค่ read; (4) model Pydantic ที่ซ้อนตัวเอง (recursive) ต้องจำกัดความลึกให้ชัด — ทั้งตอน serialize และตอนสร้างข้อมูลใหม่ ไม่งั้นผู้ใช้ธรรมดา DoS ได้**
 - **Date Added:** 2026-08-28
