@@ -3,7 +3,7 @@ import json
 from typing import Optional
 from datetime import datetime, timedelta, timezone
 
-from core.exceptions import NotFoundError, ForbiddenError, ValidationError
+from core.exceptions import NotFoundError, ForbiddenError, ValidationError, ConflictError
 from core.config import settings
 from core.categories import is_valid_category, all_main_category_codes
 
@@ -182,6 +182,11 @@ def can_see(level: str, issue_level: str, reporter_id: int, user_id: int, is_ano
 # ============================================================
 # 📝 CRUD ปัญหา
 # ============================================================
+# ปลายทางที่ผู้แจ้งขอได้: normal (เรื่องปกติ) / vote / talk (PIRI Boards)
+PUBLIC_DESTINATIONS = ("vote", "talk")
+PUBLIC_BOARD_TYPES = ("vote", "talk")
+
+
 async def create_issue(
     pool: asyncpg.Pool,
     user_id: int,
@@ -192,16 +197,31 @@ async def create_issue(
     is_anonymous: bool = False,
     room_id: Optional[int] = None,
     start_level: str = "room",
+    requested_destination: str = "normal",
 ) -> int:
     """
     สร้างปัญหาใหม่
     - เริ่มต้นที่ระดับ room (หัวหน้าห้อง + รอง) โดยค่า default
     - ถ้าผู้แจ้งเป็นระดับสูง (หัวหน้าห้อง/ประธานระดับ/สภา) สามารถเลือก start_level
       ให้เรื่องไปเริ่มที่ระดับสูงขึ้นได้เลย (เช่น ประธานสภาอยากให้เริ่มที่ council)
+    - requested_destination: ปลายทางที่ขอ — 'normal' / 'vote' / 'talk'
+      * vote/talk (PIRI Boards) = เรื่องขอเผยแพร่สาธารณะ → **อัตโนมัติตรงไปที่ council**
+        (bypass room/level — ไม่เช็คระดับผู้แจ้ง เพราะใครก็ขอโพสต์สาธารณะได้)
+        current_level ถูกตั้งเป็น 'council' ให้สภาอนุมัติ/ปัดตก
     - main_category: หมวดหลัก (suggestion/wellbeing/report), category: หมวดย่อยในหมวดหลัก
     """
     async with pool.acquire() as conn:
         async with conn.transaction():
+            # ตรวจปลายทางที่ขอ
+            if requested_destination not in ("normal", "vote", "talk"):
+                raise ValidationError(f"ปลายทางที่ขอไม่ถูกต้อง: {requested_destination}")
+
+            # PIRI Boards: vote/talk → เรื่องตรงไปที่สภา (bypass room/level)
+            # ผู้แจ้งแค่ "ขอ" เผยแพร่ — ไม่ต้องมีสิทธิ์ระดับสภา (สภาเป็นคนอนุมัติ)
+            is_public_request = requested_destination in PUBLIC_DESTINATIONS
+            if is_public_request:
+                start_level = "council"
+
             # ตรวจ start_level ถูกต้อง
             if start_level not in LEVEL_ORDER:
                 raise ValidationError(f"ระดับเริ่มต้นไม่ถูกต้อง: {start_level}")
@@ -232,7 +252,8 @@ async def create_issue(
                 raise NotFoundError("ไม่พบห้องเรียน")
 
             # 🛡️ ผู้แจ้งต้องมีสิทธิ์ในระดับที่เลือกเริ่มต้น (ไม่งั้นนักเรียนธรรมดาส่งขึ้นสภาได้)
-            if start_level != "room":
+            #    — ยกเว้นกรณีขอเผยแพร่สาธารณะ (vote/talk) ซึ่งตั้งให้ตรงไปสภาโดยดีไซน์
+            if not is_public_request and start_level != "room":
                 my_level = await user_level(pool, user_id, room_id=room_id)
                 if LEVEL_RANK.get(my_level, 0) < LEVEL_RANK.get(start_level, 1):
                     raise ForbiddenError(f"คุณมีสิทธิ์แค่ระดับ {my_level} — ไม่สามารถเริ่มที่ระดับ {start_level} ได้")
@@ -254,18 +275,21 @@ async def create_issue(
                     (room_id, main_category, category, title, description,
                      reporter_id, reporter_room_id, reporter_name,
                      current_level, current_assignee_id, status,
-                     is_anonymous)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NULL, 'pending', $10)
+                     is_anonymous, requested_destination)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NULL, 'pending', $10, $11)
                 RETURNING id
                 """,
                 room_id, main_category, category, title, description,
                 user_id, room_id, reporter_name,
                 start_level,
-                is_anonymous
+                is_anonymous, requested_destination
             )
 
             # บันทึก status history (บอกว่าออกที่ระดับไหน)
-            note = f"สร้างเรื่องใหม่ (เริ่มต้นที่ระดับ {start_level})"
+            if is_public_request:
+                note = "สร้างเรื่องใหม่ (ขอเผยแพร่สาธารณะ — ตรงไปที่สภานักเรียน)"
+            else:
+                note = f"สร้างเรื่องใหม่ (เริ่มต้นที่ระดับ {start_level})"
             await conn.execute(
                 """
                 INSERT INTO issue_status_history (issue_id, status, changed_by, note)
@@ -276,12 +300,17 @@ async def create_issue(
 
             # ถ้า start_level สูงกว่า room → บันทึก escalation เป็นประวัติด้วย
             if start_level != "room":
+                esc_reason = (
+                    "ผู้แจ้งขอเผยแพร่สาธารณะ (PIRI Boards) — ตรงไปที่สภานักเรียน"
+                    if is_public_request else
+                    "ผู้แจ้งเลือกเริ่มต้นที่ระดับนี้โดยตรง"
+                )
                 await conn.execute(
                     """
                     INSERT INTO issue_escalations (issue_id, from_level, to_level, from_assignee_id, reason)
-                    VALUES ($1, 'room', $2, $3, 'ผู้แจ้งเลือกเริ่มต้นที่ระดับนี้โดยตรง')
+                    VALUES ($1, 'room', $2, $3, $4)
                     """,
-                    issue_id, start_level, user_id
+                    issue_id, start_level, user_id, esc_reason
                 )
 
             # 🛡️ Audit log (ภายใน transaction เดียว — ตามกฎ backend.md)
@@ -295,10 +324,166 @@ async def create_issue(
                     "title": title, "main_category": main_category,
                     "category": category, "status": "pending",
                     "current_level": start_level, "is_anonymous": is_anonymous,
+                    "requested_destination": requested_destination,
                 },
             )
 
             return issue_id
+
+
+async def _has_council_authority(conn, user_id: int) -> bool:
+    """ตรวจว่า user มีอำนาจระดับสภา/แอดมิน (อนุมัติเผยแพร่สาธารณะได้):
+    - Super Admin / is_admin (แอดมิน)
+    - สภานักเรียน (council_member) / ประธานสภา (council_president) / ครูสภา (teacher_council)
+    หมายเหตุ: ไม่ใช้ user_level() เพราะครูทั่วไป (teacher) ก็คืน 'council' เพื่อมองเห็นข้อมูล —
+    แต่อำนาจอนุมัติต้องมาจากตำแหน่งสภาจริง/แอดมินเท่านั้น"""
+    if settings.SUPER_ADMIN_ID and int(user_id) == int(settings.SUPER_ADMIN_ID):
+        return True
+    rows = await conn.fetch(
+        """
+        SELECT class_role, is_admin FROM students
+        WHERE user_id = $1 AND deleted_at IS NULL AND status = 'active'
+        """,
+        user_id
+    )
+    for r in rows:
+        if r["is_admin"]:
+            return True
+        if r["class_role"] in ("council_member", "council_president", "teacher_council"):
+            return True
+    return False
+
+
+async def approve_to_public(
+    pool: asyncpg.Pool,
+    user_id: int,
+    issue_id: int,
+    board_type: str,
+    *,
+    vote_choices: Optional[list] = None,
+    allow_comments: bool = True,
+) -> int:
+    """
+    🏛️ อนุมัติเรื่องขอเผยแพร่สาธารณะ (PIRI Boards) → สร้าง board จากข้อมูล issue + ปิดเรื่อง
+
+    ข้อกำหนด (ตาม Phase 2):
+    - เฉพาะอำนาจระดับสภา/แอดมิน: สภานักเรียน / ประธานสภา / ครูสภา / admin (is_admin/Super Admin)
+    - issue ต้องขอปลายทางสาธารณะ (requested_destination != 'normal') — เรื่องธรรมดาอนุมัติเป็น board ไม่ได้
+    - board_type ต้องตรงกับที่ผู้แจ้งขอ (vote→vote, talk→talk) กันสร้าง board ผิดประเภท
+    - vote board: ต้องมี vote_choices อย่างน้อย 2 ตัวเลือก
+    - อนุมัติซ้ำไม่ได้ (published_board_id มีอยู่แล้ว → 409)
+
+    ใน transaction เดียว (ตามกฎ backend.md):
+    1. INSERT piri_boards (source_issue_id → ตัวเรื่อง, author = ผู้แจ้งเดิม, approved_by = ผู้ที่อนุมัติ)
+    2. vote board → INSERT piri_vote_choices
+    3. UPDATE issues: published_board_id = board_id, status = 'resolved', resolved_at = NOW()
+    4. INSERT issue_status_history
+    5. AuditLogger(action="APPROVE_TO_PUBLIC")
+
+    คืน board_id ที่สร้าง
+    """
+    # ---- validate ภายนอก transaction (เร็ว + กัน transaction เสีย) ----
+    if board_type not in PUBLIC_BOARD_TYPES:
+        raise ValidationError(f"ประเภท board ไม่ถูกต้อง: {board_type} (ต้องเป็น talk/vote)")
+    if board_type == "vote":
+        if not vote_choices or len(vote_choices) < 2:
+            raise ValidationError("Board แบบโหวตต้องมีตัวเลือกอย่างน้อย 2 ตัวเลือก")
+
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            # 1) อำนาจสภา/แอดมิน
+            if not await _has_council_authority(conn, user_id):
+                raise ForbiddenError("เฉพาะสภานักเรียน/ประธานสภา/ครูสภา/แอดมินที่อนุมัติเผยแพร่สาธารณะได้")
+
+            # 2) ดึง issue (FOR UPDATE กัน TOCTOU — อนุมัติพร้อมกัน 2 ที่)
+            issue = await conn.fetchrow(
+                "SELECT * FROM issues WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
+                issue_id
+            )
+            if not issue:
+                raise NotFoundError("ไม่พบเรื่องนี้")
+
+            # 3) ต้องขอปลายทางสาธารณะ
+            if issue["requested_destination"] == "normal":
+                raise ValidationError("เรื่องนี้ไม่ได้ขอเผยแพร่สาธารณะ — อนุมัติเป็น PIRI Board ไม่ได้")
+
+            # 4) board_type ต้องตรงกับที่ผู้แจ้งขอ
+            if board_type != issue["requested_destination"]:
+                raise ValidationError(
+                    f"เรื่องนี้ขอเผยแพร่แบบ '{issue['requested_destination']}' "
+                    f"แต่เลือกอนุมัติเป็น '{board_type}'"
+                )
+
+            # 5) อนุมัติซ้ำไม่ได้
+            if issue["published_board_id"]:
+                raise ConflictError("เรื่องนี้เผยแพร่เป็น PIRI Board ไปแล้ว")
+
+            # 6) สร้าง board จากข้อมูล issue (author = ผู้แจ้งเดิม, approved_by = ผู้ที่อนุมัติ)
+            board_id = await conn.fetchval(
+                """
+                INSERT INTO piri_boards
+                    (source_issue_id, board_type, title, description, cover_image_url,
+                     author_id, is_anonymous, approved_by, approved_at,
+                     status, allow_comments, tags)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), 'active', $9, '[]'::jsonb)
+                RETURNING id
+                """,
+                issue_id, board_type, issue["title"], issue["description"],
+                issue["image_url"],
+                issue["reporter_id"], issue["is_anonymous"],
+                user_id, allow_comments
+            )
+
+            # 7) vote board → บันทึกตัวเลือก (sort_order = ลำดับใน list)
+            if board_type == "vote":
+                for i, choice_text in enumerate(vote_choices):
+                    await conn.execute(
+                        """
+                        INSERT INTO piri_vote_choices (board_id, choice_text, sort_order)
+                        VALUES ($1, $2, $3)
+                        """,
+                        board_id, choice_text, i
+                    )
+
+            # 8) ปิดเรื่อง + ผูก board
+            await conn.execute(
+                """
+                UPDATE issues
+                SET published_board_id = $1, status = 'resolved',
+                    resolved_at = NOW(), updated_at = NOW()
+                WHERE id = $2
+                """,
+                board_id, issue_id
+            )
+            await conn.execute(
+                """
+                INSERT INTO issue_status_history (issue_id, status, changed_by, note)
+                VALUES ($1, 'resolved', $2, $3)
+                """,
+                issue_id, user_id, f"สภาอนุมัติเผยแพร่เป็น PIRI Board (ประเภท {board_type})"
+            )
+
+            # 9) 🛡️ Audit log (ภายใน transaction เดียว — ตามกฎ backend.md)
+            from core.logger import AuditLogger
+            await AuditLogger("issue_service").log(
+                conn=conn, action="APPROVE_TO_PUBLIC",
+                actor_identifier=str(user_id), client_source="web",
+                room_id=issue["room_id"], user_id=user_id,
+                entity_type="piri_board", entity_id=board_id,
+                old_values={
+                    "status": issue["status"],
+                    "published_board_id": issue["published_board_id"],
+                    "requested_destination": issue["requested_destination"],
+                },
+                new_values={
+                    "board_type": board_type, "board_id": board_id,
+                    "allow_comments": allow_comments,
+                    "vote_choices": vote_choices,
+                    "status": "resolved", "published_board_id": board_id,
+                },
+            )
+
+            return board_id
 
 
 async def update_issue(
@@ -645,6 +830,7 @@ async def list_issues(
                 i.image_url, i.reporter_id, i.reporter_name, i.current_level,
                 i.current_assignee_id, i.current_assignee_role, i.status, i.priority,
                 i.is_anonymous, i.resolved_at, i.created_at, i.updated_at,
+                i.requested_destination, i.published_board_id,
                 r.room_name,
                 reporter_r.room_name AS reporter_room,
                 u.full_name AS assignee_name,
@@ -700,6 +886,8 @@ def _issue_to_dict(row, with_details=False) -> dict:
         "status": row["status"],
         "priority": row["priority"],
         "is_anonymous": row["is_anonymous"],
+        "requested_destination": row.get("requested_destination", "normal"),
+        "published_board_id": row.get("published_board_id"),
         "resolved_at": row["resolved_at"],
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],

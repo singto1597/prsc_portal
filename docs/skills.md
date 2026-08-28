@@ -411,3 +411,14 @@
   6. **เทสต์ Gotcha:** (a) insert audit ตรงๆ อย่า reuse `$1` ข้าม type (INTEGER user_id vs VARCHAR entity_id → AmbiguousParameterError — บทเรียนเดิม); (b) `register_user(pool, username, password, full_name, student_id, room_code, student_no, class_role)` มี `student_no` เป็น positional — ลืมแล้ว class_role ตกไปที่ student_no → `DataError: $4: 'teacher'`
   - **กฎ: (1) ข้อมูล network ของทุก audit เก็บผ่าน request context กลาง ไม่ใช่แก้ signature ทุก service; (2) audit ทุกชนิดมี status/success-error — ตัวนับ "การเข้าใช้งาน" ต้อง filter success; (3) read audit ต้องไม่ทำให้ request หลักพัง (best-effort); (4) ตาราง audit ต้องมี index ที่ตรงกับ query (group by day + filter action) ก่อนจะ "เก็บทุกอย่าง"**
 - **Date Added:** 2026-08-27
+
+### 🛠️ สิทธิ์ระดับสภา ≠ `user_level()=='council'` — ครูทั่วไปก็คืน 'council' (เป็นแค่ visibility) ต้องตรวจตำแหน่งจริง
+- **Context/Problem:** สร้าง `approve_to_public` (สภาอนุมัติเรื่องขอโพสต์สาธารณะเป็น PIRI Board) — ต้องการเช็ค "อำนาจระดับสภา/แอดมิน" แต่ถ้าใช้ `user_level(pool, user_id) == 'council'` จะ **ครูทั่วไป (teacher) ผ่านด้วย** เพราะ `user_level()` คืน 'council' ให้ทุกคนที่ "มองเห็นข้อมูลทั้งโรงเรียน" (teacher/teacher_council/council_president/admin/council_member) — ครูทั่วไปไม่ได้เป็นสภาแต่จะอนุมัติเรื่องสาธารณะได้ (privilege escalation)
+- **Root Cause:** ฟังก์ชันเดียวกันถูกใช้เพื่อ 2 จุดประสงค์ — `user_level` ตั้งใจคืน 'council' สำหรับ *visibility* (ครูเห็นทั้งโรงเรียน) แต่ *authority* (สิทธิ์กระทำ) ต้องดูจากตำแหน่งจริง; ถ้าสลับมาใช้ visibility เป็น permission จะเปิดช่องทันที
+- **Correct Pattern/Solution:**
+  1. แยก helper `_has_council_authority(conn, user_id)`: Super Admin / `is_admin` ผ่าน, หรือ `class_role IN ('council_member','council_president','teacher_council')` (ตำแหน่งสภาจริง) — **ไม่รวม 'teacher'**
+  2. เช็ค authority ด้วย helper นี้เท่านั้นสำหรับ action ที่ต้อง "เป็นสภา"; `user_level()` ใช้สำหรับ filter การมองเห็น/รายการเท่านั้น
+  3. `start_level` bypass: เรื่องขอสาธารณะ (vote/talk) ตั้ง `start_level='council'` อัตโนมัติ — ต้อง **ข้าม** เช็ค `user_level >= start_level` (ไม่งั้นนักเรียนขอโหวตไม่ได้) เพราะผู้แจ้งแค่ "ขอ" — สภาเป็นคนอนุมัติทีหลัง
+  4. test: council_member (ไม่ใช่ admin) อนุมัติได้ 200 / student อนุมัติ 403 + deep-DB ตรวจไม่มี board ถูกสร้างตอน 403; teacher ควรได้ 403 ด้วย
+  - **กฎ: อย่าใช้ฟังก์ชันที่ออกแบบเพื่อ "เห็นข้อมูล" มาอนุมัติ "กระทำการ" — visibility scope กับ authority ต้องเป็นคนละเช็ค; เวลาเปิดฟีเจอร์ที่ "ใครก็ขอได้แต่สภาอนุมัติ" ให้ข้าม level-check ตอนสร้าง แต่บังคับ authority-check ตอนอนุมัติ**
+- **Date Added:** 2026-08-28

@@ -6,7 +6,7 @@ from core.exceptions import NotFoundError, ForbiddenError, ValidationError, Conf
 from core.categories import all_main_category_codes
 from models.issue_schemas import (
     IssueCreateRequest, IssueUpdateRequest, IssueOut, IssueStepOut, IssueCountdownOut,
-    StepCreateRequest, CountdownSetRequest, EscalateRequest,
+    StepCreateRequest, CountdownSetRequest, EscalateRequest, ApproveToPublicRequest,
     CommentCreateRequest, CommentOut, IssueListOut,
 )
 from services import issue_service
@@ -48,7 +48,7 @@ async def create_issue(
         issue_id = await issue_service.create_issue(
             pool, uid, req.main_category, req.category, req.title,
             req.description, req.is_anonymous, req.room_id,
-            req.start_level,
+            req.start_level, req.requested_destination,
         )
         issue = await issue_service.get_issue(pool, uid, issue_id)
     except (NotFoundError, ValidationError, ForbiddenError) as e:
@@ -129,6 +129,26 @@ async def update_issue(
     except (NotFoundError, ForbiddenError, ValidationError) as e:
         raise _err(e)
     return IssueOut(**issue)
+
+
+# ==================== อนุมัติเผยแพร่สาธารณะ (PIRI Boards) ====================
+@router.post("/{issue_id}/approve-to-public", response_model=dict)
+async def approve_to_public(
+    issue_id: int,
+    req: ApproveToPublicRequest,
+    user_ctx: dict = Depends(get_current_user),
+    pool: asyncpg.Pool = Depends(get_db_pool),
+):
+    """🏛️ สภานักเรียน/แอดมิน อนุมัติเรื่องขอเผยแพร่สาธารณะ → สร้าง PIRI Board + ปิดเรื่อง"""
+    uid = _ensure_user(user_ctx)
+    try:
+        board_id = await issue_service.approve_to_public(
+            pool, uid, issue_id, req.board_type,
+            vote_choices=req.vote_choices, allow_comments=req.allow_comments,
+        )
+    except (NotFoundError, ForbiddenError, ValidationError, ConflictError) as e:
+        raise _err(e)
+    return {"board_id": board_id, "status": "approved"}
 
 
 # ==================== รับเรื่อง + Countdown ====================
