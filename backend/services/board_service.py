@@ -233,6 +233,15 @@ async def get_board_detail(pool: asyncpg.Pool, user_id: int, board_id: int) -> d
             )
             detail["comments"] = _thread_comments(comment_rows)
 
+        # 👁️ นับ view_count (บอร์ดมี column view_count แต่เดิมไม่เคยมี path ที่เพิ่ม — เติมให้ทำงานจริง)
+        # raw counter (ไม่ dedup ต่อ user/session — ตั้งใจ; นับทุกครั้งที่เปิด board รวม refresh/เจ้าของเอง
+        # เหมือน "ยอดเข้าชม" แบบหยาบ — design decision จาก adversarial review, severity ต่ำ)
+        # ไม่ audit (กัน noise — การดู board ถูก audit ผ่าน log_read ใน router แล้ว)
+        await conn.execute(
+            "UPDATE piri_boards SET view_count = view_count + 1 WHERE id = $1 AND deleted_at IS NULL",
+            board_id
+        )
+
     return detail
 
 
@@ -475,7 +484,10 @@ async def add_comment(
 
 
 async def get_comment(pool: asyncpg.Pool, board_id: int, comment_id: int) -> dict:
-    """ดึงคอมเมนต์เดี่ยว (ยัง active + ไม่ถูกซ่อน) — ตอบ API หลัง insert (pattern เดียวกับ issue_service.get_comment)"""
+    """ดึงคอมเมนต์เดี่ยว (ยังไม่ soft-delete) — ตอบ API หลัง insert เท่านั้น
+    ⚠️ ตั้งใจไม่ filter is_hidden_by_admin: เรียกเฉพาะหลัง add_comment ใน router เดียวกัน —
+    ถ้า moderator ซ่อนคอมเมนต์คั่นระหว่าง add กับ get (TOCTOU) จะได้ไม่ 404 ทั้งที่เพิ่ง insert
+    (adversarial review จับ: 404 → client retry → คอมเมนต์ซ้ำ)"""
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
             f"""
@@ -483,7 +495,7 @@ async def get_comment(pool: asyncpg.Pool, board_id: int, comment_id: int) -> dic
                    s_comm.prefix, s_comm.first_name, s_comm.last_name
             FROM piri_board_comments c
             {_COMMENTER_JOIN}
-            WHERE c.id = $1 AND c.board_id = $2 AND c.deleted_at IS NULL AND c.is_hidden_by_admin = FALSE
+            WHERE c.id = $1 AND c.board_id = $2 AND c.deleted_at IS NULL
             """,
             comment_id, board_id
         )

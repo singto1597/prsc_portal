@@ -311,6 +311,30 @@ async def init_db(pool: asyncpg.Pool):
                 );
                 """)
 
+                # piri_board_reports: แจ้งความไม่เหมาะสมของคอมเมนต์ (Phase 5)
+                #   - reason จำกัดหมวด (กลั่นแกล้ง/คำหยาบ/สแปม/เปิดเผยข้อมูล/อื่นๆ) — กันสแปมเหตุผลมั่ว
+                #   - status: 'open' (รอสภา/แอดมินจัดการ) / 'resolved' (ซ่อนคอมเมนต์แล้ว) / 'dismissed' (ปัดตก)
+                #   - UNIQUE(reporter_id, comment_id) partial → user แจ้งคอมเมนต์เดิมซ้ำไม่ได้ (กันสแปมรายงาน)
+                await conn.execute("""
+                CREATE TABLE IF NOT EXISTS piri_board_reports (
+                    id SERIAL PRIMARY KEY,
+                    board_id INTEGER NOT NULL REFERENCES piri_boards(id) ON DELETE CASCADE,
+                    comment_id INTEGER NOT NULL REFERENCES piri_board_comments(id) ON DELETE CASCADE,
+                    reporter_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    reason VARCHAR(30) NOT NULL,
+                    detail TEXT,
+                    status VARCHAR(20) NOT NULL DEFAULT 'open',
+                    resolved_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                    resolved_at TIMESTAMP WITH TIME ZONE,
+                    resolution_note TEXT,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    deleted_at TIMESTAMP WITH TIME ZONE,
+                    CONSTRAINT chk_piri_report_reason CHECK (reason IN ('bullying', 'profanity', 'spam', 'privacy', 'other')),
+                    CONSTRAINT chk_piri_report_status CHECK (status IN ('open', 'resolved', 'dismissed'))
+                );
+                """)
+
                 # --- 8. audit_logs (โครงสร้างเหมือนโปรเจคเก่า) ---
                 await conn.execute("""
                 CREATE TABLE IF NOT EXISTS audit_logs (
@@ -413,6 +437,11 @@ async def init_db(pool: asyncpg.Pool):
                 CREATE INDEX IF NOT EXISTS idx_piri_votes_choice ON piri_votes(choice_id);
                 CREATE INDEX IF NOT EXISTS idx_piri_board_reactions_target ON piri_board_reactions(target_type, target_id);
                 CREATE INDEX IF NOT EXISTS idx_piri_board_reactions_user ON piri_board_reactions(user_id);
+                -- PIRI Reports (Phase 5) — คิวรายงาน (กรอง status) + ค้นจาก board/comment/reporter
+                CREATE INDEX IF NOT EXISTS idx_piri_board_reports_status ON piri_board_reports(status);
+                CREATE INDEX IF NOT EXISTS idx_piri_board_reports_board ON piri_board_reports(board_id);
+                CREATE INDEX IF NOT EXISTS idx_piri_board_reports_comment ON piri_board_reports(comment_id);
+                CREATE INDEX IF NOT EXISTS idx_piri_board_reports_reporter ON piri_board_reports(reporter_id);
                 -- ผู้ใช้โหวต/react ได้ 1 ครั้งต่อ target (partial: เฉพาะ row ที่ยัง active)
                 -- → soft delete แล้วกลับมาโหวต/react ใหม่ได้ (ไม่ชน index)
                 CREATE UNIQUE INDEX IF NOT EXISTS uq_piri_votes_board_user_active
@@ -420,6 +449,10 @@ async def init_db(pool: asyncpg.Pool):
                     WHERE deleted_at IS NULL;
                 CREATE UNIQUE INDEX IF NOT EXISTS uq_piri_board_reactions_target_user_active
                     ON piri_board_reactions(target_type, target_id, user_id)
+                    WHERE deleted_at IS NULL;
+                -- user แจ้งคอมเมนต์เดิมซ้ำไม่ได้ (partial: เฉพาะรายงานที่ยัง active) — กันสแปมรายงาน
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_piri_board_report_user_comment_active
+                    ON piri_board_reports(reporter_id, comment_id)
                     WHERE deleted_at IS NULL;
                 -- audit_logs โตเร็ว (Phase 3: เก็บทุก action + read) — ต้องมี index ครบ
                 CREATE INDEX IF NOT EXISTS idx_audit_logs_action_created ON audit_logs(action, created_at);

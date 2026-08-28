@@ -8,8 +8,11 @@ PIRI Boards — Pydantic v2 Schemas (PIRI Vote + PIRI Talk)
 หมายเหตุ: `response_model` ทำหน้าที่กรอง field หวงห้าม (เช่น อย่าให้ secret รั่ว) ตามกฎ backend.md
 """
 from typing import Optional, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
+
+# หมวดเหตุผลที่แจ้งความไม่เหมาะสมได้ (ตรงกับ piri_board_reports.reason CHECK + service)
+REPORT_REASONS = ("bullying", "profanity", "spam", "privacy", "other")
 
 
 # ===================== Request =====================
@@ -88,6 +91,70 @@ class BoardDetailOut(BoardSummaryOut):
 class BoardListOut(BaseModel):
     """feed แบบแบ่งหน้า (pattern เดียวกับ /issues)"""
     items: List[BoardSummaryOut]
+    total: int
+    page: int
+    page_size: int
+    pages: int
+
+
+# ===================== Moderation / Report (Phase 5) =====================
+class ReportCreateRequest(BaseModel):
+    """🚩 นักเรียนแจ้งความไม่เหมาะสมของคอมเมนต์ (PIRI Talk)"""
+    reason: str = Field(..., description="เหตุผล: bullying/profanity/spam/privacy/other")
+    detail: Optional[str] = Field(None, max_length=500, description="รายละเอียดเพิ่มเติม (ไม่บังคับ)")
+
+    @field_validator("reason")
+    @classmethod
+    def _check_reason(cls, v: str) -> str:
+        if v not in REPORT_REASONS:
+            raise ValueError(f"เหตุผลการแจ้งไม่ถูกต้อง: {v} (ต้องเป็นหนึ่งใน {', '.join(REPORT_REASONS)})")
+        return v
+
+
+class HideCommentRequest(BaseModel):
+    """🛡️ สภา/แอดมินซ่อนคอมเมนต์ (จำเป็นต้องระบุเหตุผล — เขียน audit)"""
+    reason: str = Field(..., min_length=1, max_length=200)
+
+
+class HideBoardRequest(BaseModel):
+    """🛡️ สภา/แอดมินซ่อน board ทั้งบอร์ด"""
+    reason: str = Field(..., min_length=1, max_length=200)
+
+
+class ResolveReportRequest(BaseModel):
+    """✅ จัดการรายงาน: action='hide' (ซ่อนคอมเมนต์) / 'dismiss' (ปัดตก ไม่ซ่อน)"""
+    action: str = Field(..., description="hide (ซ่อนคอมเมนต์) / dismiss (ปัดตก)")
+    note: Optional[str] = Field(None, max_length=500, description="หมายเหตุ (ไม่บังคับ)")
+
+    @field_validator("action")
+    @classmethod
+    def _check_action(cls, v: str) -> str:
+        if v not in ("hide", "dismiss"):
+            raise ValueError(f"การจัดการไม่ถูกต้อง: {v} (ต้องเป็น hide/dismiss)")
+        return v
+
+
+class ReportOut(BaseModel):
+    """รายงาน 1 รายการในคิว (สภา/แอดมิน) — รวมชื่อ board + เนื้อความคอมเมนต์ + ผู้แจ้ง"""
+    id: int
+    board_id: int
+    board_title: str
+    comment_id: int
+    comment_body: str
+    reporter_id: Optional[int] = None
+    reporter_name: Optional[str] = None
+    reason: str
+    detail: Optional[str] = None
+    status: str
+    resolved_by: Optional[int] = None
+    resolved_at: Optional[datetime] = None
+    resolution_note: Optional[str] = None
+    created_at: datetime
+
+
+class ReportListOut(BaseModel):
+    """คิวรายงานแบบแบ่งหน้า"""
+    items: List[ReportOut]
     total: int
     page: int
     page_size: int
