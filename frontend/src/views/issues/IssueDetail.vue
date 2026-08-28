@@ -20,9 +20,12 @@ import {
   subcategoryLabel,
   STATUS_LABELS,
   LEVEL_LABELS,
+  DESTINATION_LABELS,
+  destinationBadgeClass,
   type Issue,
 } from '@/types/issue'
 import { useAuthStore } from '@/stores/auth'
+import ApproveBoardModal from '@/components/boards/ApproveBoardModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -34,15 +37,27 @@ const isLoading = ref(true)
 const daysInput = ref(3)
 const newStepTitle = ref('')
 const newStepDetail = ref('')
-const escalateReason = ref('')
-const resolveNote = ref('')
+
+// 🏛️ สภานักเรียน/แอดมิน อนุมัติเผยแพร่ PIRI Board (เรื่องขอ vote/talk ยังไม่ถูกอนุมัติ/ปิด)
+const approveOpen = ref(false)
+const canApprove = computed(() => {
+  if (!issue.value || !authStore.isCouncilAuthority) return false
+  if (issue.value.requested_destination === 'normal') return false
+  if (issue.value.published_board_id) return false
+  return !['resolved', 'cancelled', 'rejected'].includes(issue.value.status)
+})
+const publishedBoardId = computed(() => issue.value?.published_board_id ?? null)
+
+function onApproved(boardId: number) {
+  router.push({ name: 'board-detail', params: { id: boardId } })
+}
 
 async function load() {
   isLoading.value = true
   try {
     issue.value = await getIssue(Number(route.params.id))
-  } catch (e: any) {
-    Swal.fire({ icon: 'error', title: 'ไม่สามารถโหลดเรื่องได้', text: e.message })
+  } catch (e) {
+    Swal.fire({ icon: 'error', title: 'ไม่สามารถโหลดเรื่องได้', text: errMsg(e) })
   } finally {
     isLoading.value = false
   }
@@ -212,8 +227,8 @@ async function handleAccept() {
       showConfirmButton: false,
     })
     load()
-  } catch (e: any) {
-    Swal.fire({ icon: 'error', title: 'ไม่สำเร็จ', text: e.message })
+  } catch (e) {
+    Swal.fire({ icon: 'error', title: 'ไม่สำเร็จ', text: errMsg(e) })
   }
 }
 
@@ -229,8 +244,8 @@ async function handleAddStep() {
     newStepDetail.value = ''
     Swal.fire({ icon: 'success', title: 'เพิ่มขั้นตอนแล้ว', timer: 1000, showConfirmButton: false })
     load()
-  } catch (e: any) {
-    Swal.fire({ icon: 'error', title: 'ไม่สำเร็จ', text: e.message })
+  } catch (e) {
+    Swal.fire({ icon: 'error', title: 'ไม่สำเร็จ', text: errMsg(e) })
   }
 }
 
@@ -239,8 +254,8 @@ async function handleCompleteStep(stepId: number) {
   try {
     await completeStep(issue.value.id, stepId)
     load()
-  } catch (e: any) {
-    Swal.fire({ icon: 'error', title: 'ไม่สำเร็จ', text: e.message })
+  } catch (e) {
+    Swal.fire({ icon: 'error', title: 'ไม่สำเร็จ', text: errMsg(e) })
   }
 }
 
@@ -268,8 +283,8 @@ async function handleEscalate() {
       showConfirmButton: false,
     })
     load()
-  } catch (e: any) {
-    Swal.fire({ icon: 'error', title: 'ไม่สำเร็จ', text: e.message })
+  } catch (e) {
+    Swal.fire({ icon: 'error', title: 'ไม่สำเร็จ', text: errMsg(e) })
   }
 }
 
@@ -291,8 +306,8 @@ async function handleResolve() {
     await resolveIssue(issue.value.id, value || undefined)
     Swal.fire({ icon: 'success', title: 'ปิดเรื่องแล้ว!', timer: 1500, showConfirmButton: false })
     load()
-  } catch (e: any) {
-    Swal.fire({ icon: 'error', title: 'ไม่สำเร็จ', text: e.message })
+  } catch (e) {
+    Swal.fire({ icon: 'error', title: 'ไม่สำเร็จ', text: errMsg(e) })
   }
 }
 
@@ -323,8 +338,8 @@ async function handleCancel() {
       showConfirmButton: false,
     })
     load()
-  } catch (e: any) {
-    Swal.fire({ icon: 'error', title: 'ไม่สำเร็จ', text: e.message })
+  } catch (e) {
+    Swal.fire({ icon: 'error', title: 'ไม่สำเร็จ', text: errMsg(e) })
   }
 }
 
@@ -345,8 +360,8 @@ async function handleExtendCountdown() {
     await updateCountdown(issue.value.id, Number(value))
     Swal.fire({ icon: 'success', title: 'ยืดเวลาแล้ว', timer: 1500, showConfirmButton: false })
     load()
-  } catch (e: any) {
-    Swal.fire({ icon: 'error', title: 'ไม่สำเร็จ', text: e.message })
+  } catch (e) {
+    Swal.fire({ icon: 'error', title: 'ไม่สำเร็จ', text: errMsg(e) })
   }
 }
 
@@ -406,6 +421,10 @@ function historyStatusBadge(s: string): string {
             <span class="px-2.5 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
               {{ LEVEL_LABELS[issue.current_level] }}
             </span>
+            <span v-if="issue.requested_destination && issue.requested_destination !== 'normal'"
+              class="px-2.5 py-0.5 text-xs rounded-full" :class="destinationBadgeClass(issue.requested_destination)">
+              {{ DESTINATION_LABELS[issue.requested_destination] }}
+            </span>
           </div>
           <h1 class="text-lg sm:text-xl font-bold text-gray-900 leading-snug break-words">
             {{ issue.title }}
@@ -453,6 +472,22 @@ function historyStatusBadge(s: string): string {
         class="px-4 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-700 text-sm font-medium"
       >
         <i class="bi bi-hand-thumbs-up mr-1"></i> รับเรื่อง + ตั้งเวลา
+      </button>
+      <!-- 🏛️ สภานักเรียน/แอดมิน อนุมัติเผยแพร่เป็น PIRI Board -->
+      <button
+        v-if="canApprove"
+        @click="approveOpen = true"
+        class="px-4 py-2.5 bg-violet-600 text-white rounded-xl hover:bg-violet-700 text-sm font-medium"
+      >
+        <i class="bi bi-people-fill mr-1"></i> อนุมัติเผยแพร่สาธารณะ
+      </button>
+      <!-- เรื่องที่เผยแพร่เป็น board แล้ว → ลิงก์ไปชม -->
+      <button
+        v-if="publishedBoardId"
+        @click="router.push({ name: 'board-detail', params: { id: publishedBoardId } })"
+        class="px-4 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 text-sm font-medium"
+      >
+        <i class="bi bi-box-arrow-up-right mr-1"></i> ดู PIRI Board สาธารณะ
       </button>
       <button
         v-if="canManage && canEscalate"
@@ -679,5 +714,8 @@ function historyStatusBadge(s: string): string {
       </div>
       <p v-else class="text-sm text-gray-400">ไม่มีประวัติ</p>
     </div>
+
+    <!-- 🏛️ Modal อนุมัติเผยแพร่ PIRI Board -->
+    <ApproveBoardModal :issue="issue" v-model:open="approveOpen" @approved="onApproved" />
   </div>
 </template>

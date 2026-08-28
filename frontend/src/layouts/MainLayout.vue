@@ -85,6 +85,7 @@ const menuItems = computed(() => {
   }
   items.push({ name: 'แจ้งปัญหา / ความคิดเห็น', path: '/issues/new', icon: 'bi-pencil-square' });
   items.push({ name: 'เรื่องของฉัน', path: '/issues/mine', icon: 'bi-file-earmark-text' });
+  items.push({ name: 'PIRI Boards', path: '/boards', icon: 'bi-columns-gap' });
   if (authStore.hasPermission('RECEIVE_ISSUES')) {
     items.push({ name: 'เรื่องที่รับ / ระดับฉัน', path: '/issues/received', icon: 'bi-inbox' });
   }

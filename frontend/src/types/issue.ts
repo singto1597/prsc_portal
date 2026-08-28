@@ -1,6 +1,8 @@
 // Issue / Feedback data models
 
 export type IssueLevel = 'room' | 'level' | 'council'
+// ปลายทางที่ผู้แจ้งขอ (PIRI Boards): 'normal' = ดำเนินการปกติ, 'vote' = เผยแพร่เป็นโหวตสาธารณะ, 'talk' = เผยแพร่เป็นบอร์ดพูดคุยสาธารณะ
+export type RequestedDestination = 'normal' | 'vote' | 'talk'
 export type IssueStatus =
   | 'pending'
   | 'in_progress'
@@ -103,6 +105,9 @@ export interface Issue {
   status: IssueStatus
   priority: string
   is_anonymous: boolean
+  // 🆕 ปลายทางที่ผู้แจ้งขอ (PIRI Boards) + board สาธารณะที่สภาอนุมัติแล้ว (ชี้ piri_boards.id)
+  requested_destination?: RequestedDestination
+  published_board_id?: number | null
   resolved_at: string | null
   created_at: string
   updated_at: string
@@ -169,4 +174,18 @@ export const LEVEL_LABELS: Record<IssueLevel, string> = {
   room: 'หัวหน้าห้อง / รองฝ่าย',
   level: 'ประธานระดับ',
   council: 'สภานักเรียน',
+}
+
+// รูปแบบที่ผู้แจ้งขอ (PIRI Boards) — ตรงกับ backend requested_destination
+export const DESTINATION_LABELS: Record<RequestedDestination, string> = {
+  normal: 'ดำเนินการปกติ',
+  vote: 'โหวตสาธารณะ',
+  talk: 'พูดคุยสาธารณะ',
+}
+
+// badge สีในรายการเรื่อง — ให้เห็นชัดว่าเรื่องไหนขอเผยแพร่เป็น board
+export function destinationBadgeClass(dest: RequestedDestination | undefined): string {
+  if (dest === 'vote') return 'bg-violet-100 text-violet-700'
+  if (dest === 'talk') return 'bg-sky-100 text-sky-700'
+  return ''
 }

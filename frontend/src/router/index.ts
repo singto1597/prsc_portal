@@ -77,6 +77,16 @@ const router = createRouter({
           component: () => import('@/views/issues/EditIssue.vue'),
         },
         {
+          path: 'boards',
+          name: 'boards',
+          component: () => import('@/views/boards/PiriBoards.vue'),
+        },
+        {
+          path: 'boards/:id',
+          name: 'board-detail',
+          component: () => import('@/views/boards/BoardDetail.vue'),
+        },
+        {
           path: 'students',
           name: 'students',
           component: () => import('@/views/students/StudentList.vue'),

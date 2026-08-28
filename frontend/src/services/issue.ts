@@ -1,5 +1,12 @@
 import api from './api'
-import type { Issue, IssueComment, IssueListResponse, IssueStep, UpdateIssuePayload } from '@/types/issue'
+import type {
+  Issue,
+  IssueComment,
+  IssueListResponse,
+  IssueStep,
+  RequestedDestination,
+  UpdateIssuePayload,
+} from '@/types/issue'
 
 // Issue API
 
@@ -11,6 +18,19 @@ export interface CreateIssuePayload {
   is_anonymous: boolean
   room_id?: number | null
   start_level?: string
+  requested_destination?: RequestedDestination
+}
+
+// Payload สำหรับอนุมัติเผยแพร่สาธารณะ (สภานักเรียน/แอดมิน) — ตรงกับ backend ApproveToPublicRequest
+export interface ApproveToPublicPayload {
+  board_type: 'vote' | 'talk'
+  vote_choices?: string[]
+  allow_comments?: boolean
+}
+
+export interface ApproveToPublicResult {
+  board_id: number
+  status: string
 }
 
 export type IssueSort = 'asc' | 'desc'
@@ -40,6 +60,14 @@ export async function createIssue(payload: CreateIssuePayload): Promise<Issue> {
 
 export async function updateIssue(id: number, payload: UpdateIssuePayload): Promise<Issue> {
   return (await api.patch(`/api/issues/${id}`, payload)) as Issue
+}
+
+// 🏛️ สภานักเรียน/แอดมิน อนุมัติเรื่องขอเผยแพร่สาธารณะ → สร้าง PIRI Board + ปิดเรื่อง
+export async function approveToPublic(
+  id: number,
+  payload: ApproveToPublicPayload,
+): Promise<ApproveToPublicResult> {
+  return (await api.post(`/api/issues/${id}/approve-to-public`, payload)) as ApproveToPublicResult
 }
 
 export async function acceptIssue(id: number, estimated_days: number): Promise<void> {

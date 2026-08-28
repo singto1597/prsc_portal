@@ -3,7 +3,7 @@ import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import Swal from 'sweetalert2';
 import { createIssue } from '@/services/issue';
-import { MAIN_CATEGORIES, LEVEL_LABELS, type MainCategory, type Category } from '@/types/issue';
+import { MAIN_CATEGORIES, LEVEL_LABELS, type MainCategory, type Category, type RequestedDestination } from '@/types/issue';
 import { useAuthStore } from '@/stores/auth';
 
 const router = useRouter();
@@ -15,7 +15,39 @@ const title = ref('');
 const description = ref('');
 const isAnonymous = ref(false);
 const startLevel = ref('room');
+// รูปแบบที่ต้องการดำเนินการ (PIRI Boards): normal = ปกติ, vote/talk = ขอเผยแพร่สาธารณะ (สภาอนุมัติ)
+const requestedDestination = ref<RequestedDestination>('normal');
 const isLoading = ref(false);
+
+// ตัวเลือก "รูปแบบที่ต้องการดำเนินการ" — แสดงในฟอร์ม
+const DESTINATION_OPTIONS: Array<{
+  value: RequestedDestination;
+  label: string;
+  icon: string;
+  desc: string;
+}> = [
+  {
+    value: 'normal',
+    label: 'ดำเนินการปกติ',
+    icon: 'bi bi-check2-circle',
+    desc: 'สภานักเรียนรับเรื่องแล้วจัดการตามขั้นตอนปกติ',
+  },
+  {
+    value: 'vote',
+    label: 'โหวตสาธารณะ',
+    icon: 'bi bi-bar-chart-fill',
+    desc: 'สภาอนุมัติ → เผยแพร่เป็นบอร์ดโหวตให้ทุกคนโหวตได้',
+  },
+  {
+    value: 'talk',
+    label: 'พูดคุยสาธารณะ',
+    icon: 'bi bi-chat-dots-fill',
+    desc: 'สภาอนุมัติ → เผยแพร่เป็นบอร์ดพูดคุยให้ทุกคนร่วมแสดงความเห็น',
+  },
+];
+
+// เลือกขอเผยแพร่ (vote/talk) → เรื่องถูกส่งตรงไปยังสภาเพื่อพิจารณา
+const wantsPublic = computed(() => requestedDestination.value !== 'normal');
 
 // ระดับของผู้ใช้ (สูงสุด) — ใช้กำหนดว่าให้เลือกระดับเริ่มต้นได้แค่ไหน
 const myLevel = computed(() => {
@@ -76,17 +108,20 @@ async function handleSubmit() {
       title: title.value.trim(),
       description: description.value.trim(),
       is_anonymous: isAnonymous.value,
+      requested_destination: requestedDestination.value,
     });
     Swal.fire({
       icon: 'success',
       title: 'แจ้งเรื่องสำเร็จ!',
-      html: 'เรื่องของคุณถูกส่งไปยัง<b>หัวหน้าห้อง + รองฝ่าย</b>แล้ว<br>ติดตามสถานะได้ที่ "เรื่องของฉัน"',
+      html: wantsPublic.value
+        ? 'เรื่องของคุณถูกส่งไปยัง<b>สภานักเรียน</b>เพื่อพิจารณาอนุมัติเผยแพร่แล้ว<br>ติดตามสถานะได้ที่ "เรื่องของฉัน"'
+        : 'เรื่องของคุณถูกส่งไปยัง<b>หัวหน้าห้อง + รองฝ่าย</b>แล้ว<br>ติดตามสถานะได้ที่ "เรื่องของฉัน"',
       confirmButtonText: 'ตกลง',
     }).then(() => {
       router.push({ name: 'issue-detail', params: { id: issue.id } });
     });
-  } catch (e: any) {
-    Swal.fire({ icon: 'error', title: 'แจ้งเรื่องไม่สำเร็จ', text: e.message || 'เกิดข้อผิดพลาด' });
+  } catch (e) {
+    Swal.fire({ icon: 'error', title: 'แจ้งเรื่องไม่สำเร็จ', text: e instanceof Error ? e.message : 'เกิดข้อผิดพลาด' });
   } finally {
     isLoading.value = false;
   }
@@ -141,10 +176,36 @@ async function handleSubmit() {
       </div>
     </div>
 
-    <!-- Step 3: รายละเอียด -->
+    <!-- Step 3: รูปแบบที่ต้องการดำเนินการ (PIRI Boards) -->
+    <div class="mb-6">
+      <label class="block text-sm font-medium text-gray-700 mb-2">3. รูปแบบที่ต้องการดำเนินการ</label>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
+        <button
+          v-for="opt in DESTINATION_OPTIONS"
+          :key="opt.value"
+          type="button"
+          @click="requestedDestination = opt.value"
+          class="p-3 sm:p-4 rounded-xl border-2 text-left transition flex flex-col"
+          :class="requestedDestination === opt.value
+            ? 'border-red-600 bg-red-50'
+            : 'border-gray-200 hover:border-red-300'"
+        >
+          <div class="flex items-center gap-2 mb-1">
+            <i :class="[opt.icon, 'text-lg', requestedDestination === opt.value ? 'text-red-600' : 'text-gray-400']"></i>
+            <span class="text-sm font-semibold" :class="requestedDestination === opt.value ? 'text-red-700' : 'text-gray-700'">{{ opt.label }}</span>
+          </div>
+          <p class="text-xs text-gray-500 leading-snug">{{ opt.desc }}</p>
+        </button>
+      </div>
+      <p v-if="wantsPublic" class="mt-2 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+        <i class="bi bi-info-circle mr-1"></i> เรื่องที่ขอเผยแพร่จะถูกส่งตรงไปยัง<b>สภานักเรียน</b>เพื่อพิจารณาอนุมัติเป็นบอร์ดสาธารณะ — ถ้าไม่ได้รับอนุมัติเรื่องจะถูกปิด
+      </p>
+    </div>
+
+    <!-- Step 4: รายละเอียด -->
     <form @submit.prevent="handleSubmit" class="space-y-4">
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">3. หัวข้อ</label>
+        <label class="block text-sm font-medium text-gray-700 mb-1">4. หัวข้อ</label>
         <input
           v-model="title"
           type="text"
@@ -154,7 +215,7 @@ async function handleSubmit() {
         />
       </div>
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">4. รายละเอียด</label>
+        <label class="block text-sm font-medium text-gray-700 mb-1">5. รายละเอียด</label>
         <textarea
           v-model="description"
           rows="5"

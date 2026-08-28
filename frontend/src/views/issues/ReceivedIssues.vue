@@ -8,12 +8,15 @@ import {
   subcategoryLabel,
   STATUS_LABELS,
   LEVEL_LABELS,
+  DESTINATION_LABELS,
+  destinationBadgeClass,
   type Issue,
   type MainCategory,
 } from '@/types/issue';
 import { useAuthStore } from '@/stores/auth';
 import IssueListToolbar from '@/components/IssueListToolbar.vue';
 import PaginationBar from '@/components/PaginationBar.vue';
+import ApproveBoardModal from '@/components/boards/ApproveBoardModal.vue';
 
 const authStore = useAuthStore();
 const route = useRoute();
@@ -22,6 +25,26 @@ const issues = ref<Issue[]>([]);
 const total = ref(0); // จำนวนทั้งหมดที่ตรงเงื่อนไข (จาก envelope)
 const isLoading = ref(true);
 const error = ref('');
+// 🏛️ อนุมัติเผยแพร่ PIRI Board (สภานักเรียน/แอดมิน) — modal ตั้งค่าตัวเลือกโหวต/คอมเมนต์
+const approveTarget = ref<Issue | null>(null);
+const approveOpen = ref(false);
+
+// สภานักเรียน/แอดมิน อนุมัติเรื่องที่ขอเผยแพร่ (vote/talk) และยังไม่ถูกอนุมัติ/ปิด
+function canApprove(i: Issue): boolean {
+  if (!authStore.isCouncilAuthority) return false
+  if (i.requested_destination === 'normal') return false
+  if (i.published_board_id) return false
+  return !['resolved', 'cancelled', 'rejected'].includes(i.status)
+}
+
+function openApprove(i: Issue) {
+  approveTarget.value = i
+  approveOpen.value = true
+}
+
+function onApproved(boardId: number) {
+  router.push({ name: 'board-detail', params: { id: boardId } })
+}
 const q = ref('');           // คำค้นหา
 const sort = ref<'asc' | 'desc'>('desc'); // ใหม่ไปเก่า (default)
 const page = ref(1);
@@ -310,6 +333,10 @@ function statusColor(s: string) {
                 }">
                 {{ LEVEL_LABELS[i.current_level] }}
               </span>
+              <span v-if="i.requested_destination && i.requested_destination !== 'normal'"
+                class="px-2 py-0.5 text-xs rounded-full" :class="destinationBadgeClass(i.requested_destination)">
+                {{ DESTINATION_LABELS[i.requested_destination] }}
+              </span>
             </div>
             <h3 class="font-semibold text-gray-900 truncate">{{ i.title }}</h3>
             <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 mt-1">
@@ -319,10 +346,17 @@ function statusColor(s: string) {
               <span v-if="i.current_assignee_name"><i class="bi bi-person-badge mr-1"></i> {{ i.current_assignee_name }}</span>
             </div>
           </div>
-          <div class="text-right shrink-0">
+          <div class="text-right shrink-0 flex flex-col items-end gap-2">
             <span class="px-2.5 py-1 text-xs font-medium rounded-full whitespace-nowrap" :class="statusColor(i.status)">
               {{ STATUS_LABELS[i.status] }}
             </span>
+            <button
+              v-if="canApprove(i)"
+              @click.stop.prevent="openApprove(i)"
+              class="px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700 whitespace-nowrap"
+            >
+              <i class="bi bi-people-fill mr-1"></i> อนุมัติเผยแพร่
+            </button>
           </div>
         </div>
       </RouterLink>
@@ -330,6 +364,9 @@ function statusColor(s: string) {
 
     <!-- แบ่งหน้า -->
     <PaginationBar :total="total" :page="page" :page-size="pageSize" :loading="isLoading" @page-change="onPageChange" />
+
+    <!-- 🏛️ Modal อนุมัติเผยแพร่ PIRI Board -->
+    <ApproveBoardModal :issue="approveTarget" v-model:open="approveOpen" @approved="onApproved" />
   </div>
 </template>
 
