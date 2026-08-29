@@ -77,6 +77,22 @@ const router = createRouter({
           component: () => import('@/views/issues/EditIssue.vue'),
         },
         {
+          path: 'boards',
+          name: 'boards',
+          component: () => import('@/views/boards/PiriBoards.vue'),
+        },
+        {
+          path: 'boards/reports',
+          name: 'board-reports',
+          component: () => import('@/views/boards/ReportModeration.vue'),
+          meta: { requiresAuth: true, requiresCouncil: true },
+        },
+        {
+          path: 'boards/:id',
+          name: 'board-detail',
+          component: () => import('@/views/boards/BoardDetail.vue'),
+        },
+        {
           path: 'students',
           name: 'students',
           component: () => import('@/views/students/StudentList.vue'),
@@ -133,6 +149,12 @@ router.beforeEach(async (to) => {
       // ไม่มีสิทธิ์ → ไปหน้าแรกที่เข้าได้ตามบทบาท
       return getHomeRoute()
     }
+  }
+
+  // หน้าเฉพาะสภานักเรียน/แอดมิน (อำนาจระดับสภา — เช่น คิวรายงาน)
+  const requiresCouncil = to.meta.requiresCouncil as boolean | undefined
+  if (requiresCouncil && isAuthenticated && !authStore.isCouncilAuthority) {
+    return getHomeRoute()
   }
 
   return true

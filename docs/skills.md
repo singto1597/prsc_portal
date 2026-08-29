@@ -6,6 +6,7 @@
 - **Context/Problem:** `INSERT INTO rooms (room_code, room_name) VALUES ($1,$1)` → `AmbiguousParameterError: inconsistent types deduced for parameter $1` (VARCHAR vs TEXT) และ `INSERT has more expressions than target columns` เมื่อ parameter count ไม่ตรงคอลัมน์
 - **Root Cause:** asyncpg อนุมาน type ของ parameter จากบริบท — ใช้ `$1` ตัวเดียวกับ 2 คอลัมน์ที่ type ต่างกัน (หรือ count ผิด) จะพังทั้งตอน runtime และตอน seed
 - **Correct Pattern/Solution:** ใช้ parameter แยกเสมอ `VALUES ($1,$2,$3)`; นับจำนวน `$n` ให้ตรงกับคอลัมน์+values ก่อนรัน; โดยเฉพาะใน `seed_data.py`/script ที่มือเขียน SQL ตรงๆ — อาการเดาได้จาก error `INSERT has more expressions`
+- **ขยาย (recursive CTE):** `WITH RECURSIVE chain(...) AS (SELECT 1, $1 UNION ALL SELECT ...)` → `UndefinedFunctionError: operator does not exist: integer = text` — asyncpg อนุมาน type ของ `$1` ใน non-recursive term ไม่ได้ (บริบทยังไม่รู้ column type) → ตอน JOIN `chain.cid` กับ `c.id` เจอ text=integer. **Fix: cast เสมอ `SELECT 1, $1::integer`** ใน non-recursive term ของ recursive CTE (เจอจริง 2026-08-28 ตอนวัด depth ของ comment chain)
 - **Date Added:** 2026-08-08
 
 ### 🛠️ FastAPI Router + asyncpg — ต้องมี `python-multipart` สำหรับ `UploadFile`/Form
@@ -411,3 +412,94 @@
   6. **เทสต์ Gotcha:** (a) insert audit ตรงๆ อย่า reuse `$1` ข้าม type (INTEGER user_id vs VARCHAR entity_id → AmbiguousParameterError — บทเรียนเดิม); (b) `register_user(pool, username, password, full_name, student_id, room_code, student_no, class_role)` มี `student_no` เป็น positional — ลืมแล้ว class_role ตกไปที่ student_no → `DataError: $4: 'teacher'`
   - **กฎ: (1) ข้อมูล network ของทุก audit เก็บผ่าน request context กลาง ไม่ใช่แก้ signature ทุก service; (2) audit ทุกชนิดมี status/success-error — ตัวนับ "การเข้าใช้งาน" ต้อง filter success; (3) read audit ต้องไม่ทำให้ request หลักพัง (best-effort); (4) ตาราง audit ต้องมี index ที่ตรงกับ query (group by day + filter action) ก่อนจะ "เก็บทุกอย่าง"**
 - **Date Added:** 2026-08-27
+
+### 🛠️ สิทธิ์ระดับสภา ≠ `user_level()=='council'` — ครูทั่วไปก็คืน 'council' (เป็นแค่ visibility) ต้องตรวจตำแหน่งจริง
+- **Context/Problem:** สร้าง `approve_to_public` (สภาอนุมัติเรื่องขอโพสต์สาธารณะเป็น PIRI Board) — ต้องการเช็ค "อำนาจระดับสภา/แอดมิน" แต่ถ้าใช้ `user_level(pool, user_id) == 'council'` จะ **ครูทั่วไป (teacher) ผ่านด้วย** เพราะ `user_level()` คืน 'council' ให้ทุกคนที่ "มองเห็นข้อมูลทั้งโรงเรียน" (teacher/teacher_council/council_president/admin/council_member) — ครูทั่วไปไม่ได้เป็นสภาแต่จะอนุมัติเรื่องสาธารณะได้ (privilege escalation)
+- **Root Cause:** ฟังก์ชันเดียวกันถูกใช้เพื่อ 2 จุดประสงค์ — `user_level` ตั้งใจคืน 'council' สำหรับ *visibility* (ครูเห็นทั้งโรงเรียน) แต่ *authority* (สิทธิ์กระทำ) ต้องดูจากตำแหน่งจริง; ถ้าสลับมาใช้ visibility เป็น permission จะเปิดช่องทันที
+- **Correct Pattern/Solution:**
+  1. แยก helper `_has_council_authority(conn, user_id)`: Super Admin / `is_admin` ผ่าน, หรือ `class_role IN ('council_member','council_president','teacher_council')` (ตำแหน่งสภาจริง) — **ไม่รวม 'teacher'**
+  2. เช็ค authority ด้วย helper นี้เท่านั้นสำหรับ action ที่ต้อง "เป็นสภา"; `user_level()` ใช้สำหรับ filter การมองเห็น/รายการเท่านั้น
+  3. `start_level` bypass: เรื่องขอสาธารณะ (vote/talk) ตั้ง `start_level='council'` อัตโนมัติ — ต้อง **ข้าม** เช็ค `user_level >= start_level` (ไม่งั้นนักเรียนขอโหวตไม่ได้) เพราะผู้แจ้งแค่ "ขอ" — สภาเป็นคนอนุมัติทีหลัง
+  4. test: council_member (ไม่ใช่ admin) อนุมัติได้ 200 / student อนุมัติ 403 + deep-DB ตรวจไม่มี board ถูกสร้างตอน 403; teacher ควรได้ 403 ด้วย
+  - **กฎ: อย่าใช้ฟังก์ชันที่ออกแบบเพื่อ "เห็นข้อมูล" มาอนุมัติ "กระทำการ" — visibility scope กับ authority ต้องเป็นคนละเช็ค; เวลาเปิดฟีเจอร์ที่ "ใครก็ขอได้แต่สภาอนุมัติ" ให้ข้าม level-check ตอนสร้าง แต่บังคับ authority-check ตอนอนุมัติ**
+- **Date Added:** 2026-08-28
+
+### 🛠️ Board สาธารณะ (PIRI Boards) — anonymous ต้องซ่อน author_id ด้วย (ไม่ใช่แค่ชื่อ) + Denormalized counter drift เป็น known limitation
+- **Context/Problem:** สร้าง PIRI Boards (Phase 3: feed board สาธารณะ + vote + คอมเมนต์) — ผู้แจ้งขอ "anonymous" ตอนสร้าง issue → board ควรไม่ระบุตัวตน; และพึ่ง Denormalized counter (`vote_count`/`comment_count`) สำหรับโชว์ยอด
+- **Root Cause/สิ่งที่เจอ:**
+  1. **Anonymous รั่ว author_id:** `_board_to_dict()` ซ่อนแค่ `author_name` แต่ยังคืน `author_id` (users.id ลำดับต่อเนื่อง) → ใครก็ตามที่ล็อกอินเทียบ id กับ endpoint อื่น (student/commenter) ได้ = deanonymize — board สาธารณะเห็นทั้งโรงเรียน ยิ่งรั่ววงกว้าง
+  2. **Denormalized counter drift:** `submit_vote` เพิ่ม `vote_count` อย่างเดียว, `add_comment` เพิ่ม `comment_count` อย่างเดียว — ไม่มี path ลด; schema ตั้งใจให้ soft-delete vote แล้วโหวตใหม่ได้ (partial unique `uq_piri_votes_board_user_active WHERE deleted_at IS NULL`) แต่ counter เก่าไม่ถูกลด → ยอดลอย
+- **Correct Pattern/Solution:**
+  1. **anonymous board:** ซ่อน `author_id` + `author_name` เป็น None ทั้งคู่ (ไม่ได้แค่ชื่อ) + test ตรวจ response ทั้ง feed และ detail (`assert detail["author_id"] is None`)
+  2. **Counter drift:** ยังไม่มี API soft-delete vote/comment ใน Phase 3 → drift เกิดได้เฉพาะ direct SQL (test) — บันทึกเป็น **known limitation**: ตอนเพิ่ม revoke/delete/moderate ใน Phase หลัง ต้องลด counter ใน transaction เดียว หรือ derive ยอดจาก `COUNT(*) FROM piri_votes WHERE deleted_at IS NULL` แทนการอ่าน counter (กันยอดลอยแบบถาวร)
+  3. **ปิดช่อง moderation:** `add_comment` reply ต้องตรวจ `is_hidden_by_admin = FALSE` บน parent ด้วย (ไม่ใช่แค่ `deleted_at IS NULL`) — ไม่งั้น reply ต่อคอมเมนต์ที่แอดมินซ่อนแล้ว โดน `_thread_comments` ย้ายขึ้น root (bypass moderation)
+  4. **Defensive (จาก adversarial review):** (a) comment fetch ใส่ `LIMIT 1000`; (b) **Pydantic recursive model ระเบิดได้ — `BoardCommentOut` ซ้อนตัวเอง: reply chain ~256 ชั้น → `BoardDetailOut(**detail)` เกิด `ValidationError: recursion_loop` → HTTP 500** ทุก GET detail; ผู้ใช้ธรรมดาสร้าง chain นี้ได้ (โพสต์ reply ต่อ reply ซ้ำๆ ไม่มี throttle) → DoS จริง → ต้อง (i) พับความลึก tree ที่ส่ง client (`MAX_DISPLAY_DEPTH=8` — reply เกินถูกย้ายใต้บรรพบุรุษที่ยังใต้ลิมิต, ไม่หาย) + (ii) guard ตอนสร้าง reply (`MAX_REPLY_DEPTH=30` — recursive CTE นับความยาว chain ถึง root แล้ว 400) + (iii) parent ที่ soft delete → ลูกขึ้น root ต้องรีเซ็ต `parent_comment_id=None` (กัน frontend เจอ id แขวน); (c) `my_vote_choice_id` ต้อง JOIN choice ที่ยัง active (กันชี้ choice ที่ soft-delete แล้ว)
+  - **กฎ: (1) ฟีเจอร์ anonymous ต้องซ่อนทุก field ที่ระบุตัวตนได้ (ไม่ใช่แค่ชื่อ — id ต่อเนื่องก็ระบุตัวได้); (2) ก่อนใช้ denormalized counter ดู schema ว่ามี path soft-delete/revote ไหม — ถ้ามี ต้องมี path ลด counter มิฉะนั้นบันทึกเป็น limitation + ให้ derive จาก base table; (3) moderation flag (is_hidden) ต้องถูกเช็คทุกที่ที่ "อ้างอิง" object ที่ถูก moderate — write side ด้วย ไม่ใช่แค่ read; (4) model Pydantic ที่ซ้อนตัวเอง (recursive) ต้องจำกัดความลึกให้ชัด — ทั้งตอน serialize และตอนสร้างข้อมูลใหม่ ไม่งั้นผู้ใช้ธรรมดา DoS ได้**
+- **Date Added:** 2026-08-28
+
+### 🛠️ Board Moderation (Phase 5) — ซ่อนคอมเมนต์ต้องลด counter พร้อมกัน (ทั้ง subtree) + คอลัมน์ `closed_by` ไม่ใช่ `close_by`
+- **Context/Problem:** เพิ่ม moderation + report ให้ PIRI Boards — สภาซ่อนคอมเมนต์ไม่เหมาะสม, นักเรียนแจ้งความไม่เหมาะสม (ตาราง `piri_board_reports`), จัดการรายงาน (hide/dismiss); ตอนนี้มี path "ลบ" คอมเมนต์จริง → **counter drift ที่บันทึกเป็น known limitation ใน Phase 3 ต้องแก้**: ทุก hide ต้องลด `comment_count`, ทุก unhide ต้องเพิ่มคืน
+- **สิ่งที่เจอ/บทเรียน:**
+  1. **ซ่อนทั้ง subtree (ไม่ใช่แค่ตัวเดียว):** ถ้าซ่อนคอมเมนต์หลัก แต่ reply ยังแสดงอยู่ → `_thread_comments` promote ลูกขึ้น root (bypass moderation — reply ที่อ้างอิงคอมเมนต์ไม่เหมาะสมยังลอยอยู่) → ใช้ recursive CTE `WITH RECURSIVE sub(cid) AS (SELECT $1::integer UNION ALL SELECT c.id FROM piri_board_comments c JOIN sub ON c.parent_comment_id = sub.cid WHERE c.deleted_at IS NULL)` หาลูกหลานทั้งหมด แล้ว `UPDATE ... WHERE id = ANY($1::int[])` พร้อมกัน — นับ `hidden_count` จาก data-modifying CTE (`WITH updated AS (UPDATE ... RETURNING id) SELECT COUNT(*) FROM updated`) แล้ว `comment_count = GREATEST(comment_count - $2, 0)` กันติดลบ (drift จากอดีต)
+  2. **asyncpg array binding ใช้ได้:** Python list → `ANY($1::int[])` + anchor `$1::integer` ใน recursive CTE (บทเรียน `integer = text` เดิม — cast ทั้งคู่; asyncpg จัดการ list → array ตาม cast context)
+  3. **Moderation ซ้ำ → 409:** hide คอมเมนต์ที่ `is_hidden_by_admin=TRUE` อยู่แล้วต้อง ConflictError (กันลด counter ซ้ำ); resolve รายงานที่ `status!='open'` ก็ 409
+  4. **จัดการรายงาน (resolve) ใช้ action `hide`/`dismiss`:** hide → เรียก `_hide_comment_subtree` ร่วมกับ endpoint hide ตรง (DRY) + ปิดรายงาน open ทั้งหมดที่จุดนั้น (`UPDATE ... SET status='resolved' WHERE comment_id = ANY($1::int[]) AND status='open'`); dismiss → ปิดเฉพาะรายการนั้น (คอมเมนต์ยังแสดง)
+  5. **`GET /boards/reports` ต้องอยู่ก่อน `GET /boards/{board_id}`:** ไม่งั้น 'reports' ถูก match เป็น board_id (int) → 422; และ **ทุก router ที่ดัก domain exception ต้อง wrap try/except — test จับจริงว่า ForbiddenError ที่ไม่ถูกดัก → 500 แทน 403** (list_reports ลืม try/except ตอนแรก)
+  6. **คอลัมน์พยายม: `piri_boards.closed_by` (มี d) ไม่ใช่ `close_by`** — schema ใช้ `closed_at/closed_by/close_reason`; เขียน SQL ต้องระวังตัวสะกด (UndefinedColumnError จับได้ตอน test)
+  7. **Migration 008 ทำ counter reconcile:** `UPDATE piri_boards SET comment_count = (SELECT COUNT(*) ... WHERE deleted_at IS NULL AND is_hidden_by_admin = FALSE)` + `UPDATE piri_vote_choices SET vote_count = (SELECT COUNT(*) FROM piri_votes WHERE deleted_at IS NULL)` — heal drift เก่าที่เกิดก่อนมี feature hide (ทำใน migration ก่อน feature ใช้งาน)
+  8. **Test gotcha:** default reporter ต้องไม่ใช่เจ้าของคอมเมนต์ (self-report → 400) — ใน fixture คอมเมนต์สร้างโดย student → reporter ควรเป็น council/admin; reply ต้องระบุ `parent_id` จริงๆ ถึงจะซ้อน (ลืม = คอมเมนต์หลักไม่ใช่ reply); ตรวจ tree ให้เช็ค `replies` ที่ซ้อน ไม่ใช่แค่ root list
+  9. **`view_count` บน `piri_boards` เดิมไม่มี path เพิ่มเลย** (column ตั้งมาแต่ขี้เกียจ) → เพิ่ม increment ใน `get_board_detail` (ไม่ audit — read audit ผ่าน log_read อยู่แล้ว)
+- **กฎ: (1) ทุก feature ที่สร้าง/ลบ/ซ่อน object ต้องปรับ denormalized counter ใน transaction เดียว อย่างน้อย `GREATEST(x - n, 0)` กันติดลบ และ unlock path ใหม่ทุกอันต้องมี test "counter == จำนวนจริงหลังครบวงจร"; (2) moderation ต้องจัดการทั้ง subtree (กัน bypass ผ่าน promote reply); (3) route ที่มี path param int กับ literal ก่อนหน้า ระวัง shadowing — literal ต้องลงทะเบียนก่อน; (4) ทุก domain exception ที่ router ดักได้ต้อง wrap จริง — 500 แทน 403 เป็น bug**
+- **Date Added:** 2026-08-28
+
+  - **แก้เพิ่ม (หลัง adversarial review 2 — 13 confirmed):**
+    1. **unhide ต้องเป็น single comment ไม่ใช่ subtree:** unhide subtree เผลอฟื้นคอมเมนต์ที่แอดมินซ่อนแยกคนละครั้ง (resurrection bug — คอมเมนต์ที่ซ่อนเองกลับมาโผล่ทั้งโรงเรียน) → `_unhide_comment` คืนแค่ตัวที่กด (comment_count +1); อยากคืนทั้งต้น unhide ทีละตัว
+    2. **Report ต้องมี cap:** `MAX_OPEN_REPORTS_PER_USER=10` — ไม่มี cap → user enumerate board/comment ใส่รายงานนับพันฝังคิวสภา (unique index กันแค่รายงานซ้ำ comment เดียว)
+    3. **Pagination fallback COUNT ต้อง JOIN ให้ตรงกับ where_sql:** `list_reports` ตอน `q` ไม่เจอ → fallback `SELECT COUNT(*) FROM piri_board_reports r WHERE (b.title ILIKE...)` อ้าง alias b/c ที่ไม่มีใน FROM → 500 `missing FROM-clause entry` — fallback ต้อง JOIN b/c ด้วย (บทเรียน: where_sql ที่อ้าง alias ของ join ต้องมี join นั้นใน query count ด้วย)
+    4. **hide_board ต้องปิด report open ของบอร์ดด้วย** (กันคิวยังโชว์เนื้อหาบอร์ดที่ซ่อนเป็น 'open')
+    5. **`add_comment` → `get_comment` TOCTOU:** moderator ซ่อนคอมเมนต์คั่นระหว่าง add (commit) กับ get (อ่าน) → get_comment filter `is_hidden_by_admin=FALSE` → 404 ทั้งที่ insert ไปแล้ว → client retry = คอมเมนต์ซ้ำ → `get_comment` (ใช้หลัง add เท่านั้น) ไม่ filter hidden
+    6. **hide vs reply ที่ insert คั่น (TOCTOU):** re-walk subtree สูงสุด `MAX_HIDE_PASSES=3` รอบ — reply ที่ insert คั่นระหว่างนับกับซ่อนจะถูกซ่อนรอบถัดไป (ยังไม่ atomic 100% แต่แคบลงมาก)
+    7. **Test gap ที่ต้องปิด:** plain student แจ้งได้ 200, cross-board report 404, soft-deleted report 404, migration reconcile repair, reason filter + pagination envelope, descendant report auto-close
+
+### 🧯 Rehearsal Migration: correlated subquery reconcile ช้า 100 เท่า → lock ค้าง 2.4 นาที (ต้อง aggregate+JOIN)
+- **Context/Problem:** จำลอง Production DB (5k boards / 100k comments / 20k choices / 200k votes) รัน migration 008 reconcile (`UPDATE ... SET comment_count = (SELECT COUNT(*) ...)` แบบ correlated subquery) เพื่อประเมิน lock window ก่อน deploy จริง — พบว่า **vote_count reconcile ใช้เวลา 142.5 วินาที** (correlated subquery รัน 20k ครั้ง ต่างคนละ snapshot + planner เลือก scan) → Postgres ถือ ROW EXCLUSIVE บน piri_vote_choices ตลอด 2.4 นาที → writer ฝั่งนั้นรอค้าง
+- **Root Cause:** correlated subquery `SET x = (SELECT COUNT(*) FROM child WHERE child.fk = parent.id)` รัน subquery ต่อ 1 แถวแม่ — O(rows_แม่ × scan) ระดับข้อมูลจริง ระเบิด
+- **Correct Pattern/Solution:** เปลี่ยนเป็น **aggregate+JOIN** (อ่านตารางลูกผ่านเดียว + GROUP BY + LEFT JOIN) — ได้ผลลัพธ์เดียวกันแต่เร็ว ~280 เท่า:
+  ```sql
+  UPDATE piri_boards b
+  SET comment_count = COALESCE(cnt.c, 0), updated_at = NOW()
+  FROM (
+      SELECT pb.id AS bid, agg.c
+      FROM piri_boards pb
+      LEFT JOIN (
+          SELECT board_id, COUNT(*) AS c
+          FROM piri_board_comments
+          WHERE deleted_at IS NULL AND is_hidden_by_admin = FALSE
+          GROUP BY board_id
+      ) agg ON agg.board_id = pb.id
+  ) cnt
+  WHERE cnt.bid = b.id
+  ```
+  LEFT JOIN ต้องใช้ (ไม่งั้น board ที่ไม่มีคอมเมนต์เลยไม่ถูก zero)
+- **ผล rehearsal:** correlated subquery → comment_count 2.5s / vote_count 142.5s; aggregate+JOIN → 0.25s / 0.51s (รวม 762ms) — **lock window จาก 2.4 นาที เหลือ <1 วินาที** ปลอดภัยต่อ deploy จริง
+- **กฎ: (1) ก่อนเขียน UPDATE reconcile ระดับ prod ให้ rehearsal บนข้อมูลขนาดจริงก่อนเสมอ (สคริปต์ `backend/scripts/migration_rehearsal.py` มีให้ใช้); (2) ห้าม correlated subquery ใน UPDATE ที่วิ่งทั้งตาราง — ใช้ aggregate+GROUP BY+JOIN; (3) ตารางแม่ที่ต้อง zero ค่าให้ใช้ LEFT JOIN เก็บกรณีไม่มีลูก; (4) lock window ที่ยอมรับได้ ~<1s; ถ้าตารางยักษ์จริงให้แบ่ง batch + NOWAIT**
+- **Date Added:** 2026-08-28
+
+### 🛠️ View-count dedup (Phase 6) — กัน F5 ปั่นยอด + asyncpg gotcha: INSERT ใน FROM ของ subquery → SyntaxError
+- **Context/Problem:** เดิม `get_board_detail` บวก `view_count+1` ทุกครั้งที่เปิด board (adversarial review จับว่า F5/refresh รัวๆ ปั่นยอดได้) → ต้อง dedup ต่อ user ภายใน window (10 นาที) ผ่านตาราง `piri_board_views (board_id, user_id, viewed_at)` PK (board_id,user_id)
+- **Pattern (dedup atomic — ไม่มี TOCTOU ระหว่าง check กับ insert):**
+  ```sql
+  WITH ins AS (
+      INSERT INTO piri_board_views (board_id, user_id, viewed_at)
+      VALUES ($1, $2, NOW())
+      ON CONFLICT (board_id, user_id)
+      DO UPDATE SET viewed_at = NOW()
+      WHERE piri_board_views.viewed_at < NOW() - INTERVAL '10 minutes'
+      RETURNING 1
+  )
+  SELECT COUNT(*) FROM ins
+  ```
+  คืน 1 เฉพาะ "ยังไม่เคยดู" หรือ "เลย window แล้ว" → ถึงจะ +1; ภายใน window (refresh รัวๆ) `WHERE` เท็จ → ไม่คืน row → COUNT 0 → ไม่นับ
+- **⚠️ asyncpg/Postgres gotcha:** เขียนเป็น `SELECT COUNT(*) FROM (INSERT ... RETURNING ...) t` **ไม่ได้** — Postgres ห้าม DML ตรงใน FROM ของ subquery → `PostgresSyntaxError: syntax error at or near "INTO"` → GET detail พังทุกตัว → ต้องใช้ **data-modifying CTE** (`WITH ins AS (INSERT ...) SELECT COUNT(*) FROM ins`) เท่านั้น (เป็นบทเรียนเดียวกับ phase3 เรื่อง DML-CTE ที่ใช้ count ได้ แต่เลือกผิดฝั่งวาง)
+- **กฎ: ถ้าอยาก "INSERT ที่ไม่ซ้ำแล้วนับว่าแทรก/อัปเดตจริงไหม" ให้ใช้ WITH data-modifying CTE + RETURNING + COUNT(*) — ห้ามวาง INSERT ใน FROM; และ dedup แบบนี้ฟรี (ไม่ต้อง Redis) เพราะเป็น atomic UPSERT ในตารางเดียว**
+- **Date Added:** 2026-08-28

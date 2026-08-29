@@ -19,6 +19,16 @@ class IssueCreateRequest(BaseModel):
     # ระดับเริ่มต้นของเรื่อง (room/level/council) — default room
     # เฉพาะผู้มีระดับสูงขึ้นจึงเลือกได้
     start_level: str = "room"
+    # 🆕 ปลายทางที่ผู้แจ้งขอ: 'normal' / 'vote' / 'talk' (PIRI Boards)
+    # vote/talk → เรื่องตรงไปที่สภา (current_level='council') ให้สภาอนุมัติเป็น board สาธารณะ
+    requested_destination: str = "normal"
+
+    @field_validator("requested_destination")
+    @classmethod
+    def _validate_destination(cls, v: str) -> str:
+        if v not in ("normal", "vote", "talk"):
+            raise ValueError(f"ปลายทางที่ขอไม่ถูกต้อง: {v} (ต้องเป็น normal/vote/talk)")
+        return v
 
     @field_validator("main_category")
     @classmethod
@@ -75,6 +85,37 @@ class CountdownSetRequest(BaseModel):
 
 class EscalateRequest(BaseModel):
     reason: Optional[str] = None
+
+
+class ApproveToPublicRequest(BaseModel):
+    """อนุมัติเรื่องขอเผยแพร่สาธารณะ (สภานักเรียน/แอดมิน) → สร้าง PIRI Board จากเรื่อง"""
+    # ประเภท board: 'talk' / 'vote' — ต้องตรงกับ requested_destination ของเรื่อง
+    board_type: str = Field(..., description="ประเภท board ที่จะสร้าง: talk / vote")
+    # ตัวเลือกโหวต — จำเป็นถ้า board_type='vote' (อย่างน้อย 2)
+    vote_choices: Optional[List[str]] = Field(None, description="ตัวเลือกโหวต (จำเป็นถ้า board_type=vote)")
+    # เปิดให้คอมเมนต์บน board ได้ไหม (default True)
+    allow_comments: bool = True
+
+    @field_validator("board_type")
+    @classmethod
+    def _validate_board_type(cls, v: str) -> str:
+        if v not in ("talk", "vote"):
+            raise ValueError(f"ประเภท board ไม่ถูกต้อง: {v} (ต้องเป็น talk/vote)")
+        return v
+
+    @field_validator("vote_choices")
+    @classmethod
+    def _validate_vote_choices(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        if v is None:
+            return v
+        cleaned = [c.strip() for c in v if c and c.strip()]
+        if not cleaned:
+            return None
+        if len(cleaned) < 2:
+            raise ValueError("Board แบบโหวตต้องมีตัวเลือกอย่างน้อย 2 ตัวเลือก")
+        if len(cleaned) > 10:
+            raise ValueError("Board แบบโหวตมีตัวเลือกได้ไม่เกิน 10 ตัวเลือก")
+        return cleaned
 
 
 class CommentCreateRequest(BaseModel):
@@ -144,6 +185,9 @@ class IssueOut(BaseModel):
     status: str
     priority: str
     is_anonymous: bool
+    # 🆕 ปลายทางที่ผู้แจ้งขอ (normal/vote/talk) + board สาธารณะที่สภาอนุมัติแล้ว (ชี้ piri_boards.id)
+    requested_destination: str = "normal"
+    published_board_id: Optional[int] = None
     resolved_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime

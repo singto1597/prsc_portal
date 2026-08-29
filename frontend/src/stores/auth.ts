@@ -15,6 +15,14 @@ export const useAuthStore = defineStore('auth', () => {
   const displayName = computed(() => user.value?.full_name || user.value?.username || '');
   const roles = computed(() => user.value?.roles || []);
   const isAdmin = computed(() => user.value?.is_admin ?? false);
+  // 🏛️ มีอำนาจระดับสภา/แอดมิน (อนุมัติเผยแพร่ PIRI Board ได้) — ตรงกับ backend _has_council_authority
+  const isCouncilAuthority = computed(
+    () =>
+      isAdmin.value ||
+      roles.value.some((r) =>
+        ['council_member', 'council_president', 'teacher_council'].includes(r.role || ''),
+      ),
+  );
   const permissions = computed(() => user.value?.permissions || []);
   // บัญชีที่ระบบสร้างให้ (seed) → ต้องบังคับเปลี่ยนรหัสก่อนเข้าใช้งาน
   const mustChangePassword = computed(() => user.value?.must_change_password ?? false);
@@ -67,6 +75,7 @@ export const useAuthStore = defineStore('auth', () => {
     displayName,
     roles,
     isAdmin,
+    isCouncilAuthority,
     permissions,
     mustChangePassword,
     setToken,

@@ -111,6 +111,8 @@ async def init_db(pool: asyncpg.Pool):
                     status TEXT DEFAULT 'pending',       -- pending / in_progress / resolved / escalated / cancelled / rejected
                     priority TEXT DEFAULT 'normal',      -- low / normal / high / urgent
                     is_anonymous BOOLEAN DEFAULT FALSE,
+                    requested_destination VARCHAR(20) NOT NULL DEFAULT 'normal',  -- ปลายทางที่ผู้แจ้งขอ: normal / vote / talk (PIRI Boards)
+                    published_board_id INTEGER,          -- board สาธารณะที่สภาอนุมัติแล้ว (ชี้ piri_boards.id — ตั้งโดย approve_to_public)
                     resolved_at TIMESTAMP WITH TIME ZONE,
                     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -189,6 +191,158 @@ async def init_db(pool: asyncpg.Pool):
                     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP WITH TIME ZONE,
                     deleted_at TIMESTAMP
+                );
+                """)
+
+                # --- 7.6 ตาราง PIRI Boards (ระบบสาธารณะ: PIRI Talk + PIRI Vote) ---
+                # แยกงานสาธารณะออกจากระบบ issue ส่วนตัว: ต้นเรื่องมาจาก issue ที่ผู้แจ้ง
+                # ขอปลายทาง 'vote'/'talk' แล้วสภาอนุมัติ (approve_to_public — Phase 2)
+                # ทุกตารางมี created_at / updated_at / deleted_at TIMESTAMPTZ (soft delete บังคับ)
+                # --------------------------------------------------------------------
+                # piri_boards: โพสต์สาธารณะ
+                #   - source_issue_id → issues(id): ย้อนกลับไปเรื่องต้นทาง (issue ถูกลบ → ตัด link, board ยังอยู่)
+                #   - board_type: 'talk' (โพสต์+คอมเมนต์) / 'vote' (โหวต)
+                #   - author_id: ผู้สร้างต้นเรื่อง (reporter ของ issue) — กันให้เห็นว่าใครเป็นเจ้าของเรื่อง
+                #   - status: 'active' / 'closed' (ปิดประเด็น) / 'hidden' (ซ่อนโดย admin)
+                #   - tags: JSONB array ของแท็ก (asyncpg คืนเป็น string → ต้อง json.loads ก่อนใช้)
+                await conn.execute("""
+                CREATE TABLE IF NOT EXISTS piri_boards (
+                    id SERIAL PRIMARY KEY,
+                    source_issue_id INTEGER REFERENCES issues(id) ON DELETE SET NULL,
+                    board_type VARCHAR(10) NOT NULL DEFAULT 'talk',
+                    title TEXT NOT NULL,
+                    description TEXT NOT NULL,
+                    cover_image_url TEXT,
+                    author_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                    is_anonymous BOOLEAN NOT NULL DEFAULT FALSE,
+                    approved_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                    approved_at TIMESTAMP WITH TIME ZONE,
+                    view_count INTEGER NOT NULL DEFAULT 0,
+                    comment_count INTEGER NOT NULL DEFAULT 0,
+                    share_count INTEGER NOT NULL DEFAULT 0,
+                    status VARCHAR(20) NOT NULL DEFAULT 'active',
+                    allow_comments BOOLEAN NOT NULL DEFAULT TRUE,
+                    tags JSONB NOT NULL DEFAULT '[]'::jsonb,
+                    closed_at TIMESTAMP WITH TIME ZONE,
+                    closed_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                    close_reason TEXT,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    deleted_at TIMESTAMP WITH TIME ZONE,
+                    CONSTRAINT chk_piri_boards_type CHECK (board_type IN ('talk', 'vote')),
+                    CONSTRAINT chk_piri_boards_status CHECK (status IN ('active', 'closed', 'hidden'))
+                );
+                """)
+
+                # piri_board_comments: คอมเมนต์ใน board (PIRI Talk) — แบบ threaded
+                #   - parent_comment_id: self-referencing FK → reply ต่อคอมเมนต์ (NULL = คอมเมนต์หลัก)
+                #   - edit_history: JSONB array ของ {body, edited_at} snapshot (ตอนแก้ไข)
+                #   - ip_address / user_agent: เก็บผ่าน request context (ความปลอดภัย/ตรวจสอบ)
+                #   - is_hidden_by_admin: ซ่อนคอมเมนต์ไม่เหมาะสม (ยัง soft delete ได้ด้วย deleted_at)
+                await conn.execute("""
+                CREATE TABLE IF NOT EXISTS piri_board_comments (
+                    id SERIAL PRIMARY KEY,
+                    board_id INTEGER NOT NULL REFERENCES piri_boards(id) ON DELETE CASCADE,
+                    parent_comment_id INTEGER REFERENCES piri_board_comments(id) ON DELETE CASCADE,
+                    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                    body TEXT NOT NULL,
+                    image_url TEXT,
+                    is_edited BOOLEAN NOT NULL DEFAULT FALSE,
+                    edit_history JSONB NOT NULL DEFAULT '[]'::jsonb,
+                    ip_address VARCHAR(45),
+                    user_agent TEXT,
+                    is_hidden_by_admin BOOLEAN NOT NULL DEFAULT FALSE,
+                    hidden_reason TEXT,
+                    hidden_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    deleted_at TIMESTAMP WITH TIME ZONE
+                );
+                """)
+
+                # piri_vote_choices: ตัวเลือกของ board แบบ vote
+                await conn.execute("""
+                CREATE TABLE IF NOT EXISTS piri_vote_choices (
+                    id SERIAL PRIMARY KEY,
+                    board_id INTEGER NOT NULL REFERENCES piri_boards(id) ON DELETE CASCADE,
+                    choice_text TEXT NOT NULL,
+                    description TEXT,
+                    image_url TEXT,
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    vote_count INTEGER NOT NULL DEFAULT 0,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    deleted_at TIMESTAMP WITH TIME ZONE
+                );
+                """)
+
+                # piri_votes: เสียงโหวตของผู้ใช้ — ผู้ใช้คนละ 1 เสียงต่อ board
+                # UNIQUE(board_id, user_id) เป็น partial unique index (WHERE deleted_at IS NULL)
+                # เพื่อให้ soft delete แล้วกลับมาโหวตใหม่ได้ (เหมือน uq_students_room_student_active)
+                await conn.execute("""
+                CREATE TABLE IF NOT EXISTS piri_votes (
+                    id SERIAL PRIMARY KEY,
+                    board_id INTEGER NOT NULL REFERENCES piri_boards(id) ON DELETE CASCADE,
+                    choice_id INTEGER NOT NULL REFERENCES piri_vote_choices(id) ON DELETE CASCADE,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    ip_address VARCHAR(45),
+                    user_agent TEXT,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    deleted_at TIMESTAMP WITH TIME ZONE
+                );
+                """)
+
+                # piri_board_reactions: กด react (emoji) ต่อ board / คอมเมนต์
+                #   - target_type: 'board' / 'comment' (polymorphic — เช็คค่าใน CHECK)
+                #   - target_id: id ของ board/comment ปลายทาง (ไม่มี FK เพราะ polymorphic)
+                #   - UNIQUE(target_type, target_id, user_id) partial — ผู้ใช้ react ละ 1 ครั้งต่อ target
+                await conn.execute("""
+                CREATE TABLE IF NOT EXISTS piri_board_reactions (
+                    id SERIAL PRIMARY KEY,
+                    target_type VARCHAR(10) NOT NULL,
+                    target_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    reaction_type VARCHAR(20) NOT NULL,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    deleted_at TIMESTAMP WITH TIME ZONE,
+                    CONSTRAINT chk_piri_reactions_target_type CHECK (target_type IN ('board', 'comment'))
+                );
+                """)
+
+                # piri_board_reports: แจ้งความไม่เหมาะสมของคอมเมนต์ (Phase 5)
+                #   - reason จำกัดหมวด (กลั่นแกล้ง/คำหยาบ/สแปม/เปิดเผยข้อมูล/อื่นๆ) — กันสแปมเหตุผลมั่ว
+                #   - status: 'open' (รอสภา/แอดมินจัดการ) / 'resolved' (ซ่อนคอมเมนต์แล้ว) / 'dismissed' (ปัดตก)
+                #   - UNIQUE(reporter_id, comment_id) partial → user แจ้งคอมเมนต์เดิมซ้ำไม่ได้ (กันสแปมรายงาน)
+                await conn.execute("""
+                CREATE TABLE IF NOT EXISTS piri_board_reports (
+                    id SERIAL PRIMARY KEY,
+                    board_id INTEGER NOT NULL REFERENCES piri_boards(id) ON DELETE CASCADE,
+                    comment_id INTEGER NOT NULL REFERENCES piri_board_comments(id) ON DELETE CASCADE,
+                    reporter_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    reason VARCHAR(30) NOT NULL,
+                    detail TEXT,
+                    status VARCHAR(20) NOT NULL DEFAULT 'open',
+                    resolved_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                    resolved_at TIMESTAMP WITH TIME ZONE,
+                    resolution_note TEXT,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    deleted_at TIMESTAMP WITH TIME ZONE,
+                    CONSTRAINT chk_piri_report_reason CHECK (reason IN ('bullying', 'profanity', 'spam', 'privacy', 'other')),
+                    CONSTRAINT chk_piri_report_status CHECK (status IN ('open', 'resolved', 'dismissed'))
+                );
+                """)
+
+                # piri_board_views: dedup "การเข้าชม" ต่อ user (Phase 6 — กัน F5 ปั่น view_count)
+                #   PRIMARY KEY (board_id, user_id) → user 1 คน นับ view 1 ครั้งต่อ VIEW_DEDUP_WINDOW ต่อ board
+                await conn.execute("""
+                CREATE TABLE IF NOT EXISTS piri_board_views (
+                    board_id INTEGER NOT NULL REFERENCES piri_boards(id) ON DELETE CASCADE,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    viewed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (board_id, user_id)
                 );
                 """)
 
@@ -282,6 +436,35 @@ async def init_db(pool: asyncpg.Pool):
                 CREATE INDEX IF NOT EXISTS idx_issue_countdowns_issue ON issue_countdowns(issue_id);
                 CREATE INDEX IF NOT EXISTS idx_issue_status_history_issue ON issue_status_history(issue_id);
                 CREATE INDEX IF NOT EXISTS idx_issue_comments_issue ON issue_comments(issue_id);
+                -- PIRI Boards (Phase 1: ตารางสาธารณะ) — feed ตาม status/เวลา + ค้นหา board จาก issue ต้นทาง
+                CREATE INDEX IF NOT EXISTS idx_piri_boards_status_created ON piri_boards(status, created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_piri_boards_source_issue ON piri_boards(source_issue_id);
+                CREATE INDEX IF NOT EXISTS idx_piri_boards_author ON piri_boards(author_id);
+                CREATE INDEX IF NOT EXISTS idx_piri_board_comments_board ON piri_board_comments(board_id);
+                CREATE INDEX IF NOT EXISTS idx_piri_board_comments_parent ON piri_board_comments(parent_comment_id);
+                CREATE INDEX IF NOT EXISTS idx_piri_board_comments_user ON piri_board_comments(user_id);
+                CREATE INDEX IF NOT EXISTS idx_piri_vote_choices_board ON piri_vote_choices(board_id, sort_order);
+                CREATE INDEX IF NOT EXISTS idx_piri_votes_board ON piri_votes(board_id);
+                CREATE INDEX IF NOT EXISTS idx_piri_votes_choice ON piri_votes(choice_id);
+                CREATE INDEX IF NOT EXISTS idx_piri_board_reactions_target ON piri_board_reactions(target_type, target_id);
+                CREATE INDEX IF NOT EXISTS idx_piri_board_reactions_user ON piri_board_reactions(user_id);
+                -- PIRI Reports (Phase 5) — คิวรายงาน (กรอง status) + ค้นจาก board/comment/reporter
+                CREATE INDEX IF NOT EXISTS idx_piri_board_reports_status ON piri_board_reports(status);
+                CREATE INDEX IF NOT EXISTS idx_piri_board_reports_board ON piri_board_reports(board_id);
+                CREATE INDEX IF NOT EXISTS idx_piri_board_reports_comment ON piri_board_reports(comment_id);
+                CREATE INDEX IF NOT EXISTS idx_piri_board_reports_reporter ON piri_board_reports(reporter_id);
+                -- ผู้ใช้โหวต/react ได้ 1 ครั้งต่อ target (partial: เฉพาะ row ที่ยัง active)
+                -- → soft delete แล้วกลับมาโหวต/react ใหม่ได้ (ไม่ชน index)
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_piri_votes_board_user_active
+                    ON piri_votes(board_id, user_id)
+                    WHERE deleted_at IS NULL;
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_piri_board_reactions_target_user_active
+                    ON piri_board_reactions(target_type, target_id, user_id)
+                    WHERE deleted_at IS NULL;
+                -- user แจ้งคอมเมนต์เดิมซ้ำไม่ได้ (partial: เฉพาะรายงานที่ยัง active) — กันสแปมรายงาน
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_piri_board_report_user_comment_active
+                    ON piri_board_reports(reporter_id, comment_id)
+                    WHERE deleted_at IS NULL;
                 -- audit_logs โตเร็ว (Phase 3: เก็บทุก action + read) — ต้องมี index ครบ
                 CREATE INDEX IF NOT EXISTS idx_audit_logs_action_created ON audit_logs(action, created_at);
                 CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
