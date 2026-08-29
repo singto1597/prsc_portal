@@ -486,6 +486,127 @@ async def approve_to_public(
             return board_id
 
 
+async def change_destination(
+    pool: asyncpg.Pool,
+    user_id: int,
+    issue_id: int,
+    requested_destination: str,
+) -> None:
+    """
+    🔁 เปลี่ยนปลายทาง (requested_destination) ของเรื่อง — แก้กรณีผู้แจ้งเลือกผิด เช่น
+    ควรเป็น "บอร์ดพูดคุย" แต่แจ้งมาเป็น "ดำเนินการปกติ":
+    - 🔐 อำนาจ:
+      * สภานักเรียน/แอดมิน (_has_council_authority) เปลี่ยนได้ทุกเรื่อง (ทั้งสองทาง)
+      * หัวหน้าห้อง/รอง (RECEIVE_ISSUES ในห้องเรื่อง) เปลี่ยนได้เฉพาะเรื่องที่ยังอยู่ระดับ 'room'
+    - 🔄 พฤติกรรม:
+      * → 'vote'/'talk' (ปลายทางสาธารณะ): current_level='council' + รีเซ็ต pending
+        (เคลียร์ assignee + countdown) → สภานักเรียนรอรับเรื่องอีกที
+      * → 'normal': current_level='room' + รีเซ็ต pending → กลับไปหัวหน้าห้อง
+      * ระดับไม่เปลี่ยน (เช่น talk→vote ยังอยู่สภา): เปลี่ยนแค่ปลายทาง ไม่รีเซ็ต
+    - ⛔ กัน: เรื่องที่เผยแพร่เป็น PIRI Board แล้ว (409), เรื่องที่ปิดแล้ว (409)
+    - 🛡️ Audit action="CHANGE_DESTINATION" ใน transaction เดียว
+    """
+    if requested_destination not in ("normal", "vote", "talk"):
+        raise ValidationError(f"ปลายทางไม่ถูกต้อง: {requested_destination}")
+
+    target_level = "council" if requested_destination in ("vote", "talk") else "room"
+
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            issue = await conn.fetchrow(
+                "SELECT * FROM issues WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
+                issue_id
+            )
+            if not issue:
+                raise NotFoundError("ไม่พบเรื่องนี้")
+            if issue["published_board_id"]:
+                raise ConflictError("เรื่องนี้เผยแพร่เป็น PIRI Board แล้ว — เปลี่ยนปลายทางไม่ได้")
+            if issue["status"] in ("resolved", "cancelled", "rejected"):
+                raise ConflictError("เรื่องนี้ถูกปิดแล้ว — เปลี่ยนปลายทางไม่ได้")
+
+            old_destination = issue["requested_destination"]
+            if old_destination == requested_destination:
+                return  # ไม่มีอะไรเปลี่ยน
+
+            # 🔐 อำนาจ
+            if not await _has_council_authority(conn, user_id):
+                if issue["current_level"] != "room":
+                    raise ForbiddenError("เฉพาะสภานักเรียน/แอดมินที่เปลี่ยนปลายทางเรื่องที่พ้นระดับห้องแล้ว")
+                from core.rbac import require_permission
+                try:
+                    await require_permission(conn, issue["room_id"], user_id, "RECEIVE_ISSUES")
+                except ForbiddenError:
+                    raise ForbiddenError("คุณไม่ใช่ผู้รับเรื่องในห้องนี้ — เปลี่ยนปลายทางไม่ได้")
+
+            level_changed = target_level != issue["current_level"]
+
+            if level_changed:
+                # รีเซ็ตเป็น 'pending' + เคลียร์ผู้รับ/countdown (ส่งไประดับใหม่รอรับเรื่องอีกที)
+                await conn.execute(
+                    """
+                    UPDATE issues
+                    SET requested_destination = $1, current_level = $2,
+                        current_assignee_id = NULL, status = 'pending',
+                        updated_at = NOW()
+                    WHERE id = $3
+                    """,
+                    requested_destination, target_level, issue_id
+                )
+                # countdown เป็นข้อมูลปฏิบัติการผูกกับผู้รับปัจจุบัน (ตารางไม่มี deleted_at — ออกแบบ
+                # ให้ hard delete ได้) — เปลี่ยนไประดับใหม่ → เคลียร์ทิ้ง ระดับใหม่ตั้งเองใหม่ตอนรับเรื่อง
+                await conn.execute(
+                    """
+                    DELETE FROM issue_countdowns
+                    WHERE issue_id = $1
+                    """,
+                    issue_id
+                )
+            else:
+                # ระดับไม่เปลี่ยน (เช่น talk→vote ยังอยู่สภา) — เปลี่ยนแค่ปลายทาง
+                await conn.execute(
+                    """
+                    UPDATE issues
+                    SET requested_destination = $1, updated_at = NOW()
+                    WHERE id = $2
+                    """,
+                    requested_destination, issue_id
+                )
+
+            new_status = "pending" if level_changed else issue["status"]
+            note = (
+                f"เปลี่ยนปลายทางจาก '{old_destination}' เป็น '{requested_destination}'"
+                f" → ส่ง{'สภานักเรียน' if target_level == 'council' else 'หัวหน้าห้อง'}รับเรื่องอีกครั้ง"
+                if level_changed
+                else f"เปลี่ยนปลายทางจาก '{old_destination}' เป็น '{requested_destination}'"
+            )
+            await conn.execute(
+                """
+                INSERT INTO issue_status_history (issue_id, status, changed_by, note)
+                VALUES ($1, $2, $3, $4)
+                """,
+                issue_id, new_status, user_id, note
+            )
+
+            # 🛡️ Audit log (ภายใน transaction เดียว — ตามกฎ backend.md)
+            from core.logger import AuditLogger
+            await AuditLogger("issue_service").log(
+                conn=conn, action="CHANGE_DESTINATION",
+                actor_identifier=str(user_id), client_source="web",
+                room_id=issue["room_id"], user_id=user_id,
+                entity_type="issue", entity_id=issue_id,
+                old_values={
+                    "requested_destination": old_destination,
+                    "current_level": issue["current_level"],
+                    "status": issue["status"],
+                },
+                new_values={
+                    "requested_destination": requested_destination,
+                    "current_level": target_level,
+                    "status": new_status,
+                },
+            )
+
+
 async def update_issue(
     pool: asyncpg.Pool,
     user_id: int,

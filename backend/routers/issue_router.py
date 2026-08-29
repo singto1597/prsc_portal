@@ -6,8 +6,8 @@ from core.exceptions import NotFoundError, ForbiddenError, ValidationError, Conf
 from core.categories import all_main_category_codes
 from models.issue_schemas import (
     IssueCreateRequest, IssueUpdateRequest, IssueOut, IssueStepOut, IssueCountdownOut,
-    StepCreateRequest, CountdownSetRequest, EscalateRequest, ApproveToPublicRequest,
-    CommentCreateRequest, CommentOut, IssueListOut,
+    StepCreateRequest, CountdownSetRequest, ChangeDestinationRequest, EscalateRequest,
+    ApproveToPublicRequest, CommentCreateRequest, CommentOut, IssueListOut,
 )
 from services import issue_service
 from services import audit_service
@@ -149,6 +149,25 @@ async def approve_to_public(
     except (NotFoundError, ForbiddenError, ValidationError, ConflictError) as e:
         raise _err(e)
     return {"board_id": board_id, "status": "approved"}
+
+
+# ==================== เปลี่ยนปลายทาง (แก้แจ้งผิด — normal/vote/talk) ====================
+@router.patch("/{issue_id}/destination", response_model=IssueOut)
+async def change_destination(
+    issue_id: int,
+    req: ChangeDestinationRequest,
+    user_ctx: dict = Depends(get_current_user),
+    pool: asyncpg.Pool = Depends(get_db_pool),
+):
+    """🔁 เปลี่ยนปลายทางของเรื่อง (หัวหน้าห้อง/รอง + สภานักเรียน/แอดมิน)
+    เช่น แจ้งเป็น 'ดำเนินการปกติ' แต่ควรเป็น 'บอร์ดพูดคุย' → เปลี่ยนแล้วส่งสภานักเรียนพิจารณา"""
+    uid = _ensure_user(user_ctx)
+    try:
+        await issue_service.change_destination(pool, uid, issue_id, req.requested_destination)
+        issue = await issue_service.get_issue(pool, uid, issue_id)
+    except (NotFoundError, ForbiddenError, ValidationError, ConflictError) as e:
+        raise _err(e)
+    return IssueOut(**issue)
 
 
 # ==================== รับเรื่อง + Countdown ====================

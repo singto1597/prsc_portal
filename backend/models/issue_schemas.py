@@ -83,6 +83,18 @@ class CountdownSetRequest(BaseModel):
     estimated_days: int = Field(..., ge=1, le=365, description="จำนวนวันที่ใช้แก้ปัญหา")
 
 
+class ChangeDestinationRequest(BaseModel):
+    """เปลี่ยนปลายทางของเรื่อง (แก้แจ้งผิด) — หัวหน้าห้อง/สภา เปลี่ยน normal/vote/talk"""
+    requested_destination: str = Field(..., description="ปลายทางใหม่: normal/vote/talk")
+
+    @field_validator("requested_destination")
+    @classmethod
+    def _check_destination(cls, v: str) -> str:
+        if v not in ("normal", "vote", "talk"):
+            raise ValueError(f"ปลายทางไม่ถูกต้อง: {v} (ต้องเป็น normal/vote/talk)")
+        return v
+
+
 class EscalateRequest(BaseModel):
     reason: Optional[str] = None
 

@@ -62,6 +62,14 @@ export async function updateIssue(id: number, payload: UpdateIssuePayload): Prom
   return (await api.patch(`/api/issues/${id}`, payload)) as Issue
 }
 
+// 🔁 เปลี่ยนปลายทางของเรื่อง (หัวหน้าห้อง/สภา แก้แจ้งผิด) — normal/vote/talk
+export async function changeDestination(
+  id: number,
+  requested_destination: RequestedDestination,
+): Promise<Issue> {
+  return (await api.patch(`/api/issues/${id}/destination`, { requested_destination })) as Issue
+}
+
 // 🏛️ สภานักเรียน/แอดมิน อนุมัติเรื่องขอเผยแพร่สาธารณะ → สร้าง PIRI Board + ปิดเรื่อง
 export async function approveToPublic(
   id: number,
