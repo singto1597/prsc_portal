@@ -11,7 +11,14 @@ vi.mock('@/services/api', () => ({
   default: { get: getMock, patch: patchMock, post: postMock, delete: deleteMock },
 }))
 
-import { listIssues, updateIssue, createComment, updateComment, deleteComment } from '@/services/issue'
+import {
+  listIssues,
+  updateIssue,
+  createComment,
+  updateComment,
+  deleteComment,
+  changeDestination,
+} from '@/services/issue'
 
 describe('issue services (รายการ/แก้ไขเรื่อง + คอมเมนต์)', () => {
   beforeEach(() => {
@@ -86,5 +93,17 @@ describe('issue services (รายการ/แก้ไขเรื่อง +
     await deleteComment(7, 1)
 
     expect(deleteMock).toHaveBeenCalledWith('/api/issues/7/comments/1')
+  })
+
+  it('changeDestination → PATCH /api/issues/{id}/destination ส่ง requested_destination', async () => {
+    const fakeIssue = { id: 7, requested_destination: 'talk', current_level: 'council' }
+    patchMock.mockResolvedValue(fakeIssue)
+
+    const result = await changeDestination(7, 'talk')
+
+    expect(patchMock).toHaveBeenCalledWith('/api/issues/7/destination', {
+      requested_destination: 'talk',
+    })
+    expect(result).toEqual(fakeIssue)
   })
 })

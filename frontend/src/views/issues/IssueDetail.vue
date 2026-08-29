@@ -11,6 +11,7 @@ import {
   resolveIssue,
   updateCountdown,
   cancelIssue,
+  changeDestination,
   createComment,
   updateComment,
   deleteComment,
@@ -23,6 +24,7 @@ import {
   DESTINATION_LABELS,
   destinationBadgeClass,
   type Issue,
+  type RequestedDestination,
 } from '@/types/issue'
 import { useAuthStore } from '@/stores/auth'
 import ApproveBoardModal from '@/components/boards/ApproveBoardModal.vue'
@@ -50,6 +52,76 @@ const publishedBoardId = computed(() => issue.value?.published_board_id ?? null)
 
 function onApproved(boardId: number) {
   router.push({ name: 'board-detail', params: { id: boardId } })
+}
+
+// 🔁 เปลี่ยนปลายทาง (แก้แจ้งผิด): สภา/แอดมิน เปลี่ยนได้ทุกเรื่อง; หัวหน้าห้อง/รอง เปลี่ยนได้
+// เฉพาะเรื่องที่ยังอยู่ระดับห้องของตัวเอง — กันเรื่องที่เผยแพร่เป็น board แล้ว/ปิดแล้ว
+const ROOM_HANDLER_ROLES = [
+  'class_president',
+  'vice_academic',
+  'vice_discipline',
+  'vice_activity',
+  'vice_reception',
+]
+const canChangeDestination = computed(() => {
+  if (!issue.value || !authStore.user) return false
+  if (issue.value.published_board_id) return false
+  if (['resolved', 'cancelled', 'rejected'].includes(issue.value.status)) return false
+  if (authStore.isCouncilAuthority) return true
+  if (issue.value.current_level !== 'room') return false
+  return authStore.roles.some(
+    (r) =>
+      ROOM_HANDLER_ROLES.includes(r.role || '') &&
+      r.room_id != null &&
+      r.room_id === issue.value?.room_id,
+  )
+})
+
+async function handleChangeDestination() {
+  if (!issue.value) return
+  const { value: dest } = await Swal.fire({
+    title: 'แก้ไขปลายทางของเรื่อง',
+    html: 'เรื่องจะถูกส่งไป<span class="font-semibold">' +
+      (issue.value.current_level === 'council' ? 'สภานักเรียน' : 'หัวหน้าห้อง') +
+      '</span>เพื่อรับเรื่องอีกครั้ง',
+    icon: 'question',
+    input: 'select',
+    inputOptions: {
+      normal: DESTINATION_LABELS.normal,
+      vote: DESTINATION_LABELS.vote,
+      talk: DESTINATION_LABELS.talk,
+    },
+    inputValue: issue.value.requested_destination || 'normal',
+    showCancelButton: true,
+    confirmButtonText: 'ถัดไป',
+    cancelButtonText: 'ยกเลิก',
+  })
+  if (!dest || dest === issue.value.requested_destination) return
+
+  const willGoPublic = dest === 'vote' || dest === 'talk'
+  const { isConfirmed } = await Swal.fire({
+    icon: 'warning',
+    title: 'ยืนยันเปลี่ยนปลายทาง?',
+    html:
+      'เป็น <b>' +
+      DESTINATION_LABELS[dest as RequestedDestination] +
+      '</b><br>' +
+      (willGoPublic
+        ? 'เรื่องจะถูกส่งไปยัง<b>สภานักเรียน</b>เพื่อพิจารณาอนุมัติเป็น PIRI Board'
+        : 'เรื่องจะ<b>ถอนคำขอเผยแพร่</b>และกลับไปยังหัวหน้าห้องดำเนินการตามปกติ'),
+    showCancelButton: true,
+    confirmButtonText: 'เปลี่ยน',
+    cancelButtonText: 'ยกเลิก',
+  })
+  if (!isConfirmed) return
+
+  try {
+    await changeDestination(issue.value.id, dest as RequestedDestination)
+    Swal.fire({ icon: 'success', title: 'เปลี่ยนปลายทางแล้ว', timer: 1200, showConfirmButton: false })
+    load()
+  } catch (e) {
+    Swal.fire({ icon: 'error', title: 'เปลี่ยนปลายทางไม่สำเร็จ', text: errMsg(e) })
+  }
 }
 
 async function load() {
@@ -481,6 +553,15 @@ function historyStatusBadge(s: string): string {
         class="px-4 py-2.5 bg-violet-600 text-white rounded-xl hover:bg-violet-700 text-sm font-medium"
       >
         <i class="bi bi-people-fill mr-1"></i> อนุมัติเผยแพร่สาธารณะ
+      </button>
+      <!-- 🔁 หัวหน้าห้อง/สภา แก้ไขปลายทาง (แจ้งผิด) — normal/vote/talk -->
+      <button
+        v-if="canChangeDestination"
+        @click="handleChangeDestination"
+        data-testid="change-dest-btn"
+        class="px-4 py-2.5 bg-amber-500 text-white rounded-xl hover:bg-amber-600 text-sm font-medium"
+      >
+        <i class="bi bi-arrow-repeat mr-1"></i> แก้ไขปลายทาง
       </button>
       <!-- เรื่องที่เผยแพร่เป็น board แล้ว → ลิงก์ไปชม -->
       <button
