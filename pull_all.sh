@@ -29,6 +29,8 @@ git reset --hard origin/$CURRENT_BRANCH
 # ⚠️ ใช้ absolute path ของ git-lfs (ไม่ใช่ command -v git-lfs) เพราะ script นี้
 #    มักถูกรันแบบ non-interactive ซึ่ง ~/.local/bin ไม่อยู่ใน PATH → command -v หาไม่เจอ
 #    และหลัง pull ต้องตรวจว่าไฟล์เป็นไฟล์จริง (ใหญ่พอ) ไม่ใช่ pointer 131 bytes
+#    ⚠️ ตรวจทุกไฟล์ ไม่ใช่แค่ไฟล์เดียว — ถ้า pull ถูกตัดกลางคัน (เน็ต/DNS เดี้ยง)
+#       จะได้ไฟล์จริงแค่บางส่วน → ต้องลอง pull ซ้ำจนครบทุก vol
 echo "📦 กำลังดึงไฟล์จริงจาก Git LFS..."
 LFS_BIN=""
 if command -v git-lfs >/dev/null 2>&1; then
@@ -37,19 +39,34 @@ elif [ -x "$HOME/.local/bin/git-lfs" ]; then
     LFS_BIN="$HOME/.local/bin/git-lfs"
 fi
 
-if [ -n "$LFS_BIN" ]; then
-    "$LFS_BIN" pull
-    # 🧪 ตรวจว่าได้ไฟล์จริง (webp ควรหลาย KB ขึ้นไป) — ถ้ายังเป็น pointer ให้หยุดทันที
-    if [ -f frontend/public/playbooks/vol1/page-01.webp ]; then
-        SIZE=$(stat -c%s frontend/public/playbooks/vol1/page-01.webp 2>/dev/null || echo 0)
-        if [ "$SIZE" -lt 1000 ]; then
-            echo "❌ ไฟล์ playbook ยังเป็น LFS pointer ($SIZE bytes) — git lfs pull ไม่สำเร็จ หยุด deploy"
-            exit 1
-        fi
-    fi
-    echo "✅ ไฟล์ LFS เป็นไฟล์จริงแล้ว"
-else
+if [ -z "$LFS_BIN" ]; then
     echo "❌ ไม่พบ git-lfs — ไฟล์ webp/pdf จะเป็น pointer (รูปไม่แสดง) หยุด deploy"
+    exit 1
+fi
+
+# ลอง pull สูงสุด 3 รอบ (กันเน็ต/DNS ขัดข้องชั่วคราว) แล้วตรวจว่าครบทุกไฟล์จริง
+PLAYBOOK_DIR="frontend/public/playbooks"
+LFS_OK=0
+for attempt in 1 2 3; do
+    echo "  (รอบ $attempt) git lfs pull..."
+    if "$LFS_BIN" pull; then
+        # 🧪 ตรวจว่าไม่มีไฟล์ใดเหลือเป็น pointer (ขนาด < 1000 bytes = pointer 131 bytes)
+        TOTAL=$(find "$PLAYBOOK_DIR" -type f \( -name "*.webp" -o -name "*.pdf" \) 2>/dev/null | wc -l)
+        POINTERS=$(find "$PLAYBOOK_DIR" -type f \( -name "*.webp" -o -name "*.pdf" \) -size -1000c 2>/dev/null | wc -l)
+        if [ "$POINTERS" -eq 0 ] && [ "$TOTAL" -gt 0 ]; then
+            echo "✅ ไฟล์ LFS ทั้งหมด $TOTAL ไฟล์เป็นไฟล์จริงแล้ว (ไม่มี pointer เหลือ)"
+            LFS_OK=1
+            break
+        fi
+        echo "  ⚠️ ยังมีไฟล์เป็น pointer เหลือ $POINTERS/$TOTAL ไฟล์ — ลองรอบถัดไป..."
+    else
+        echo "  ⚠️ git lfs pull รอบที่ $attempt ล้มเหลว — ลองรอบถัดไป..."
+    fi
+done
+
+if [ "$LFS_OK" -ne 1 ]; then
+    echo "❌ ดึงไฟล์ LFS ไม่ครบ (ยังมี pointer เหลือ) — ตรวจสอบเน็ต/DNS ของเครื่อง แล้วรัน pull_all.sh ใหม่"
+    find "$PLAYBOOK_DIR" -type f \( -name "*.webp" -o -name "*.pdf" \) -size -1000c 2>/dev/null | head -10
     exit 1
 fi
 
