@@ -93,6 +93,18 @@ const router = createRouter({
           component: () => import('@/views/boards/BoardDetail.vue'),
         },
         {
+          path: 'playbooks',
+          name: 'playbooks',
+          component: () => import('@/views/playbooks/PlaybooksCatalog.vue'),
+          meta: { requiresAuth: true },
+        },
+        {
+          path: 'playbooks/:id',
+          name: 'playbook-reader',
+          component: () => import('@/views/playbooks/PlaybookReader.vue'),
+          meta: { requiresAuth: true },
+        },
+        {
           path: 'notifications',
           name: 'notifications',
           component: () => import('@/views/notifications/NotificationCenter.vue'),
