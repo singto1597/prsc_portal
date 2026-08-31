@@ -25,8 +25,33 @@ git reset --hard origin/$CURRENT_BRANCH
 # --- 📦 [NEW] ดึงไฟล์จริงจาก Git LFS (webp/pdf ของ P.R. Playbooks) ---
 # git reset --hard จะได้ไฟล์เป็น LFS pointer (ไฟล์เล็กๆ) ไม่ใช่ไฟล์จริง
 # ต้อง git lfs pull ก่อน build ไม่งั้น Docker COPY เอาตัวชี้ไปลง image → รูปไม่แสดง
+#
+# ⚠️ ใช้ absolute path ของ git-lfs (ไม่ใช่ command -v git-lfs) เพราะ script นี้
+#    มักถูกรันแบบ non-interactive ซึ่ง ~/.local/bin ไม่อยู่ใน PATH → command -v หาไม่เจอ
+#    และหลัง pull ต้องตรวจว่าไฟล์เป็นไฟล์จริง (ใหญ่พอ) ไม่ใช่ pointer 131 bytes
 echo "📦 กำลังดึงไฟล์จริงจาก Git LFS..."
-command -v git-lfs >/dev/null 2>&1 && git lfs pull || echo "⚠️ ไม่พบ git-lfs — ตรวจสอบว่าไฟล์ webp/pdf เป็นไฟล์จริงก่อน build"
+LFS_BIN=""
+if command -v git-lfs >/dev/null 2>&1; then
+    LFS_BIN="git-lfs"
+elif [ -x "$HOME/.local/bin/git-lfs" ]; then
+    LFS_BIN="$HOME/.local/bin/git-lfs"
+fi
+
+if [ -n "$LFS_BIN" ]; then
+    "$LFS_BIN" pull
+    # 🧪 ตรวจว่าได้ไฟล์จริง (webp ควรหลาย KB ขึ้นไป) — ถ้ายังเป็น pointer ให้หยุดทันที
+    if [ -f frontend/public/playbooks/vol1/page-01.webp ]; then
+        SIZE=$(stat -c%s frontend/public/playbooks/vol1/page-01.webp 2>/dev/null || echo 0)
+        if [ "$SIZE" -lt 1000 ]; then
+            echo "❌ ไฟล์ playbook ยังเป็น LFS pointer ($SIZE bytes) — git lfs pull ไม่สำเร็จ หยุด deploy"
+            exit 1
+        fi
+    fi
+    echo "✅ ไฟล์ LFS เป็นไฟล์จริงแล้ว"
+else
+    echo "❌ ไม่พบ git-lfs — ไฟล์ webp/pdf จะเป็น pointer (รูปไม่แสดง) หยุด deploy"
+    exit 1
+fi
 
 # --- 🚀 [NEW] ดึงเลข Commit 7 หลักล่าสุดมาใช้เป็นชื่อ Image ---
 export IMAGE_TAG=$(git rev-parse --short HEAD)
