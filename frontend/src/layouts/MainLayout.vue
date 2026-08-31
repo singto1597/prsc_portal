@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { RouterView, RouterLink, useRouter, useRoute } from 'vue-router';
 import Swal from 'sweetalert2';
 import { useAuthStore } from '@/stores/auth';
+import { useNotificationsStore } from '@/stores/notifications';
 
 const authStore = useAuthStore();
+const notificationsStore = useNotificationsStore();
 const router = useRouter();
 const route = useRoute();
 
@@ -15,11 +17,16 @@ onMounted(async () => {
   if (authStore.isAuthenticated) {
     try {
       await authStore.loadMe();
+      notificationsStore.startPolling(); // 🔔 เริ่ม poll badge
     } catch {
       authStore.logout();
       router.push({ name: 'login' });
     }
   }
+});
+
+onBeforeUnmount(() => {
+  notificationsStore.stopPolling();
 });
 
 const displayName = computed(() => authStore.displayName);
@@ -77,27 +84,39 @@ function logout() {
   });
 }
 
+// 🔔 unread badge ตามเมนู (map path → group_type จาก store)
+const menuBadge = (path: string): number => {
+  const g = {
+    '/issues/mine': 'issue_mine',
+    '/issues/received': 'issue_received',
+    '/boards': 'board',
+    '/boards/reports': 'report',
+  } as Record<string, string>;
+  const group = g[path];
+  return group ? notificationsStore.counts[group] || 0 : 0;
+};
+
 // เมนูตาม permission
 const menuItems = computed(() => {
-  const items = [];
+  const items: Array<{ name: string; path: string; icon: string; badge: number }> = [];
   if (authStore.hasPermission('VIEW_DASHBOARD')) {
-    items.push({ name: 'แดชบอร์ด', path: '/dashboard', icon: 'bi-grid-1x2' });
+    items.push({ name: 'แดชบอร์ด', path: '/dashboard', icon: 'bi-grid-1x2', badge: 0 });
   }
-  items.push({ name: 'แจ้งปัญหา / ความคิดเห็น', path: '/issues/new', icon: 'bi-pencil-square' });
-  items.push({ name: 'เรื่องของฉัน', path: '/issues/mine', icon: 'bi-file-earmark-text' });
-  items.push({ name: 'PIRI Boards', path: '/boards', icon: 'bi-columns-gap' });
+  items.push({ name: 'แจ้งปัญหา / ความคิดเห็น', path: '/issues/new', icon: 'bi-pencil-square', badge: 0 });
+  items.push({ name: 'เรื่องของฉัน', path: '/issues/mine', icon: 'bi-file-earmark-text', badge: menuBadge('/issues/mine') });
+  items.push({ name: 'PIRI Boards', path: '/boards', icon: 'bi-columns-gap', badge: menuBadge('/boards') });
   if (authStore.isCouncilAuthority) {
-    items.push({ name: 'จัดการรายงาน', path: '/boards/reports', icon: 'bi-flag-fill' });
+    items.push({ name: 'จัดการรายงาน', path: '/boards/reports', icon: 'bi-flag-fill', badge: menuBadge('/boards/reports') });
   }
   if (authStore.hasPermission('RECEIVE_ISSUES')) {
-    items.push({ name: 'เรื่องที่รับ / ระดับฉัน', path: '/issues/received', icon: 'bi-inbox' });
+    items.push({ name: 'เรื่องที่รับ / ระดับฉัน', path: '/issues/received', icon: 'bi-inbox', badge: menuBadge('/issues/received') });
   }
   if (authStore.hasPermission('MANAGE_STUDENTS')) {
-    items.push({ name: 'นักเรียน', path: '/students', icon: 'bi-people' });
-    items.push({ name: 'นำเข้า Excel', path: '/students/import', icon: 'bi-file-earmark-arrow-up' });
+    items.push({ name: 'นักเรียน', path: '/students', icon: 'bi-people', badge: 0 });
+    items.push({ name: 'นำเข้า Excel', path: '/students/import', icon: 'bi-file-earmark-arrow-up', badge: 0 });
   }
   if (authStore.hasPermission('VIEW_AUDIT_LOG')) {
-    items.push({ name: 'บันทึกการใช้งาน', path: '/audit-logs', icon: 'bi-clock-history' });
+    items.push({ name: 'บันทึกการใช้งาน', path: '/audit-logs', icon: 'bi-clock-history', badge: 0 });
   }
   return items;
 });
@@ -138,6 +157,12 @@ const isActive = (path: string) => {
             >
               <i :class="['bi', item.icon, 'text-lg mr-3', isActive(item.path) ? '' : 'transition-transform group-hover:scale-110']"></i>
               {{ item.name }}
+              <span
+                v-if="item.badge > 0"
+                class="ml-auto min-w-[20px] h-5 px-1.5 rounded-full bg-red-600 text-white text-[11px] font-bold flex items-center justify-center"
+              >
+                {{ item.badge > 99 ? '99+' : item.badge }}
+              </span>
             </RouterLink>
           </nav>
 
@@ -153,6 +178,20 @@ const isActive = (path: string) => {
                   <p class="text-[10px] tracking-wider text-red-500 font-bold uppercase truncate leading-none">{{ roleLabel }}</p>
                 </div>
               </div>
+              <!-- 🔔 กระดิ่งแจ้งเตือน (badge = unread ทั้งหมด) -->
+              <RouterLink
+                to="/notifications"
+                title="การแจ้งเตือน"
+                class="relative w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors shrink-0 ml-1"
+              >
+                <i class="bi bi-bell-fill text-lg"></i>
+                <span
+                  v-if="notificationsStore.total > 0"
+                  class="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold flex items-center justify-center"
+                >
+                  {{ notificationsStore.total > 99 ? '99+' : notificationsStore.total }}
+                </span>
+              </RouterLink>
               <button
                 @click.stop="toggleDropdown('sidebarSettings')"
                 class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors shrink-0 ml-1"
@@ -209,6 +248,12 @@ const isActive = (path: string) => {
           >
             <i :class="['bi', item.icon, 'text-lg mr-3']"></i>
             {{ item.name }}
+            <span
+              v-if="item.badge > 0"
+              class="ml-auto min-w-[20px] h-5 px-1.5 rounded-full bg-red-600 text-white text-[11px] font-bold flex items-center justify-center"
+            >
+              {{ item.badge > 99 ? '99+' : item.badge }}
+            </span>
           </RouterLink>
         </nav>
         <div class="p-3 border-t border-gray-100">
@@ -236,9 +281,21 @@ const isActive = (path: string) => {
           <img src="/logos/school-logo.png" alt="โลโก้โรงเรียน" class="w-7 h-7 rounded-full object-cover" />
           <span class="font-bold text-red-700">PIRIvoice</span>
         </div>
-        <button @click="goToProfile" class="w-8 h-8 rounded-full bg-gradient-to-br from-red-100 to-red-50 text-red-600 flex items-center justify-center text-sm font-bold">
-          {{ avatarChar }}
-        </button>
+        <div class="flex items-center gap-2">
+          <!-- 🔔 กระดิ่งแจ้งเตือน (mobile) -->
+          <RouterLink to="/notifications" class="relative w-8 h-8 flex items-center justify-center text-gray-600">
+            <i class="bi bi-bell-fill text-lg"></i>
+            <span
+              v-if="notificationsStore.total > 0"
+              class="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold flex items-center justify-center"
+            >
+              {{ notificationsStore.total > 99 ? '99+' : notificationsStore.total }}
+            </span>
+          </RouterLink>
+          <button @click="goToProfile" class="w-8 h-8 rounded-full bg-gradient-to-br from-red-100 to-red-50 text-red-600 flex items-center justify-center text-sm font-bold">
+            {{ avatarChar }}
+          </button>
+        </div>
       </header>
 
       <main class="flex-1 overflow-y-auto p-4 md:p-6 mt-14 md:mt-0 max-w-7xl w-full mx-auto">

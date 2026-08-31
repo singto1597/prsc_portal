@@ -503,3 +503,23 @@
 - **⚠️ asyncpg/Postgres gotcha:** เขียนเป็น `SELECT COUNT(*) FROM (INSERT ... RETURNING ...) t` **ไม่ได้** — Postgres ห้าม DML ตรงใน FROM ของ subquery → `PostgresSyntaxError: syntax error at or near "INTO"` → GET detail พังทุกตัว → ต้องใช้ **data-modifying CTE** (`WITH ins AS (INSERT ...) SELECT COUNT(*) FROM ins`) เท่านั้น (เป็นบทเรียนเดียวกับ phase3 เรื่อง DML-CTE ที่ใช้ count ได้ แต่เลือกผิดฝั่งวาง)
 - **กฎ: ถ้าอยาก "INSERT ที่ไม่ซ้ำแล้วนับว่าแทรก/อัปเดตจริงไหม" ให้ใช้ WITH data-modifying CTE + RETURNING + COUNT(*) — ห้ามวาง INSERT ใน FROM; และ dedup แบบนี้ฟรี (ไม่ต้อง Redis) เพราะเป็น atomic UPSERT ในตารางเดียว**
 - **Date Added:** 2026-08-28
+
+### 🛠️ Notifications fan-out (Phase 7) — asyncpg ต้อง numbering placeholder เริ่มที่ `$1` เสมอ
+- **Context/Problem:** `notify_fanout` ใช้ `INSERT ... SELECT user_id, $2, $3, ... FROM students` (คอลัมน์ `user_id` มาจาก SELECT ไม่ใช่ parameter) → `IndeterminateDatatypeError: could not determine data type of parameter $1` → POST approve-to-public 500 (จับได้ตอนรันเทสต์ 22 ตัว)
+- **Root Cause:** asyncpg numbering parameter เริ่มที่ `$1` เสมอ — SQL ที่อ้าง `$2..$10` แต่ไม่มี `$1` (เพราะ column value ไม่ใช่ param) asyncpg ยังตี `$1` เป็น parameter ตัวแรก → อนุมาน type ไม่ได้
+- **Correct Pattern/Solution:** นับ placeholder ให้เริ่มที่ `$1` ใน SQL ทุกครั้ง แม้ column บางตัวมาจาก SELECT:
+  ```sql
+  INSERT INTO notifications (user_id, group_type, ...)
+  SELECT user_id, $1, $2, $3, ...   -- $1 = group_type (param แรก)
+  FROM students
+  WHERE ... AND ($8::int IS NULL OR user_id <> $8)  -- actor_id = $8, cast ชัด
+  ```
+- **กฎ: ก่อน `conn.execute/fetch(sql, *params)` ตรวจว่า placeholder เลขขึ้นจาก $1 เรียงต่อเนื่อง และ `count('$') == len(params)`; โดยเฉพาะ SQL แบบ INSERT...SELECT หรือ dynamic WHERE ที่ column มาจาก expression ไม่ใช่ param — นี่เป็นบทเรียนที่เจอซ้ำ (ดูรายการ $1 เกิน + $2 เป็นตัวแรก)**
+- **Date Added:** 2026-08-31
+
+### 🛠️ asyncpg `AmbiguousParameterError` — `SELECT DISTINCT` ต้อง cast param ใน select-list ให้ชัด
+- **Context/Problem:** `notify_fanout` เพิ่ม `SELECT DISTINCT user_id, $1, $2, ...` เพื่อกัน user หลายห้องได้ board_new ซ้ำ → `AmbiguousParameterError: inconsistent types deduced for parameter $8 (integer versus text)` → approve-to-public 500 (เจอจริงตอนเทสต์ fan-out dedup)
+- **Root Cause:** `DISTINCT` ทำให้ asyncpg ตี type ของ select-list parameter ต้อง resolve เอง (ไม่พึ่ง INSERT target column เหมือน `SELECT` ธรรมดา) → param ที่ใช้ทั้งใน select-list และ WHERE (เช่น `$8`) เจอการอนุมานขัดกัน
+- **Correct Pattern/Solution:** cast ชัดทุก param ใน select-list: `SELECT DISTINCT user_id, $1::varchar, $2::varchar, $3::text, ..., $6::int, $7::int, $8::int, $9::text` — ไม่เหลือที่ asyncpg ต้องเดา (ดูเพิ่มจากบทเรียนเดิม `$1` ซ้ำ / `$1` เกิน / numbering เริ่ม $1)
+- **กฎ: SQL ที่มี DISTINCT/GROUP BY + parameter ใน select-list → cast `::int`/`::text`/`::varchar` ทุก param ทันที (DISTINCT โดยเฉพาะเปราะเรื่อง type inference)**
+- **Date Added:** 2026-08-31

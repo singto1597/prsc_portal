@@ -27,11 +27,13 @@ import {
   type RequestedDestination,
 } from '@/types/issue'
 import { useAuthStore } from '@/stores/auth'
+import { useNotificationsStore } from '@/stores/notifications'
 import ApproveBoardModal from '@/components/boards/ApproveBoardModal.vue'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const notificationsStore = useNotificationsStore()
 
 const issue = ref<Issue | null>(null)
 const isLoading = ref(true)
@@ -128,6 +130,8 @@ async function load() {
   isLoading.value = true
   try {
     issue.value = await getIssue(Number(route.params.id))
+    // 🔔 เปิดเรื่องแล้ว → mark notification ของเรื่องนี้ว่าอ่านแล้ว (badge ลด)
+    if (issue.value) void notificationsStore.read({ entity_type: 'issue', entity_id: issue.value.id })
   } catch (e) {
     Swal.fire({ icon: 'error', title: 'ไม่สามารถโหลดเรื่องได้', text: errMsg(e) })
   } finally {

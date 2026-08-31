@@ -23,6 +23,9 @@ from services.issue_service import _has_council_authority
 from services.board_service import _display_name
 from models.board_schemas import REPORT_REASONS
 
+# 🔔 Notification writer (อยู่ใน transaction เดียวกับข้อมูลหลัก — ลอกแบบ AuditLogger)
+from services.notification_service import notify, notify_bulk, _council_ids, _user_display_name
+
 # ค่าคงที่หมวดเหตุผล — sync กับ schemas (piri_board_reports.reason CHECK)
 REPORT_REASON_LABELS = {
     "bullying": "กลั่นแกล้ง/คุกคาม",
@@ -248,6 +251,18 @@ async def report_comment(
                 },
             )
 
+            # 🔔 แจ้งสภา/แอดมินว่ามีรายงานใหม่ (badge "จัดการรายงาน" — exclude ผู้แจ้งเอง)
+            reason_label = REPORT_REASON_LABELS.get(reason, reason)
+            await notify_bulk(
+                conn, await _council_ids(conn),
+                group_type="report", type="report_new",
+                title="มีรายงานใหม่รอจัดการ",
+                body=f'รายงาน "{reason_label}" ในกระทู้ "{board["title"]}"',
+                entity_type="piri_board_report", entity_id=report_id,
+                board_id=board_id,
+                actor_id=user_id,
+            )
+
     return {"id": report_id, "board_id": board_id, "comment_id": comment_id, "status": "open"}
 
 
@@ -395,6 +410,17 @@ async def hide_board(
                 old_values={"status": board["status"]},
                 new_values={"status": "hidden", "reason": reason},
             )
+
+            # 🔔 แจ้งเจ้าของบอร์ดว่าบอร์ดถูกซ่อน
+            if board["author_id"]:
+                await notify(
+                    conn, user_id=board["author_id"],
+                    group_type="board", type="board_hidden",
+                    title="กระทู้ของคุณถูกซ่อน",
+                    body=f'กระทู้ "{board["title"]}" ถูกซ่อน (เหตุผล: {reason})',
+                    entity_type="piri_board", entity_id=board_id, board_id=board_id,
+                    actor_id=moderator_id,
+                )
 
     return {"status": "hidden", "board_id": board_id}
 
@@ -597,6 +623,23 @@ async def resolve_report(
                 old_values={"status": "open", "reason": report["reason"]},
                 new_values={"status": "resolved" if action == "hide" else "dismissed", "note": note, **resolved},
             )
+
+            # 🔔 แจ้งผู้แจ้งรายงานว่าจัดการแล้ว
+            if report["reporter_id"]:
+                board_title = await conn.fetchval(
+                    "SELECT title FROM piri_boards WHERE id = $1", report["board_id"]
+                ) or f"บอร์ด #{report['board_id']}"
+                action_label = "ซ่อนคอมเมนต์แล้ว" if action == "hide" else "ปัดตก (ไม่ซ่อน)"
+                actor_display = await _user_display_name(conn, moderator_id) or "สภานักเรียน"
+                await notify(
+                    conn, user_id=report["reporter_id"],
+                    group_type="report", type="report_actioned",
+                    title="รายงานของคุณถูกจัดการแล้ว",
+                    body=f'รายงานในกระทู้ "{board_title}" ถูกจัดการโดย {actor_display} ({action_label})',
+                    entity_type="piri_board_report", entity_id=report_id,
+                    board_id=report["board_id"],
+                    actor_id=moderator_id, actor_name=actor_display,
+                )
 
     return {
         "report_id": report_id,

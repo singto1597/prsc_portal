@@ -93,6 +93,12 @@ const router = createRouter({
           component: () => import('@/views/boards/BoardDetail.vue'),
         },
         {
+          path: 'notifications',
+          name: 'notifications',
+          component: () => import('@/views/notifications/NotificationCenter.vue'),
+          meta: { requiresAuth: true },
+        },
+        {
           path: 'students',
           name: 'students',
           component: () => import('@/views/students/StudentList.vue'),

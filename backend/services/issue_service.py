@@ -7,6 +7,13 @@ from core.exceptions import NotFoundError, ForbiddenError, ValidationError, Conf
 from core.config import settings
 from core.categories import is_valid_category, all_main_category_codes
 
+# 🔔 Notification writer (อยู่ใน transaction เดียวกับข้อมูลหลัก — ลอกแบบ AuditLogger)
+from services.notification_service import (
+    notify, notify_bulk, notify_fanout,
+    _room_receiver_ids, _council_ids, _level_president_ids,
+    _user_display_name, _mask_actor,
+)
+
 # 🔼 ลำดับการ Escalate (พีระมิด)
 # room (หัวหน้าห้อง+รอง) → level (ประธานระดับ) → council (สภานักเรียน)
 LEVEL_ORDER = ["room", "level", "council"]
@@ -328,6 +335,23 @@ async def create_issue(
                 },
             )
 
+            # 🔔 แจ้งเตือนผู้รับเรื่องในระดับนั้น (badge "เรื่องที่รับ") — เรื่อง anonymous ไม่รั่วชื่อ
+            actor_name = _mask_actor(reporter_name, is_anonymous)
+            if start_level == "room":
+                receivers = await _room_receiver_ids(conn, room_id)
+            elif start_level == "level":
+                receivers = await _level_president_ids(conn, await _room_level(conn, room_id))
+            else:  # council (รวมเรื่องขอเผยแพร่สาธารณะ vote/talk — ตรงไปสภา)
+                receivers = await _council_ids(conn)
+            await notify_bulk(
+                conn, receivers,
+                group_type="issue_received", type="issue_new",
+                title="เรื่องใหม่ในระดับของคุณ",
+                body=f'มีเรื่องใหม่ "{title}" จาก {actor_name or "ไม่ระบุชื่อ"}',
+                entity_type="issue", entity_id=issue_id,
+                actor_id=user_id, actor_name=actor_name,
+            )
+
             return issue_id
 
 
@@ -483,6 +507,17 @@ async def approve_to_public(
                 },
             )
 
+            # 🔔 แจ้งทุกคนว่ามีบอร์ดใหม่ (fan-out — exclude ตัวที่อนุมัติ)
+            board_type_label = "โหวต" if board_type == "vote" else "พูดคุย"
+            await notify_fanout(
+                conn,
+                group_type="board", type="board_new",
+                title="มีกระทู้ใหม่บน PIRI Boards",
+                body=f'"{issue["title"]}" ({board_type_label})',
+                entity_type="piri_board", entity_id=board_id, board_id=board_id,
+                actor_id=user_id, actor_name=None,
+            )
+
             return board_id
 
 
@@ -605,6 +640,34 @@ async def change_destination(
                     "status": new_status,
                 },
             )
+
+            # 🔔 แจ้งผู้แจ้งเรื่องว่าปลายทางเปลี่ยน (badge "เรื่องของฉัน")
+            dest_label = {
+                "normal": "ดำเนินการปกติ", "vote": "โหวตสาธารณะ", "talk": "บอร์ดพูดคุย",
+            }.get(requested_destination, requested_destination)
+            if issue["reporter_id"]:
+                await notify(
+                    conn, user_id=issue["reporter_id"],
+                    group_type="issue_mine", type="issue_update",
+                    title="อัปเดตสถานะเรื่อง",
+                    body=f'เรื่อง "{issue["title"]}" เปลี่ยนปลายทางเป็น "{dest_label}"',
+                    entity_type="issue", entity_id=issue_id,
+                    actor_id=user_id,
+                )
+            # ถ้าเปลี่ยนระดับ → แจ้งผู้รับเรื่องในระดับใหม่ด้วย (badge "เรื่องที่รับ")
+            if level_changed:
+                receivers = (
+                    await _council_ids(conn) if target_level == "council"
+                    else await _room_receiver_ids(conn, issue["room_id"])
+                )
+                await notify_bulk(
+                    conn, receivers,
+                    group_type="issue_received", type="issue_new",
+                    title="เรื่องใหม่ในระดับของคุณ",
+                    body=f'มีเรื่องใหม่ "{issue["title"]}" (เปลี่ยนปลายทางจาก {old_destination})',
+                    entity_type="issue", entity_id=issue_id,
+                    actor_id=user_id,
+                )
 
 
 async def update_issue(
@@ -1123,6 +1186,18 @@ async def accept_issue(pool: asyncpg.Pool, user_id: int, issue_id: int, estimate
                 },
             )
 
+            # 🔔 แจ้งผู้แจ้งเรื่องว่ารับงานแล้ว (badge "เรื่องของฉัน")
+            if issue["reporter_id"]:
+                actor_display = await _user_display_name(conn, user_id) or "ผู้รับเรื่อง"
+                await notify(
+                    conn, user_id=issue["reporter_id"],
+                    group_type="issue_mine", type="issue_update",
+                    title="อัปเดตสถานะเรื่อง",
+                    body=f'เรื่อง "{issue["title"]}" ถูก {actor_display} รับไปดำเนินการแล้ว (ตั้งเวลา {estimated_days} วัน)',
+                    entity_type="issue", entity_id=issue_id,
+                    actor_id=user_id,
+                )
+
 
 async def update_countdown(pool: asyncpg.Pool, user_id: int, issue_id: int, estimated_days: int) -> None:
     """แก้ไข countdown (ยืดเวลา) — ผู้รับเรื่อง หรือ admin/ครูที่จัดการเรื่องได้"""
@@ -1314,6 +1389,32 @@ async def escalate_issue(pool: asyncpg.Pool, user_id: int, issue_id: int, reason
                 },
             )
 
+            # 🔔 แจ้งผู้แจ้งเรื่องว่าถูกส่งต่อ + ผู้รับเรื่องในระดับใหม่ (badge ตามกลุ่ม)
+            level_label = {
+                "room": "หัวหน้าห้อง", "level": "ประธานระดับ", "council": "สภานักเรียน",
+            }.get(next_level, next_level)
+            if issue["reporter_id"]:
+                await notify(
+                    conn, user_id=issue["reporter_id"],
+                    group_type="issue_mine", type="issue_update",
+                    title="อัปเดตสถานะเรื่อง",
+                    body=f'เรื่อง "{issue["title"]}" ถูกส่งต่อไปยังระดับ {level_label}',
+                    entity_type="issue", entity_id=issue_id,
+                    actor_id=user_id,
+                )
+            if next_level == "level":
+                new_receivers = await _level_president_ids(conn, await _room_level(conn, issue["room_id"]))
+            else:
+                new_receivers = await _council_ids(conn)
+            await notify_bulk(
+                conn, new_receivers,
+                group_type="issue_received", type="issue_new",
+                title="เรื่องใหม่ในระดับของคุณ",
+                body=f'มีเรื่องใหม่ "{issue["title"]}" (ส่งต่อจากระดับ {issue["current_level"]})',
+                entity_type="issue", entity_id=issue_id,
+                actor_id=user_id,
+            )
+
 
 async def resolve_issue(pool: asyncpg.Pool, user_id: int, issue_id: int, note: Optional[str] = None) -> None:
     """ปิดเรื่อง (แก้ไขเสร็จ)"""
@@ -1356,6 +1457,17 @@ async def resolve_issue(pool: asyncpg.Pool, user_id: int, issue_id: int, note: O
                 old_values={"status": issue["status"]},
                 new_values={"status": "resolved", "note": note},
             )
+
+            # 🔔 แจ้งผู้แจ้งเรื่องว่าจัดการเสร็จสิ้น (badge "เรื่องของฉัน")
+            if issue["reporter_id"]:
+                await notify(
+                    conn, user_id=issue["reporter_id"],
+                    group_type="issue_mine", type="issue_update",
+                    title="อัปเดตสถานะเรื่อง",
+                    body=f'เรื่อง "{issue["title"]}" ถูกจัดการเสร็จสิ้นแล้ว',
+                    entity_type="issue", entity_id=issue_id,
+                    actor_id=user_id,
+                )
 
 
 async def cancel_issue(pool: asyncpg.Pool, user_id: int, issue_id: int, reason: Optional[str] = None) -> str:
@@ -1418,6 +1530,17 @@ async def cancel_issue(pool: asyncpg.Pool, user_id: int, issue_id: int, reason: 
                 old_values={"status": issue["status"]},
                 new_values={"status": new_status, "note": note},
             )
+
+            # 🔔 ถ้าผู้ดูแลปัดตก → แจ้งผู้แจ้ง (ผู้แจ้งกดยกเลิกเอง → notify self-guard ตัดทิ้ง)
+            if new_status == "rejected" and issue["reporter_id"]:
+                await notify(
+                    conn, user_id=issue["reporter_id"],
+                    group_type="issue_mine", type="issue_update",
+                    title="อัปเดตสถานะเรื่อง",
+                    body=f'เรื่อง "{issue["title"]}" ถูกปัดตกแล้ว' + (f" (เหตุผล: {reason})" if reason else ""),
+                    entity_type="issue", entity_id=issue_id,
+                    actor_id=user_id,
+                )
             return new_status
 
 
@@ -1572,6 +1695,32 @@ async def add_comment(pool: asyncpg.Pool, user_id: int, issue_id: int, body: str
                 entity_type="issue_comment", entity_id=comment_id,
                 new_values={"body": body},
             )
+
+            # 🔔 แจ้งผู้แจ้งเรื่อง + ผู้รับเรื่องว่ามีคอมเมนต์ใหม่ (badge "เรื่องของฉัน"/"เรื่องที่รับ")
+            comment_actor_name = commenter_name or await _user_display_name(conn, user_id) or "ผู้ใช้"
+            # 🛡️ เรื่อง anonymous + ผู้คอมเมนต์เป็นผู้แจ้งเอง → อย่าให้ชื่อผู้แจ้งรั่วผ่าน notification
+            # (adversarial review: ถ้าไม่มาสก์ สภาที่รับงานเห็นชื่อจริงผู้แจ้งจาก notification ทันที
+            # แม้เรื่องจะ anonymous)
+            if issue["is_anonymous"] and issue["reporter_id"] == user_id:
+                comment_actor_name = "ไม่ระบุชื่อ"
+            if issue["reporter_id"]:
+                await notify(
+                    conn, user_id=issue["reporter_id"],
+                    group_type="issue_mine", type="issue_comment",
+                    title="มีความคิดเห็นใหม่",
+                    body=f'{comment_actor_name} คอมเมนต์ในเรื่อง "{issue["title"]}"',
+                    entity_type="issue", entity_id=issue_id,
+                    actor_id=user_id, actor_name=comment_actor_name,
+                )
+            if issue["current_assignee_id"]:
+                await notify(
+                    conn, user_id=issue["current_assignee_id"],
+                    group_type="issue_received", type="issue_comment",
+                    title="มีความคิดเห็นใหม่",
+                    body=f'{comment_actor_name} คอมเมนต์ในเรื่อง "{issue["title"]}"',
+                    entity_type="issue", entity_id=issue_id,
+                    actor_id=user_id, actor_name=comment_actor_name,
+                )
             return comment_id
 
 

@@ -19,6 +19,9 @@ import asyncpg
 
 from core.exceptions import NotFoundError, ForbiddenError, ValidationError, ConflictError
 
+# 🔔 Notification writer (อยู่ใน transaction เดียวกับข้อมูลหลัก — ลอกแบบ AuditLogger)
+from services.notification_service import notify, _user_display_name
+
 # ⚠️ ความลึก reply ที่ปลอดภัย — กัน recursive Pydantic overflow:
 # BoardCommentOut เป็น model ซ้อนตัวเอง — reply chain ~256 ชั้นทำ BoardDetailOut(**detail)
 # เกิด 'recursion_loop' ValidationError → HTTP 500 ทุกครั้งที่ GET detail (adversarial review ยืนยันแล้ว)
@@ -440,9 +443,10 @@ async def add_comment(
 
             if parent_id:
                 # ต้องยัง active และไม่ถูกแอดมินซ่อน (กัน reply ต่อคอมเมนต์ที่ moderation ซ่อนไว้แล้ว)
+                # เลือก user_id ด้วย → ใช้แจ้งเตือนเจ้าของคอมเมนต์ต้นทางว่ามีคนตอบกลับ
                 parent = await conn.fetchrow(
                     """
-                    SELECT id FROM piri_board_comments
+                    SELECT id, user_id FROM piri_board_comments
                     WHERE id = $1 AND board_id = $2 AND deleted_at IS NULL AND is_hidden_by_admin = FALSE
                     """,
                     parent_id, board_id
@@ -499,6 +503,31 @@ async def add_comment(
                     "body": body,
                 },
             )
+
+            # 🔔 แจ้งเตือน: reply → เจ้าของคอมเมนต์ต้นทาง; top-level → เจ้าของบอร์ด
+            # (ทั้งคู่ group 'board' → badge PIRI Boards; self-guard กันตอบ/คอมเมนต์บอร์ดตัวเอง)
+            body_snippet = body if len(body) <= 80 else body[:80] + "…"
+            actor_name = await _user_display_name(conn, user_id) or "ผู้ใช้"
+            if parent_id and parent["user_id"]:
+                await notify(
+                    conn, user_id=parent["user_id"],
+                    group_type="board", type="board_reply",
+                    title="มีผู้ตอบกลับความคิดเห็นของคุณ",
+                    body=f'{actor_name}: "{body_snippet}"',
+                    entity_type="piri_board_comment", entity_id=comment_id,
+                    board_id=board_id,
+                    actor_id=user_id, actor_name=actor_name,
+                )
+            elif board["author_id"]:
+                await notify(
+                    conn, user_id=board["author_id"],
+                    group_type="board", type="board_reply",
+                    title="มีคอมเมนต์ใหม่ในกระทู้ของคุณ",
+                    body=f'{actor_name}: "{body_snippet}"',
+                    entity_type="piri_board_comment", entity_id=comment_id,
+                    board_id=board_id,
+                    actor_id=user_id, actor_name=actor_name,
+                )
             return comment_id
 
 
