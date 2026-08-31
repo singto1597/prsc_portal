@@ -398,6 +398,44 @@ async def init_db(pool: asyncpg.Pool):
                 );
                 """)
 
+                # --- 8.6 announcements: ประกาศสาธารณะบน Landing Page ---
+                #   - priority: normal / high / urgent (urgent = พื้นหลังแดงเข้มบนหน้า Landing)
+                #   - link: ลิงก์ปลายทาง (optional) เมื่อคลิกประกาศ
+                await conn.execute("""
+                CREATE TABLE IF NOT EXISTS announcements (
+                    id SERIAL PRIMARY KEY,
+                    message TEXT NOT NULL,
+                    priority VARCHAR(10) NOT NULL DEFAULT 'normal',
+                    link TEXT,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    deleted_at TIMESTAMP WITH TIME ZONE,
+                    CONSTRAINT chk_announcements_priority CHECK (priority IN ('normal', 'high', 'urgent'))
+                );
+                """)
+
+                # Seed ประกาศเริ่มต้น (เฉพาะฐานข้อมูลใหม่) — idempotent
+                announcement_count = await conn.fetchval(
+                    "SELECT COUNT(*) FROM announcements"
+                )
+                if announcement_count == 0:
+                    await conn.executemany(
+                        """
+                        INSERT INTO announcements (message, priority) VALUES ($1, $2)
+                        """,
+                        [
+                            (
+                                "ยินดีต้อนรับสู่ PIRIvoice — ส่งเสียงของคุณเพื่อให้โรงเรียนดีขึ้น",
+                                "normal",
+                            ),
+                            (
+                                "สภานักเรียนเปิดรับข้อเสนอโครงการใหม่ผ่าน PIRI Vote แล้ว วันนี้โหวตได้เลย!",
+                                "high",
+                            ),
+                        ],
+                    )
+                    logger.info("📣 Seeded default announcements.")
+
                 # --- 9. ตารางคิวงาน Import นักเรียนจาก Excel (Queue: ARQ Worker) ---
                 # status: 'PENDING' (อัปโหลดแล้ว ยังไม่สั่งเริ่ม) / 'QUEUED' (ยิงเข้า Redis แล้ว)
                 #         'PROCESSING' (worker กำลังทำงาน) / 'COMPLETED' / 'FAILED'

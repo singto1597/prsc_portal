@@ -523,3 +523,10 @@
 - **Correct Pattern/Solution:** cast ชัดทุก param ใน select-list: `SELECT DISTINCT user_id, $1::varchar, $2::varchar, $3::text, ..., $6::int, $7::int, $8::int, $9::text` — ไม่เหลือที่ asyncpg ต้องเดา (ดูเพิ่มจากบทเรียนเดิม `$1` ซ้ำ / `$1` เกิน / numbering เริ่ม $1)
 - **กฎ: SQL ที่มี DISTINCT/GROUP BY + parameter ใน select-list → cast `::int`/`::text`/`::varchar` ทุก param ทันที (DISTINCT โดยเฉพาะเปราะเรื่อง type inference)**
 - **Date Added:** 2026-08-31
+
+### 🛠️ Seed ใน `init_db` — `COUNT()==0` ถูก re-insert ตอน TestClient เปิด app (พังเทสที่คาดจำนวนแถว)
+- **Context/Problem:** เพิ่มตาราง `announcements` + seed แบบ "insert ถ้าตารางว่าง" ลงใน `init_db` → เทส `test_public.py` คาด `len(data)==2` แต่ได้ 4 (seed 2 + ของเทส 2) ทั้งที่ `clean_database` truncate แล้ว
+- **Root Cause:** `client` fixture เปิด `TestClient(app)` → FastAPI lifespan วิ่ง `init_db` อีกครั้ง → seed เห็น `COUNT()==0` (เพิ่งโดน truncate) → insert seed ใหม่ **หลัง** clean_database → ข้อมูล test ปนกับ seed เสมอ
+- **Correct Pattern/Solution:** seed แบบ `if count==0` ใช้ได้กับ prod (idempotent) แต่เทสต้องไม่พึ่ง "ตารางว่าง" — ให้ fixture ของเทสเคลียร์ตารางนั้นเองก่อน insert ข้อมูลของมัน (`DELETE FROM announcements WHERE deleted_at IS NULL` ใน `public_world`) และตัดสินใจเรื่องนี้ตอนออกแบบตารางใหม่: seed ที่วิ่งซ้ำทุก startup + เทสที่มี `client` fixture = ต้องเคลียร์เอง
+- **กฎ: เมื่อเขียนเทสที่อ่านตารางที่ `init_db` seed ไว้ ให้ล้างตารางนั้นใน fixture ก่อน insert เสมอ (ห้ามเดา count จาก schema seed); หมายเหตุ — `clean_database` ต้องมีตารางใหม่ใน TRUNCATE list ด้วย**
+- **Date Added:** 2026-08-31

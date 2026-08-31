@@ -38,7 +38,7 @@ function onChildClick() {
       class="flex items-center rounded-xl transition-all"
       :class="parentActive() ? 'bg-red-50 text-red-600 border border-red-100/50 shadow-sm' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'"
     >
-      <RouterLink to="/playbooks" class="flex-1 flex items-center px-3.5 py-3 text-sm font-semibold min-w-0">
+      <RouterLink to="/app/playbooks" class="flex-1 flex items-center px-3.5 py-3 text-sm font-semibold min-w-0">
         <i class="bi bi-journal-bookmark-fill text-lg mr-3"></i>
         <span class="truncate">P.R. Playbooks</span>
       </RouterLink>

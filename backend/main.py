@@ -17,6 +17,7 @@ from routers import import_router
 from routers import audit_router
 from routers import boards
 from routers import notification_router
+from routers import public_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -108,6 +109,7 @@ app.include_router(import_router.router, prefix="/api")
 app.include_router(audit_router.router, prefix="/api")
 app.include_router(boards.router, prefix="/api")
 app.include_router(notification_router.router, prefix="/api")
+app.include_router(public_router.router, prefix="/api/v1")
 
 
 @app.get("/health", tags=["Health"])

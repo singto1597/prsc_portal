@@ -71,7 +71,7 @@ function statusColor(s: string) {
         <h1 class="text-xl sm:text-2xl font-bold text-gray-900 leading-tight"><i class="bi bi-file-earmark-text mr-1 text-red-500"></i> เรื่องของฉัน</h1>
         <p class="text-sm text-gray-500">ติดตามสถานะเรื่องที่คุณแจ้ง</p>
       </div>
-      <RouterLink to="/issues/new" class="btn-gradient text-sm shrink-0">
+      <RouterLink to="/app/issues/new" class="btn-gradient text-sm shrink-0">
         <i class="bi bi-plus-lg"></i> แจ้งเรื่องใหม่
       </RouterLink>
     </div>
@@ -111,7 +111,7 @@ function statusColor(s: string) {
     <div v-else-if="!issues.length" class="bg-white rounded-xl p-10 text-center text-gray-400">
       <div class="text-4xl mb-2"><i class="bi bi-inbox"></i></div>
       <p>ยังไม่มีเรื่องที่คุณแจ้ง</p>
-      <RouterLink to="/issues/new" class="inline-block mt-3 text-red-600 hover:underline">แจ้งเรื่องแรกของคุณ <i class="bi bi-arrow-right"></i></RouterLink>
+      <RouterLink to="/app/issues/new" class="inline-block mt-3 text-red-600 hover:underline">แจ้งเรื่องแรกของคุณ <i class="bi bi-arrow-right"></i></RouterLink>
     </div>
 
     <TransitionGroup v-else name="list" tag="div" class="grid gap-3">

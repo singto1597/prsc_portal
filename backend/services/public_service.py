@@ -1,0 +1,163 @@
+"""Public API — ข้อมูลสาธารณะสำหรับ Landing Page (ไม่ต้องล็อกอิน)
+
+โฟกัสที่ความปลอดภัยของข้อมูล: เปิดเผยเฉพาะภาพรวม / เรื่องที่ปิดแล้วแบบ mask ตัวตน
+"""
+from typing import Optional
+
+import asyncpg
+
+# ── แมป priority → impact_score (ระดับผลกระทบ 1–10) ──
+_PRIORITY_IMPACT = {"low": 3, "normal": 5, "high": 7, "urgent": 9}
+
+# ── แมปบทบาทผู้รับงาน → "ตำแหน่ง/หน่วยงานที่รับผิดชอบ" (ภาษาไทย) ──
+_ROLE_DEPARTMENT = {
+    "student": "นักเรียน",
+    "class_president": "หัวหน้าห้อง",
+    "vice_academic": "รองวิชาการ",
+    "vice_discipline": "รองวินัย",
+    "vice_activity": "รองกิจกรรม",
+    "vice_reception": "รองปฏิคม",
+    "level_president": "ประธานระดับ",
+    "council_member": "สภานักเรียน",
+    "council_president": "ประธานสภา",
+    "teacher_council": "ครูสภา",
+    "teacher": "ครู",
+    "admin": "ฝ่ายบริหาร",
+}
+
+
+def _mask_reporter(is_anonymous: bool, level: Optional[str], room_no: Optional[int]) -> str:
+    """Mask ตัวตนผู้แจ้ง — เช่น 'นักเรียน ม.4/1' หรือ 'นักเรียน (ไม่ประสงค์ออกนาม)'"""
+    if is_anonymous:
+        return "นักเรียน (ไม่ประสงค์ออกนาม)"
+    level_txt = (level or "").strip()
+    if level_txt:
+        base = f"นักเรียน {level_txt}"
+        if room_no:
+            base = f"{base}/{room_no}"
+        return base
+    return "นักเรียน"
+
+
+def _role_department(role: Optional[str]) -> str:
+    return _ROLE_DEPARTMENT.get(role or "") or "สภานักเรียน"
+
+
+def _duration_hours(resolved_at, created_at) -> Optional[float]:
+    if not resolved_at or not created_at:
+        return None
+    hours = (resolved_at - created_at).total_seconds() / 3600.0
+    return round(hours, 1)
+
+
+async def get_system_stats(pool: asyncpg.Pool) -> dict:
+    """สถิติรวมของระบบ (Public)"""
+    async with pool.acquire() as conn:
+        total = await conn.fetchval(
+            "SELECT COUNT(*) FROM issues WHERE deleted_at IS NULL"
+        ) or 0
+        resolved = await conn.fetchval(
+            "SELECT COUNT(*) FROM issues WHERE deleted_at IS NULL AND status = 'resolved'"
+        ) or 0
+        resolved_rate = round((resolved / total * 100), 1) if total else 0.0
+        avg_hours = await conn.fetchval(
+            """
+            SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (resolved_at - created_at)) / 3600.0), 0)
+            FROM issues
+            WHERE deleted_at IS NULL
+              AND status = 'resolved'
+              AND resolved_at IS NOT NULL
+              AND created_at IS NOT NULL
+            """
+        )
+        talk_threads = await conn.fetchval(
+            """
+            SELECT COUNT(*) FROM piri_boards
+            WHERE deleted_at IS NULL AND status = 'active' AND board_type = 'talk'
+            """
+        ) or 0
+        votes = await conn.fetchval(
+            "SELECT COUNT(*) FROM piri_votes WHERE deleted_at IS NULL"
+        ) or 0
+
+    return {
+        "total_issues": total,
+        "resolved_rate_percent": float(resolved_rate),
+        "avg_resolve_hours": round(float(avg_hours or 0), 1),
+        "active_talk_threads": talk_threads,
+        "active_votes": votes,
+    }
+
+
+async def get_resolved_cases(pool: asyncpg.Pool, limit: int) -> list[dict]:
+    """เรื่องที่ปิดงานแล้วล่าสุด (Public) — เปิดเผยเฉพาะ summary + สรุปวิธีแก้"""
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT
+                i.id,
+                i.title,
+                i.category,
+                i.priority,
+                i.is_anonymous,
+                i.reporter_name,
+                i.resolved_at,
+                i.created_at,
+                i.current_assignee_role,
+                r.level       AS reporter_level,
+                r.room_number AS reporter_room_no
+            FROM issues i
+            LEFT JOIN rooms r ON r.id = i.reporter_room_id
+            WHERE i.deleted_at IS NULL
+              AND i.status = 'resolved'
+              AND i.resolved_at IS NOT NULL
+            ORDER BY i.resolved_at DESC
+            LIMIT $1
+            """,
+            limit,
+        )
+
+        out: list[dict] = []
+        for row in rows:
+            # สรุปวิธีแก้: note ล่าสุดตอนสถานะเปลี่ยนเป็น resolved
+            summary = await conn.fetchval(
+                """
+                SELECT note FROM issue_status_history
+                WHERE issue_id = $1 AND status = 'resolved'
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                row["id"],
+            )
+            out.append(
+                {
+                    "id": str(row["id"]),
+                    "title": row["title"],
+                    "category": row["category"],
+                    "reporter_mask": _mask_reporter(
+                        row["is_anonymous"], row["reporter_level"], row["reporter_room_no"]
+                    ),
+                    "resolved_at": row["resolved_at"],
+                    "solution_summary": (summary or "เรื่องนี้ถูกปิดเรียบร้อยแล้ว").strip(),
+                    "department_in_charge": _role_department(row["current_assignee_role"]),
+                    "impact_score": _PRIORITY_IMPACT.get(row["priority"], 5),
+                    "duration_hours": _duration_hours(row["resolved_at"], row["created_at"]),
+                }
+            )
+        return out
+
+
+async def get_announcements(pool: asyncpg.Pool) -> list[dict]:
+    """ประกาศสาธารณะ — เรียง urgent/high มาก่อน"""
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT id, message, priority, link
+            FROM announcements
+            WHERE deleted_at IS NULL
+            ORDER BY
+                (CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 ELSE 2 END),
+                created_at DESC
+            """
+        )
+        return [dict(r) for r in rows]

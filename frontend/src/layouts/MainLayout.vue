@@ -88,10 +88,10 @@ function logout() {
 // 🔔 unread badge ตามเมนู (map path → group_type จาก store)
 const menuBadge = (path: string): number => {
   const g = {
-    '/issues/mine': 'issue_mine',
-    '/issues/received': 'issue_received',
-    '/boards': 'board',
-    '/boards/reports': 'report',
+    '/app/issues/mine': 'issue_mine',
+    '/app/issues/received': 'issue_received',
+    '/app/boards': 'board',
+    '/app/boards/reports': 'report',
   } as Record<string, string>;
   const group = g[path];
   return group ? notificationsStore.counts[group] || 0 : 0;
@@ -101,29 +101,29 @@ const menuBadge = (path: string): number => {
 const menuItems = computed(() => {
   const items: Array<{ name: string; path: string; icon: string; badge: number }> = [];
   if (authStore.hasPermission('VIEW_DASHBOARD')) {
-    items.push({ name: 'แดชบอร์ด', path: '/dashboard', icon: 'bi-grid-1x2', badge: 0 });
+    items.push({ name: 'แดชบอร์ด', path: '/app/dashboard', icon: 'bi-grid-1x2', badge: 0 });
   }
-  items.push({ name: 'แจ้งปัญหา / ความคิดเห็น', path: '/issues/new', icon: 'bi-pencil-square', badge: 0 });
-  items.push({ name: 'เรื่องของฉัน', path: '/issues/mine', icon: 'bi-file-earmark-text', badge: menuBadge('/issues/mine') });
-  items.push({ name: 'PIRI Boards', path: '/boards', icon: 'bi-columns-gap', badge: menuBadge('/boards') });
+  items.push({ name: 'แจ้งปัญหา / ความคิดเห็น', path: '/app/issues/new', icon: 'bi-pencil-square', badge: 0 });
+  items.push({ name: 'เรื่องของฉัน', path: '/app/issues/mine', icon: 'bi-file-earmark-text', badge: menuBadge('/app/issues/mine') });
+  items.push({ name: 'PIRI Boards', path: '/app/boards', icon: 'bi-columns-gap', badge: menuBadge('/app/boards') });
   if (authStore.isCouncilAuthority) {
-    items.push({ name: 'จัดการรายงาน', path: '/boards/reports', icon: 'bi-flag-fill', badge: menuBadge('/boards/reports') });
+    items.push({ name: 'จัดการรายงาน', path: '/app/boards/reports', icon: 'bi-flag-fill', badge: menuBadge('/app/boards/reports') });
   }
   if (authStore.hasPermission('RECEIVE_ISSUES')) {
-    items.push({ name: 'เรื่องที่รับ / ระดับฉัน', path: '/issues/received', icon: 'bi-inbox', badge: menuBadge('/issues/received') });
+    items.push({ name: 'เรื่องที่รับ / ระดับฉัน', path: '/app/issues/received', icon: 'bi-inbox', badge: menuBadge('/app/issues/received') });
   }
   if (authStore.hasPermission('MANAGE_STUDENTS')) {
-    items.push({ name: 'นักเรียน', path: '/students', icon: 'bi-people', badge: 0 });
-    items.push({ name: 'นำเข้า Excel', path: '/students/import', icon: 'bi-file-earmark-arrow-up', badge: 0 });
+    items.push({ name: 'นักเรียน', path: '/app/students', icon: 'bi-people', badge: 0 });
+    items.push({ name: 'นำเข้า Excel', path: '/app/students/import', icon: 'bi-file-earmark-arrow-up', badge: 0 });
   }
   if (authStore.hasPermission('VIEW_AUDIT_LOG')) {
-    items.push({ name: 'บันทึกการใช้งาน', path: '/audit-logs', icon: 'bi-clock-history', badge: 0 });
+    items.push({ name: 'บันทึกการใช้งาน', path: '/app/audit-logs', icon: 'bi-clock-history', badge: 0 });
   }
   return items;
 });
 
 const isActive = (path: string) => {
-  if (path === '/dashboard') return route.path === '/dashboard';
+  if (path === '/app/dashboard') return route.path === '/app/dashboard';
   return route.path.startsWith(path);
 };
 </script>
@@ -137,7 +137,7 @@ const isActive = (path: string) => {
     <aside class="hidden md:flex md:flex-shrink-0 relative z-50">
       <div class="flex flex-col w-64 bg-white border-r border-gray-100 shadow-sm h-full">
         <!-- Brand -->
-        <RouterLink to="/" class="flex items-center h-16 px-5 bg-gradient-to-r from-red-600 to-red-700 shrink-0">
+        <RouterLink to="/app" class="flex items-center h-16 px-5 bg-gradient-to-r from-red-600 to-red-700 shrink-0">
           <img src="/logos/school-logo.png" alt="โลโก้โรงเรียน" class="w-9 h-9 rounded-full object-cover mr-3 border border-white/30" />
           <div>
             <span class="text-white text-base font-black tracking-wider leading-none">PIRIvoice</span>
@@ -184,7 +184,7 @@ const isActive = (path: string) => {
               </div>
               <!-- 🔔 กระดิ่งแจ้งเตือน (badge = unread ทั้งหมด) -->
               <RouterLink
-                to="/notifications"
+                to="/app/notifications"
                 title="การแจ้งเตือน"
                 class="relative w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors shrink-0 ml-1"
               >
@@ -290,7 +290,7 @@ const isActive = (path: string) => {
         </div>
         <div class="flex items-center gap-2">
           <!-- 🔔 กระดิ่งแจ้งเตือน (mobile) -->
-          <RouterLink to="/notifications" class="relative w-8 h-8 flex items-center justify-center text-gray-600">
+          <RouterLink to="/app/notifications" class="relative w-8 h-8 flex items-center justify-center text-gray-600">
             <i class="bi bi-bell-fill text-lg"></i>
             <span
               v-if="notificationsStore.total > 0"

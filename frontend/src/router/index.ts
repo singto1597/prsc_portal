@@ -18,6 +18,32 @@ function getHomeRoute(): { name: string } {
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
+    // 🏠 Landing page (สาธารณะ) — หน้าแรกของเว็บ
+    {
+      path: '/',
+      name: 'landing',
+      component: () => import('@/views/Landing.vue'),
+      meta: { requiresAuth: false },
+    },
+    // 🔁 ลิงก์เก่าของแอป (ก่อนย้ายไป /app) — รีไดเรกต์เข้าที่เดิม กันบุ๊กมาร์ก/ลิงก์เก่าเสีย
+    { path: '/dashboard', redirect: '/app/dashboard' },
+    { path: '/issues/new', redirect: '/app/issues/new' },
+    { path: '/issues/mine', redirect: '/app/issues/mine' },
+    { path: '/issues/received', redirect: '/app/issues/received' },
+    { path: '/issues/:id/edit', redirect: '/app/issues/:id/edit' },
+    { path: '/issues/:id', redirect: '/app/issues/:id' },
+    { path: '/boards/reports', redirect: '/app/boards/reports' },
+    { path: '/boards/:id', redirect: '/app/boards/:id' },
+    { path: '/boards', redirect: '/app/boards' },
+    { path: '/playbooks/:id', redirect: '/app/playbooks/:id' },
+    { path: '/playbooks', redirect: '/app/playbooks' },
+    { path: '/notifications', redirect: '/app/notifications' },
+    { path: '/students/import', redirect: '/app/students/import' },
+    { path: '/students', redirect: '/app/students' },
+    { path: '/audit-logs', redirect: '/app/audit-logs' },
+    { path: '/profile/edit', redirect: '/app/profile/edit' },
+    { path: '/profile/password', redirect: '/app/profile/password' },
+    { path: '/profile', redirect: '/app/profile' },
     {
       path: '/login',
       name: 'login',
@@ -25,7 +51,7 @@ const router = createRouter({
       meta: { requiresAuth: false },
     },
     {
-      path: '/',
+      path: '/app',
       component: MainLayout,
       meta: { requiresAuth: true },
       redirect: () => getHomeRoute(),
@@ -140,20 +166,26 @@ router.beforeEach(async (to) => {
   if (to.meta.requiresAuth && !isAuthenticated) {
     return { name: 'login' }
   }
+
+  // โหลด user ให้ชัวร์ก่อนตัดสินใจ redirect/สิทธิ์ — ไม่งั้น getHomeRoute()
+  // เห็น permissions ว่าง → redirect ผิดบทบาทตอน refresh หน้า Landing/login
+  if (isAuthenticated && !authStore.user) {
+    try {
+      await authStore.loadMe()
+    } catch {
+      /* ignore — เหลือ user null → ตกไป route พื้นฐาน (new-issue) */
+    }
+  }
+
   if (to.path === '/login' && isAuthenticated) {
     return { name: 'dashboard' }
   }
+  // เข้า Landing แล้ว แต่ล็อกอินอยู่แล้ว → ข้ามไปหน้าแรกตามบทบาท
+  if (to.name === 'landing' && isAuthenticated) {
+    return getHomeRoute()
+  }
 
   if (isAuthenticated) {
-    // โหลด user ให้ชัวร์ (ใช้ตรวจ permission + must_change_password)
-    if (!authStore.user) {
-      try {
-        await authStore.loadMe()
-      } catch {
-        /* ignore */
-      }
-    }
-
     // 🔐 บัญชีที่ระบบสร้างให้ (seed) ยังไม่ได้เปลี่ยนรหัส → บังคับไปหน้าเปลี่ยนรหัสก่อนใช้ระบบ
     if (authStore.mustChangePassword && to.name !== 'profile-password') {
       return { name: 'profile-password' }
