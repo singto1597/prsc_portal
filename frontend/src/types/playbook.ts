@@ -1,4 +1,4 @@
-// คู่มือสภานักเรียน (P.R. Playbook) — ข้อมูล 6 เล่ม (หมวดหมู่)
+// P.R. Playbooks — คู่มือสภานักเรียน ข้อมูล 6 เล่ม (หมวดหมู่)
 // ไฟล์รูปภาพ + PDF ถูกวางไว้ใน public/playbooks/volN/ โดยตรง
 // → Vite เสิร์ฟเป็น static asset (ไม่ผ่าน module bundler, ไม่ต้อง import)
 // โค้ดคำนวณ URL เอง เช่น /playbooks/vol1/page-01.webp
@@ -18,7 +18,7 @@ export interface Playbook {
 /**
  * Mock data 6 เล่ม
  * ⚠️ totalPages ต้องตรงกับจำนวนไฟล์ page-XX.webp ที่วางจริงใน public/playbooks/volN/
- * เช่น vol1 มี page-01.webp ถึง page-24.webp → totalPages = 24
+ * เช่น vol1 มี page-01.webp ถึง page-10.webp → totalPages = 10
  */
 export const PLAYBOOKS: Playbook[] = [
   {
@@ -27,16 +27,16 @@ export const PLAYBOOKS: Playbook[] = [
     description: 'แนวทางด้านการเรียน การสอบ ทุนการศึกษา และแหล่งเรียนรู้ภายในโรงเรียน',
     coverImage: '/playbooks/vol1/cover.webp',
     pdfUrl: '/playbooks/vol1/playbook.pdf',
-    totalPages: 24,
+    totalPages: 10,
     basePath: '/playbooks/vol1/',
   },
   {
     id: 'vol2',
-    title: 'วินัยและกติกา',
-    description: 'ระเบียบวินัยและกติกาของโรงเรียนที่นักเรียนทุกคนควรทราบพร้อมแนวปฏิบัติตนอย่างถูกต้อง',
+    title: 'วินัย',
+    description: 'ระเบียบวินัยและกติกาของโรงเรียนที่นักเรียนทุกคนควรทราบ พร้อมแนวปฏิบัติตนอย่างถูกต้อง',
     coverImage: '/playbooks/vol2/cover.webp',
     pdfUrl: '/playbooks/vol2/playbook.pdf',
-    totalPages: 18,
+    totalPages: 8,
     basePath: '/playbooks/vol2/',
   },
   {
@@ -45,25 +45,25 @@ export const PLAYBOOKS: Playbook[] = [
     description: 'กิจกรรมนักเรียน ชมรม และเทศกาลต่าง ๆ ของโรงเรียน พร้อมแนวทางเข้าร่วมอย่างมีความสุข',
     coverImage: '/playbooks/vol3/cover.webp',
     pdfUrl: '/playbooks/vol3/playbook.pdf',
-    totalPages: 20,
+    totalPages: 12,
     basePath: '/playbooks/vol3/',
   },
   {
     id: 'vol4',
-    title: 'สวัสดิการ',
-    description: 'สวัสดิการและบริการของนักเรียน เช่น ทุนการศึกษา โรงอาหาร ห้องพยาบาล และบริการอื่น ๆ',
+    title: 'ปฏิคม',
+    description: 'การต้อนรับและอัธยาศัยไมตรี การเป็นเจ้าภาพจัดงานพิธี และการบริการรับรองแขกของโรงเรียน',
     coverImage: '/playbooks/vol4/cover.webp',
     pdfUrl: '/playbooks/vol4/playbook.pdf',
-    totalPages: 16,
+    totalPages: 9,
     basePath: '/playbooks/vol4/',
   },
   {
     id: 'vol5',
-    title: 'Wellbeing (สุขภาพและความเป็นอยู่)',
+    title: 'สุขภาวะ',
     description: 'การดูแลสุขภาพกายและใจ การจัดการความเครียด และการใช้ชีวิตอย่างสมดุลในวัยเรียน',
     coverImage: '/playbooks/vol5/cover.webp',
     pdfUrl: '/playbooks/vol5/playbook.pdf',
-    totalPages: 22,
+    totalPages: 11,
     basePath: '/playbooks/vol5/',
   },
   {
@@ -72,7 +72,7 @@ export const PLAYBOOKS: Playbook[] = [
     description: 'ประชาธิปไตยในโรงเรียน บทบาทของสภานักเรียน สิทธิและหน้าที่ของนักเรียน และการมีส่วนร่วม',
     coverImage: '/playbooks/vol6/cover.webp',
     pdfUrl: '/playbooks/vol6/playbook.pdf',
-    totalPages: 26,
+    totalPages: 12,
     basePath: '/playbooks/vol6/',
   },
 ]

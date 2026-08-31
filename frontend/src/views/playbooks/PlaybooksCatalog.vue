@@ -15,9 +15,9 @@ const isCoverBroken = (id: string) => failedCovers.value.has(id)
   <div>
     <div class="mb-6">
       <h1 class="text-xl sm:text-2xl font-bold text-gray-900 leading-tight">
-        <i class="bi bi-journal-bookmark-fill mr-1 text-red-500"></i> คู่มือสภานักเรียน
+        <i class="bi bi-journal-bookmark-fill mr-1 text-red-500"></i> P.R. Playbooks
       </h1>
-      <p class="text-sm text-gray-500 mt-1">P.R. Playbook — คู่มือฉบับ E-book อ่านเลื่อนลงได้ ครอบคลุม 6 หมวดหมู่ของนักเรียน</p>
+      <p class="text-sm text-gray-500 mt-1">P.R. Playbooks — คู่มือสภานักเรียนฉบับ E-book อ่านเลื่อนลงได้ ครอบคลุม 6 หมวดหมู่</p>
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

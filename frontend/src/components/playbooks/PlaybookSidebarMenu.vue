@@ -4,7 +4,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import { PLAYBOOKS } from '@/types/playbook'
 
 /**
- * เมนู "คู่มือสภานักเรียน" ใน sidebar — หัวข้อหลักขยาย/ย่อได้ มีเมนูย่อย 6 เล่ม
+ * เมนู "P.R. Playbooks" ใน sidebar — หัวข้อหลักขยาย/ย่อได้ มีเมนูย่อย 6 เล่ม
  * ใช้ทั้ง desktop sidebar และ mobile drawer (mobile ส่ง close-on-navigate + @navigate)
  */
 const props = withDefaults(
@@ -33,14 +33,14 @@ function onChildClick() {
 
 <template>
   <div>
-    <!-- หัวข้อหลัก: คลิก → หน้าคู่มือ, กด chevron → ขยาย/ย่อเมนู -->
+    <!-- หัวข้อหลัก: คลิก → หน้าหนังสือ, กด chevron → ขยาย/ย่อเมนู -->
     <div
       class="flex items-center rounded-xl transition-all"
       :class="parentActive() ? 'bg-red-50 text-red-600 border border-red-100/50 shadow-sm' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'"
     >
       <RouterLink to="/playbooks" class="flex-1 flex items-center px-3.5 py-3 text-sm font-semibold min-w-0">
         <i class="bi bi-journal-bookmark-fill text-lg mr-3"></i>
-        <span class="truncate">คู่มือสภานักเรียน</span>
+        <span class="truncate">P.R. Playbooks</span>
       </RouterLink>
       <button
         type="button"

@@ -166,7 +166,7 @@ const isActive = (path: string) => {
               </span>
             </RouterLink>
 
-            <!-- 📖 คู่มือสภานักเรียน (P.R. Playbook) — 6 เล่ม -->
+            <!-- 📖 P.R. Playbooks — 6 เล่ม -->
             <PlaybookSidebarMenu class="pt-1" />
           </nav>
 
@@ -260,7 +260,7 @@ const isActive = (path: string) => {
             </span>
           </RouterLink>
 
-          <!-- 📖 คู่มือสภานักเรียน (P.R. Playbook) — 6 เล่ม (มือถือ: ปิด drawer หลังคลิก) -->
+          <!-- 📖 P.R. Playbooks — 6 เล่ม (มือถือ: ปิด drawer หลังคลิก) -->
           <PlaybookSidebarMenu close-on-navigate @navigate="isSidebarOpen = false" class="pt-1" />
         </nav>
         <div class="p-3 border-t border-gray-100">
