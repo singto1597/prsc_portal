@@ -22,6 +22,12 @@ echo "⬇️ กำลังดึงโค้ดล่าสุดจาก Mon
 git fetch origin
 git reset --hard origin/$CURRENT_BRANCH
 
+# --- 📦 [NEW] ดึงไฟล์จริงจาก Git LFS (webp/pdf ของ P.R. Playbooks) ---
+# git reset --hard จะได้ไฟล์เป็น LFS pointer (ไฟล์เล็กๆ) ไม่ใช่ไฟล์จริง
+# ต้อง git lfs pull ก่อน build ไม่งั้น Docker COPY เอาตัวชี้ไปลง image → รูปไม่แสดง
+echo "📦 กำลังดึงไฟล์จริงจาก Git LFS..."
+command -v git-lfs >/dev/null 2>&1 && git lfs pull || echo "⚠️ ไม่พบ git-lfs — ตรวจสอบว่าไฟล์ webp/pdf เป็นไฟล์จริงก่อน build"
+
 # --- 🚀 [NEW] ดึงเลข Commit 7 หลักล่าสุดมาใช้เป็นชื่อ Image ---
 export IMAGE_TAG=$(git rev-parse --short HEAD)
 echo "🏷️ ตรวจพบ Commit ล่าสุด: ${IMAGE_TAG}"

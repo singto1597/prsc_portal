@@ -34,14 +34,16 @@ RUN rm -rf /usr/share/nginx/html/*
 COPY --from=build-stage /app/dist /usr/share/nginx/html
 
 # (สำคัญสำหรับ Vue Router) เพื่อให้การกด Refresh หน้าเว็บ (ที่ไม่ได้อยู่ที่ Root path) ไม่ติด 404
-# เราจะสร้างไฟล์คอนฟิกพื้นฐานของ Nginx ให้ชี้ทุก Request กลับไปที่ index.html เสมอ
+# ⚠️ ห้ามใช้ $uri/ — ถ้า path นั้นมีโฟลเดอร์จริงอยู่ (เช่น /playbooks/ ที่เก็บรูป) nginx จะ
+#    จับว่าเป็น directory แล้วคืน 403 (ไม่มี index) แทนที่จะส่งต่อไปที่ SPA
+#    ใช้แค่ try_files $uri /index.html → ไฟล์จริงถูกเสิร์ฟ, route ที่เหลือ fallback ไป SPA
 RUN echo 'server { \
     listen 80; \
     server_name _; \
     root /usr/share/nginx/html; \
     index index.html; \
     location / { \
-        try_files $uri $uri/ /index.html; \
+        try_files $uri /index.html; \
     } \
 }' > /etc/nginx/conf.d/default.conf
 
