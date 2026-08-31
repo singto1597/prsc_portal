@@ -13,6 +13,7 @@ import {
   type ReportStatus,
 } from '@/types/board'
 import { useAuthStore } from '@/stores/auth'
+import { useNotificationsStore } from '@/stores/notifications'
 import PaginationBar from '@/components/PaginationBar.vue'
 
 /**
@@ -23,6 +24,7 @@ import PaginationBar from '@/components/PaginationBar.vue'
  * - กรอง: status (open/resolved/dismissed), reason (หมวด), q (ค้นหา) + แบ่งหน้า
  */
 const authStore = useAuthStore()
+const notificationsStore = useNotificationsStore()
 
 const reports = ref<ReportItem[]>([])
 const total = ref(0)
@@ -83,6 +85,8 @@ async function load() {
     })
     reports.value = res.items
     total.value = res.total
+    // 🔔 เปิดคิวรายงานแล้ว → mark ว่าเห็นรายงานใหม่แล้ว (badge "จัดการรายงาน" ลด)
+    void notificationsStore.read({ group_type: 'report' })
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'โหลดรายงานไม่สำเร็จ'
   } finally {

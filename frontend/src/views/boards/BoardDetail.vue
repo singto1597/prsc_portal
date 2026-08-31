@@ -5,9 +5,11 @@ import Swal from 'sweetalert2'
 import { getBoard, submitVote, addComment, hideBoard } from '@/services/board'
 import { BOARD_TYPE_LABELS, boardTypeIcon, type BoardDetail } from '@/types/board'
 import { useAuthStore } from '@/stores/auth'
+import { useNotificationsStore } from '@/stores/notifications'
 import CommentThread from '@/components/boards/CommentThread.vue'
 
 const authStore = useAuthStore()
+const notificationsStore = useNotificationsStore()
 
 /**
  * 📄 PIRI Board — รองรับ 2 เลย์เอาต์:
@@ -72,6 +74,8 @@ async function load() {
     board.value = await getBoard(Number(route.params.id))
     // รีเซ็ตตัวเลือกที่เลือก (หลังโหวตแล้ว reload — ป้องกัน select ตัวเดิมหลงเหลือ)
     if (board.value?.my_vote_choice_id) selectedChoice.value = null
+    // 🔔 เปิดบอร์ดแล้ว → mark notification ของบอร์ดนี้ว่าอ่านแล้ว (badge ลด)
+    if (board.value) void notificationsStore.read({ board_id: board.value.id })
   } catch (e) {
     loadError.value = e instanceof Error ? e.message : 'โหลดบอร์ดไม่สำเร็จ'
   } finally {

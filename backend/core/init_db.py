@@ -371,6 +371,33 @@ async def init_db(pool: asyncpg.Pool):
                 );
                 """)
 
+                # --- 8.5 notifications: ระบบแจ้งเตือน + unread badge + read-receipt (Phase 7) ---
+                #   - group_type: กลุ่มสำหรับ badge ตามเมนู (issue_mine=เรื่องของฉัน / issue_received=เรื่องที่รับ /
+                #     board=PIRI Boards / report=จัดการรายงาน)
+                #   - type: เหตุการณ์ (issue_new|issue_update|issue_comment|board_new|board_reply|board_hidden|report_new|report_actioned)
+                #   - entity_type/entity_id: จุดปลายทาง (คลิกแล้วไปที่เรื่อง/บอร์ด/รายงาน)
+                #   - board_id: denormalize เพื่อ batch mark-read เมื่อเปิด board โดยไม่ต้องรู้ entity_type
+                #   - actor_name: snapshot ชื่อผู้ก่อเหตุ (เรื่อง anonymous → 'ไม่ระบุชื่อ')
+                #   - read_at: NULL = ยังไม่อ่าน → badge = COUNT(*) WHERE read_at IS NULL GROUP BY group_type
+                #   - ทุก insert อยู่ใน transaction เดียวกับข้อมูลหลัก (ลอกแบบ AuditLogger — ตามกฎ backend.md)
+                await conn.execute("""
+                CREATE TABLE IF NOT EXISTS notifications (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    group_type VARCHAR(30) NOT NULL,
+                    type VARCHAR(30) NOT NULL,
+                    title TEXT NOT NULL,
+                    body TEXT NOT NULL,
+                    entity_type VARCHAR(30),
+                    entity_id INTEGER,
+                    board_id INTEGER,
+                    actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                    actor_name TEXT,
+                    read_at TIMESTAMP WITH TIME ZONE,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                );
+                """)
+
                 # --- 9. ตารางคิวงาน Import นักเรียนจาก Excel (Queue: ARQ Worker) ---
                 # status: 'PENDING' (อัปโหลดแล้ว ยังไม่สั่งเริ่ม) / 'QUEUED' (ยิงเข้า Redis แล้ว)
                 #         'PROCESSING' (worker กำลังทำงาน) / 'COMPLETED' / 'FAILED'
@@ -470,6 +497,15 @@ async def init_db(pool: asyncpg.Pool):
                 CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
                 CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON audit_logs(entity_type, entity_id);
                 CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at);
+                -- notifications (Phase 7) — unread badge (group by) + รายการล่าสุด + batch mark-read
+                CREATE INDEX IF NOT EXISTS idx_notifications_user_unread_group
+                    ON notifications(user_id, group_type) WHERE read_at IS NULL;
+                CREATE INDEX IF NOT EXISTS idx_notifications_user_created
+                    ON notifications(user_id, created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_notifications_board
+                    ON notifications(board_id) WHERE board_id IS NOT NULL;
+                CREATE INDEX IF NOT EXISTS idx_notifications_entity
+                    ON notifications(entity_type, entity_id);
                 CREATE INDEX IF NOT EXISTS idx_students_room_no_active
                     ON students(room_id, student_no)
                     WHERE deleted_at IS NULL;
