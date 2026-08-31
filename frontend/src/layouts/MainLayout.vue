@@ -4,6 +4,7 @@ import { RouterView, RouterLink, useRouter, useRoute } from 'vue-router';
 import Swal from 'sweetalert2';
 import { useAuthStore } from '@/stores/auth';
 import { useNotificationsStore } from '@/stores/notifications';
+import PlaybookSidebarMenu from '@/components/playbooks/PlaybookSidebarMenu.vue';
 
 const authStore = useAuthStore();
 const notificationsStore = useNotificationsStore();
@@ -164,6 +165,9 @@ const isActive = (path: string) => {
                 {{ item.badge > 99 ? '99+' : item.badge }}
               </span>
             </RouterLink>
+
+            <!-- 📖 คู่มือสภานักเรียน (P.R. Playbook) — 6 เล่ม -->
+            <PlaybookSidebarMenu class="pt-1" />
           </nav>
 
           <!-- User footer -->
@@ -255,6 +259,9 @@ const isActive = (path: string) => {
               {{ item.badge > 99 ? '99+' : item.badge }}
             </span>
           </RouterLink>
+
+          <!-- 📖 คู่มือสภานักเรียน (P.R. Playbook) — 6 เล่ม (มือถือ: ปิด drawer หลังคลิก) -->
+          <PlaybookSidebarMenu close-on-navigate @navigate="isSidebarOpen = false" class="pt-1" />
         </nav>
         <div class="p-3 border-t border-gray-100">
           <button @click="isSidebarOpen = false; goToProfile()" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-gray-700 hover:bg-red-50">
