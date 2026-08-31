@@ -17,7 +17,7 @@ const isCoverBroken = (id: string) => failedCovers.value.has(id)
       <h1 class="text-xl sm:text-2xl font-bold text-gray-900 leading-tight">
         <i class="bi bi-journal-bookmark-fill mr-1 text-red-500"></i> P.R. Playbooks
       </h1>
-      <p class="text-sm text-gray-500 mt-1">P.R. Playbooks — คู่มือสภานักเรียนฉบับ E-book อ่านเลื่อนลงได้ ครอบคลุม 6 หมวดหมู่</p>
+      <p class="text-sm text-gray-500 mt-1">P.R. Playbooks — คู่มือนักเรียนฉบับ E-book อ่านเลื่อนลงได้ ครอบคลุม 6 หมวดหมู่</p>
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -63,11 +63,5 @@ const isCoverBroken = (id: string) => failedCovers.value.has(id)
         </div>
       </RouterLink>
     </div>
-
-    <!-- หมายเหตุการจัดเก็บไฟล์ -->
-    <p class="mt-6 text-xs text-gray-400 leading-relaxed">
-      <i class="bi bi-info-circle mr-1"></i>
-      ไฟล์หนังสือถูกจัดเก็บที่ public/playbooks/vol1 – vol6 (รูปปก cover.webp, หน้าหนังสือ page-01.webp … และ PDF ต้นฉบับ playbook.pdf)
-    </p>
   </div>
 </template>

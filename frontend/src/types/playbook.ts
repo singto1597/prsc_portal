@@ -27,7 +27,7 @@ export const PLAYBOOKS: Playbook[] = [
     description: 'แนวทางด้านการเรียน การสอบ ทุนการศึกษา และแหล่งเรียนรู้ภายในโรงเรียน',
     coverImage: '/playbooks/vol1/cover.webp',
     pdfUrl: '/playbooks/vol1/playbook.pdf',
-    totalPages: 10,
+    totalPages: 7,
     basePath: '/playbooks/vol1/',
   },
   {
@@ -36,7 +36,7 @@ export const PLAYBOOKS: Playbook[] = [
     description: 'ระเบียบวินัยและกติกาของโรงเรียนที่นักเรียนทุกคนควรทราบ พร้อมแนวปฏิบัติตนอย่างถูกต้อง',
     coverImage: '/playbooks/vol2/cover.webp',
     pdfUrl: '/playbooks/vol2/playbook.pdf',
-    totalPages: 8,
+    totalPages: 17,
     basePath: '/playbooks/vol2/',
   },
   {
@@ -45,7 +45,7 @@ export const PLAYBOOKS: Playbook[] = [
     description: 'กิจกรรมนักเรียน ชมรม และเทศกาลต่าง ๆ ของโรงเรียน พร้อมแนวทางเข้าร่วมอย่างมีความสุข',
     coverImage: '/playbooks/vol3/cover.webp',
     pdfUrl: '/playbooks/vol3/playbook.pdf',
-    totalPages: 12,
+    totalPages: 20,
     basePath: '/playbooks/vol3/',
   },
   {
@@ -54,7 +54,7 @@ export const PLAYBOOKS: Playbook[] = [
     description: 'การต้อนรับและอัธยาศัยไมตรี การเป็นเจ้าภาพจัดงานพิธี และการบริการรับรองแขกของโรงเรียน',
     coverImage: '/playbooks/vol4/cover.webp',
     pdfUrl: '/playbooks/vol4/playbook.pdf',
-    totalPages: 9,
+    totalPages: 14,
     basePath: '/playbooks/vol4/',
   },
   {
@@ -63,7 +63,7 @@ export const PLAYBOOKS: Playbook[] = [
     description: 'การดูแลสุขภาพกายและใจ การจัดการความเครียด และการใช้ชีวิตอย่างสมดุลในวัยเรียน',
     coverImage: '/playbooks/vol5/cover.webp',
     pdfUrl: '/playbooks/vol5/playbook.pdf',
-    totalPages: 11,
+    totalPages: 17,
     basePath: '/playbooks/vol5/',
   },
   {
@@ -72,7 +72,7 @@ export const PLAYBOOKS: Playbook[] = [
     description: 'ประชาธิปไตยในโรงเรียน บทบาทของสภานักเรียน สิทธิและหน้าที่ของนักเรียน และการมีส่วนร่วม',
     coverImage: '/playbooks/vol6/cover.webp',
     pdfUrl: '/playbooks/vol6/playbook.pdf',
-    totalPages: 12,
+    totalPages: 19,
     basePath: '/playbooks/vol6/',
   },
 ]
