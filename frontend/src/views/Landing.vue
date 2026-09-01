@@ -83,7 +83,6 @@ const hasAnnouncementsError = ref(false);
 
 // ── UI: Navbar ──
 const isScrolled = ref(false);
-const isMobileMenuOpen = ref(false);
 
 // ── DOM refs ──
 /** ภาชนะ Bento Grid ของสถิติ — ใช้รัน Count-up เมื่อข้อมูลโหลดเสร็จ */
@@ -158,12 +157,10 @@ function prefersReducedMotion(): boolean {
 }
 
 const goLogin = () => {
-  isMobileMenuOpen.value = false;
   router.push({ name: 'login' });
 };
 
 function scrollToId(id: string) {
-  isMobileMenuOpen.value = false;
   document.getElementById(id)?.scrollIntoView({
     behavior: prefersReducedMotion() ? 'auto' : 'smooth',
   });
@@ -426,11 +423,20 @@ const workflowTiers = [
     iconCls: 'bg-red-50 text-red-600',
   },
   {
+    name: 'ประธานระดับ',
+    desc: 'รวบรวมเรื่องทั้งระดับชั้น กลั่นกรองความสำคัญ และส่งต่อขึ้นสภาเมื่อเกินความสามารถ',
+    icon: 'bi-people-fill',
+    width: 'max-w-xl',
+    num: '03',
+    ring: 'border-rose-200 bg-white text-slate-900',
+    iconCls: 'bg-rose-50 text-rose-600',
+  },
+  {
     name: 'สภานักเรียน · ประธานสภา',
     desc: 'วินิจฉัยเรื่องยาก ตั้งเวลานับถอยหลัง และมอบหมายหน่วยงานที่รับผิดชอบโดยตรง',
     icon: 'bi-flag-fill',
-    width: 'max-w-xl',
-    num: '03',
+    width: 'max-w-lg',
+    num: '04',
     ring: 'border-rose-200 bg-gradient-to-br from-rose-50 to-white text-slate-900',
     iconCls: 'bg-rose-100 text-rose-600',
   },
@@ -531,45 +537,15 @@ watch([stats, isLoadingStats], () => {
           </button>
         </div>
 
-        <!-- Hamburger (mobile) -->
+        <!-- ปุ่มเข้าสู่ระบบ (mobile) — ใช้แทนแฮมเบอร์เกอร์ ตรง CTA ที่อยากให้เห็นชัด -->
         <button
-          class="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white/80 text-slate-700 shadow-sm lg:hidden"
-          :aria-expanded="isMobileMenuOpen"
-          aria-controls="mobile-menu"
-          :aria-label="isMobileMenuOpen ? 'ปิดเมนู' : 'เปิดเมนู'"
-          @click="isMobileMenuOpen = !isMobileMenuOpen"
+          @click="goLogin"
+          class="flex items-center gap-2 rounded-xl bg-gradient-to-r from-red-600 via-rose-500 to-red-600 bg-[length:200%_auto] px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-rose-500/30 transition-all duration-300 hover:bg-right hover:shadow-rose-500/50 active:scale-[0.97] lg:hidden"
         >
-          <i :class="isMobileMenuOpen ? 'bi bi-x-lg text-lg' : 'bi bi-list text-2xl'"></i>
+          <i class="bi bi-box-arrow-in-right text-base"></i>
+          เข้าสู่ระบบ
         </button>
       </nav>
-
-      <!-- เมนูมือถือ -->
-      <Transition name="menu-drop">
-        <div
-          v-if="isMobileMenuOpen"
-          id="mobile-menu"
-          class="border-t border-slate-100 bg-white/95 px-4 py-4 backdrop-blur-xl lg:hidden"
-        >
-          <div class="flex flex-col gap-1">
-            <button
-              v-for="link in navLinks"
-              :key="link.id"
-              @click="scrollToId(link.id)"
-              class="flex items-center justify-between rounded-xl px-4 py-3 text-left text-sm font-semibold text-slate-700 transition-colors hover:bg-rose-50 hover:text-rose-600"
-            >
-              {{ link.label }}
-              <i class="bi bi-chevron-right text-slate-300"></i>
-            </button>
-            <button
-              @click="goLogin"
-              class="mt-2 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-rose-500/30"
-            >
-              <i class="bi bi-box-arrow-in-right text-base"></i>
-              เข้าสู่ระบบ
-            </button>
-          </div>
-        </div>
-      </Transition>
     </header>
 
     <main class="relative">
@@ -682,8 +658,8 @@ watch([stats, isLoadingStats], () => {
               <div class="relative mx-auto w-[min(290px,82vw)] rounded-[2.9rem] border-[7px] border-slate-900 bg-slate-900 shadow-2xl sm:w-[310px]">
                 <!-- จอ -->
                 <div class="relative overflow-hidden rounded-[2.35rem] bg-[#F7F7F9]">
-                  <!-- กล้อง (notch) -->
-                  <div class="absolute left-1/2 top-2 z-20 h-6 w-28 -translate-x-1/2 rounded-full bg-slate-900"></div>
+                  <!-- กล้อง (notch) — z-10 ไว้ใต้ floating cards ด้านนอกกรอบ -->
+                  <div class="absolute left-1/2 top-2 z-10 h-6 w-28 -translate-x-1/2 rounded-full bg-slate-900"></div>
 
                   <!-- Status bar -->
                   <div class="flex items-center justify-between px-6 pb-1 pt-2.5 text-[10px] font-bold text-slate-900">
@@ -777,8 +753,8 @@ watch([stats, isLoadingStats], () => {
                 </div>
               </div>
 
-              <!-- Floating card: เรื่องที่เข้าสู่ระบบ (ข้อมูลจริง) -->
-              <div class="animate-float absolute -left-4 -top-3 flex items-center gap-2 rounded-xl border border-white/70 bg-white/90 px-3.5 py-2.5 text-xs font-bold text-slate-700 shadow-xl backdrop-blur">
+              <!-- Floating card: เรื่องที่เข้าสู่ระบบ (ข้อมูลจริง) — z-30 ให้อยู่เหนือแถบดำ/notch -->
+              <div class="animate-float absolute -left-4 -top-3 z-30 flex items-center gap-2 rounded-xl border border-white/70 bg-white/90 px-3.5 py-2.5 text-xs font-bold text-slate-700 shadow-xl backdrop-blur">
                 <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-500/15 text-rose-600"><i class="bi bi-inbox-fill"></i></span>
                 <template v-if="!isLoadingStats && stats">
                   เรื่องเข้าสู่ระบบ {{ numberFmt.format(stats.total_issues) }}
@@ -786,7 +762,7 @@ watch([stats, isLoadingStats], () => {
                 <div v-else class="skeleton-shimmer h-4 w-20 rounded bg-slate-100"></div>
               </div>
               <!-- Floating card: เสียงบน PIRI Vote (ข้อมูลจริง) -->
-              <div class="animate-float animation-delay-1500 absolute -bottom-4 -right-3 flex items-center gap-2 rounded-xl border border-white/70 bg-white/90 px-3.5 py-2.5 text-xs font-bold text-slate-700 shadow-xl backdrop-blur">
+              <div class="animate-float animation-delay-1500 absolute -bottom-4 -right-3 z-30 flex items-center gap-2 rounded-xl border border-white/70 bg-white/90 px-3.5 py-2.5 text-xs font-bold text-slate-700 shadow-xl backdrop-blur">
                 <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-500/15 text-rose-600"><i class="bi bi-patch-check-fill"></i></span>
                 <template v-if="!isLoadingStats && stats">
                   {{ numberFmt.format(stats.active_votes) }} เสียงบน PIRI Vote
@@ -1461,8 +1437,8 @@ watch([stats, isLoadingStats], () => {
                 </div>
               </div>
 
-              <!-- Floating card: ปิดสำเร็จ -->
-              <div class="animate-float absolute -right-3 -top-5 flex items-center gap-2 rounded-xl border border-white/15 bg-slate-800/90 px-3.5 py-2.5 text-xs font-bold text-slate-100 shadow-2xl backdrop-blur">
+              <!-- Floating card: ปิดสำเร็จ — z-30 ให้อยู่เหนือกรอบ mockup -->
+              <div class="animate-float absolute -right-3 -top-5 z-30 flex items-center gap-2 rounded-xl border border-white/15 bg-slate-800/90 px-3.5 py-2.5 text-xs font-bold text-slate-100 shadow-2xl backdrop-blur">
                 <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-400"><i class="bi bi-check-circle-fill"></i></span>
                 <template v-if="!isLoadingStats && stats">
                   {{ numberFmt.format(stats.resolved_issues) }} เรื่องที่ปิดสำเร็จ
@@ -1470,7 +1446,7 @@ watch([stats, isLoadingStats], () => {
                 <div v-else class="skeleton-shimmer h-4 w-20 rounded bg-slate-700"></div>
               </div>
               <!-- Floating card: เสียงโหวตใหม่ -->
-              <div class="animate-float animation-delay-1500 absolute -bottom-5 -left-3 flex items-center gap-2 rounded-xl border border-white/15 bg-slate-800/90 px-3.5 py-2.5 text-xs font-bold text-slate-100 shadow-2xl backdrop-blur">
+              <div class="animate-float animation-delay-1500 absolute -bottom-5 -left-3 z-30 flex items-center gap-2 rounded-xl border border-white/15 bg-slate-800/90 px-3.5 py-2.5 text-xs font-bold text-slate-100 shadow-2xl backdrop-blur">
                 <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-500/15 text-rose-400"><i class="bi bi-people-fill"></i></span>
                 <template v-if="!isLoadingStats && stats">
                   {{ numberFmt.format(stats.active_votes) }} เสียงบน PIRI Vote
@@ -1666,12 +1642,12 @@ watch([stats, isLoadingStats], () => {
   }
 }
 
+/* ไม่ใช้ preserve-3d — ลูกไม่มี translateZ ต่างระดับ แถม preserve-3d ทำให้
+   การเรียงชั้น (stacking) ของ floating cards กับกรอบโทรศัพท์เพี้ยน */
 .phone-tilt {
-  transform-style: preserve-3d;
   animation: floatTilt 7s ease-in-out infinite;
 }
 .mockup-tilt {
-  transform-style: preserve-3d;
   animation: floatTiltDark 8s ease-in-out infinite;
 }
 .tilt-shadow {
@@ -1757,21 +1733,6 @@ watch([stats, isLoadingStats], () => {
 }
 
 /* ============================================================
- * Mobile menu drop
- * ============================================================ */
-.menu-drop-enter-active,
-.menu-drop-leave-active {
-  transition:
-    opacity 0.22s ease,
-    transform 0.22s ease;
-}
-.menu-drop-enter-from,
-.menu-drop-leave-to {
-  opacity: 0;
-  transform: translateY(-8px);
-}
-
-/* ============================================================
  * Dark sections — grid pattern
  * ============================================================ */
 .bg-grid-dark {
@@ -1814,12 +1775,6 @@ watch([stats, isLoadingStats], () => {
   .animate-fade-in,
   .skeleton-shimmer {
     opacity: 1 !important;
-  }
-  .menu-drop-enter-active,
-  .menu-drop-leave-active {
-    transition: none !important;
-    opacity: 1 !important;
-    transform: none !important;
   }
 }
 
