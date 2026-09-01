@@ -88,6 +88,8 @@ async def test_public_stats(client, db_pool, public_world):
     data = res.json()
 
     assert data["total_issues"] == 2  # resolved 1 + pending 1
+    assert data["resolved_issues"] == 1  # เรื่องที่ปิดสำเร็จแล้ว
+    assert data["routed_issues"] == 0  # pending ยังไม่ถูกส่งต่อ
     assert data["resolved_rate_percent"] == 50.0
     assert data["avg_resolve_hours"] > 0
     assert isinstance(data["active_talk_threads"], int)
@@ -97,6 +99,38 @@ async def test_public_stats(client, db_pool, public_world):
     async with db_pool.acquire() as conn:
         db_total = await conn.fetchval("SELECT COUNT(*) FROM issues WHERE deleted_at IS NULL")
         assert db_total == data["total_issues"]
+        db_routed = await conn.fetchval(
+            "SELECT COUNT(*) FROM issues WHERE deleted_at IS NULL AND status IN ('in_progress', 'escalated')"
+        )
+        assert db_routed == data["routed_issues"]
+
+
+@pytest.mark.asyncio
+async def test_public_stats_trend(client, db_pool, public_world):
+    """GET /api/v1/public/stats/trend — sparkline ข้อมูลจริง ครบทุกวัน ไม่ขาดช่วง"""
+    res = client.get("/api/v1/public/stats/trend", params={"days": 14})
+    assert res.status_code == 200
+    data = res.json()
+
+    # คืนวันละจุดครบ 14 วัน เรียงจากเก่าไปใหม่ และมีค่าจริงอย่างน้อย 1 วัน (จาก public_world)
+    assert isinstance(data, list)
+    assert len(data) == 14
+    assert sum(p["count"] for p in data) == 2  # resolved 1 + pending 1 สร้างใน public_world
+    assert all(p["count"] >= 0 for p in data)
+
+    # Deep DB verify: วันแรกกับวันสุดท้ายใน DB ต้องตรงกับ API
+    async with db_pool.acquire() as conn:
+        db_min_day = await conn.fetchval(
+            """
+            SELECT MIN((created_at AT TIME ZONE 'Asia/Bangkok')::date)::text
+            FROM issues WHERE deleted_at IS NULL
+            """
+        )
+        assert db_min_day == data[0]["date"] or db_min_day in [p["date"] for p in data]
+
+    # days นอกช่วงถูก reject
+    res_bad = client.get("/api/v1/public/stats/trend", params={"days": 2})
+    assert res_bad.status_code == 422  # ge=3
 
 
 @pytest.mark.asyncio

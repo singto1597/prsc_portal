@@ -2,6 +2,7 @@
 
 โฟกัสที่ความปลอดภัยของข้อมูล: เปิดเผยเฉพาะภาพรวม / เรื่องที่ปิดแล้วแบบ mask ตัวตน
 """
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import asyncpg
@@ -51,13 +52,25 @@ def _duration_hours(resolved_at, created_at) -> Optional[float]:
 
 
 async def get_system_stats(pool: asyncpg.Pool) -> dict:
-    """สถิติรวมของระบบ (Public)"""
+    """สถิติรวมของระบบ (Public)
+
+    เน้นเมตริก "ความ Active" ของระบบมากกว่าจุดจบคดี (ตาม UX feedback):
+    - total_issues: เรื่องที่เข้าสู่ระบบแล้ว
+    - resolved_issues: เรื่องที่ปิดสำเร็จแล้ว (จำนวนจริง ไม่ใช่ %)
+    - routed_issues: เรื่องที่กำลังดำเนินการ/ส่งต่อฝ่ายที่เกี่ยวข้องแล้ว
+    """
     async with pool.acquire() as conn:
         total = await conn.fetchval(
             "SELECT COUNT(*) FROM issues WHERE deleted_at IS NULL"
         ) or 0
         resolved = await conn.fetchval(
             "SELECT COUNT(*) FROM issues WHERE deleted_at IS NULL AND status = 'resolved'"
+        ) or 0
+        routed = await conn.fetchval(
+            """
+            SELECT COUNT(*) FROM issues
+            WHERE deleted_at IS NULL AND status IN ('in_progress', 'escalated')
+            """
         ) or 0
         resolved_rate = round((resolved / total * 100), 1) if total else 0.0
         avg_hours = await conn.fetchval(
@@ -82,11 +95,44 @@ async def get_system_stats(pool: asyncpg.Pool) -> dict:
 
     return {
         "total_issues": total,
+        "resolved_issues": resolved,
+        "routed_issues": routed,
         "resolved_rate_percent": float(resolved_rate),
         "avg_resolve_hours": round(float(avg_hours or 0), 1),
         "active_talk_threads": talk_threads,
         "active_votes": votes,
     }
+
+
+async def get_stats_trend(pool: asyncpg.Pool, days: int) -> list[dict]:
+    """แนวโน้มจำนวนเรื่องใหม่ต่อวัน ย้อนหลัง N วัน (Public) — ข้อมูลจริงสำหรับ Sparkline
+
+    นับตามวันที่ (Asia/Bangkok) ของ created_at แล้วเติมวันว่างเป็น 0
+    เพื่อให้กราฟเห็นภาพ "ระบบเริ่มขยับ" แม้บางวันไม่มีเรื่อง
+    """
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT (created_at AT TIME ZONE 'Asia/Bangkok')::date AS day, COUNT(*)::int AS count
+            FROM issues
+            WHERE deleted_at IS NULL
+              AND created_at >= NOW() - ($1::int * INTERVAL '1 day')
+            GROUP BY day
+            ORDER BY day
+            """,
+            days,
+        )
+
+    counts = {r["day"].isoformat(): r["count"] for r in rows}
+    # วันที่ "วันนี้" ในเวลาไทย (UTC+7) — เริ่มนับจากวันวานถอยหลังให้ครบ `days` วัน
+    now_bkk = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=7)))
+    today = now_bkk.date()
+    out: list[dict] = []
+    for offset in range(days - 1, -1, -1):
+        d = today - timedelta(days=offset)
+        iso = d.isoformat()
+        out.append({"date": iso, "count": counts.get(iso, 0)})
+    return out
 
 
 async def get_resolved_cases(pool: asyncpg.Pool, limit: int) -> list[dict]:

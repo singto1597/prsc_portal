@@ -530,3 +530,33 @@
 - **Correct Pattern/Solution:** seed แบบ `if count==0` ใช้ได้กับ prod (idempotent) แต่เทสต้องไม่พึ่ง "ตารางว่าง" — ให้ fixture ของเทสเคลียร์ตารางนั้นเองก่อน insert ข้อมูลของมัน (`DELETE FROM announcements WHERE deleted_at IS NULL` ใน `public_world`) และตัดสินใจเรื่องนี้ตอนออกแบบตารางใหม่: seed ที่วิ่งซ้ำทุก startup + เทสที่มี `client` fixture = ต้องเคลียร์เอง
 - **กฎ: เมื่อเขียนเทสที่อ่านตารางที่ `init_db` seed ไว้ ให้ล้างตารางนั้นใน fixture ก่อน insert เสมอ (ห้ามเดา count จาก schema seed); หมายเหตุ — `clean_database` ต้องมีตารางใหม่ใน TRUNCATE list ด้วย**
 - **Date Added:** 2026-08-31
+
+### 🛠️ CSS `overflow-x-hidden` บน root wrapper พัง `position: sticky` (Navbar ไม่ติดด้านบนเงียบ ๆ)
+- **Context/Problem:** Landing.vue wrap ทั้งหน้าด้วย `<div class="overflow-x-hidden">` เพื่อตัดองค์ประกอบล้นขอบ → header `position: sticky; top: 0` **ไม่ติดขอบจอ** (เลื่อนผ่านแล้วหายไป)
+- **Root Cause:** per CSS spec เมื่อ axis หนึ่งเป็น `hidden` และอีก axis เป็น `visible` → `visible` ถูกคอมพิวต์เป็น `auto` → wrapper กลายเป็น **scroll container** → sticky ผูกกับ scrollport ของ wrapper (ไม่ใช่ viewport) แต่ wrapper สูง auto (โตตามเนื้อหา ไม่เคย scroll) → sticky ไม่ทำงาน
+- **Correct Pattern/Solution:** ใช้ `overflow-x: clip` แทน `hidden` บน wrapper — `clip` **ไม่** สร้าง scroll container (sticky ยังทำงาน) แต่ตัดภาพล้นขอบเหมือนกัน (Chrome 90+/Firefox 81+/Safari 16+; ตกยุคเก่าได้แค่เลื่อนล้นเล็กน้อย); และโค้ดที่บล็อกล้นจริง ๆ (blob, floating card) ให้ `overflow-hidden` ระดับ section แทน
+- **กฎ: ถ้าต้องการตัด overflow แนวนอนโดยไม่พัง sticky → `overflow-x: clip` (ไม่ใช่ hidden); เช็คเสมอว่า element ไหนเป็น scroll container ก่อนใช้ sticky**
+- **Date Added:** 2026-09-01
+
+### 🛠️ SVG `preserveAspectRatio="none"` ยืด `circle` เป็นวงรี (จุดสุดท้ายของ sparkline เพี้ยน)
+- **Context/Problem:** Sparkline ข้อมูลจริง (Landing stats) ใช้ `svg viewBox="0 0 320 84"` + `preserveAspectRatio="none"` + `w-full h-24` ให้ยืดเต็มความกว้าง → จุดสุดท้าย `<circle r="4">` ถูกยืดเป็นวงรีเมื่อจอสัดส่วนต่างจาก viewBox (hero card กว้าง ~578px → อัตราส่วน 6.0 vs viewBox 3.81)
+- **Root Cause:** `vector-effect="non-scaling-stroke"` แก้ stroke ของ polyline แต่ **ไม่แก้ geometry** — circle โดน non-uniform scale เต็ม ๆ (กลายเป็นวงรี + stroke ไม่สม่ำเสมอ)
+- **Correct Pattern/Solution:** ลบ `<circle>` ออกจาก SVG → วาง HTML dot (span ทรงกลม fixed-size) ทับบนกรอบ `relative` เดียวกันกับ svg โดยใช้ % จากพิกัด viewBox: `left: last.x/320*100%`, `top: last.y/84*100%` (ข้อมูลที่อยู่ใน scope ของ code เดียวกันจะตรงกับตำแหน่งเสมอ แม้ svg ยืด)
+- **กฎ: chart แบบ SVG ที่ใช้ `preserveAspectRatio="none"` (ยืดไม่เท่ากัน) → จุด/ลูกเล่นที่ต้องเป็นวงกลมคงที่ ให้วาดเป็น HTML overlay ที่ % position ไม่ใช่ `<circle>` ใน SVG**
+- **Date Added:** 2026-09-01
+
+### 🛠️ Count-up / อนิเมชันหลังโหลดข้อมูล — watch ต้องรอ flag loading ปิดก่อน (element อยู่ใน `v-else` ของ Skeleton)
+- **Context/Problem:** Landing stats ใช้ Count-up: `watch(stats, () => nextTick(() => animate(grid)))` → **ไม่เคยวิ่ง** เพราะ Bento Grid อยู่ใน `v-else` (แสดงเมื่อ `!isLoadingStats`) ส่วน `stats` ถูก set ใน try ขณะที่ `isLoadingStats` ยัง true → ณ ตอน watch fire grid ยังไม่ mount → `ref` เป็น null → animate ข้าม
+- **Root Cause:** element อยู่ใน branch ที่ถูก conditional render โดยอิง flag loading ที่ถูก set `false` ใน `finally` (หลัง data set เสมอ) → timing ของ `data` กับ `element mount` ไม่พร้อมกัน
+- **Correct Pattern/Solution:** watch แบบสองแหล่ง `watch([stats, isLoadingStats], () => { if (!stats || isLoadingStats) return; nextTick(animate) })` → animate เกิดตอน `isLoadingStats` เพิ่ง flip เป็น false (grid mount พอดี); กันไว้ทั้งกรณีโหลดครั้งแรกและ retry
+- **กฎ: ถ้าองค์ประกอบถูก conditional render จาก flag loading → อนิเมชันหลังโหลดต้อง watch ทั้ง data + flag (รอ flag = false) ไม่งั้น ref ยัง null**
+- **Date Added:** 2026-09-01
+
+### 🛠️ วิธีรัน pytest เมื่อ pypi/network down (DNS ตาย) — ใช้ container ที่มี deps อยู่แล้ว
+- **Context/Problem:** `docker compose -f docker-compose.test.yml run --rm test_runner` install pytest ทุกครั้งจาก pypi (`--no-cache-dir`) → host DNS ตาย (`getent hosts pypi.org` ค้าง / curl timeout) → ติดตั้งไม่ได้ ไม่มีทางรันเทส
+- **Correct Pattern/Solution:** หา container/image ที่มี pytest + pytest-asyncio + httpx + bcrypt + fastapi อยู่แล้ว แล้วใช้แทน:
+  1. `docker ps -a` หา container ที่เคยรันเทส (เช่น `piri_test_runner` ที่ Exited) → `docker start <name>` → deps ยังอยู่ใน writable layer → `docker exec ... python -m pytest`
+  2. หรือยืม image ของโปรเจคอื่นที่ติดตั้งครบ (`cm-test-runner:ready`) → `docker run --network <compose-net> -e DATABASE_URL=... -v ./backend:/app -w /app --entrypoint python3 <img> -m pytest`
+  - ตรวจว่า container อยู่ net เดียวกับ `test_db` + `DATABASE_URL` ถูกต้องก่อน
+- **กฎ: ติดตั้ง pytest ไม่ได้เพราะ network → อย่ารอ pip; หา container/image ที่มี deps ครบแล้ว mount backend เข้าไปแทน (network แค่ตอน first-install เท่านั้น)**
+- **Date Added:** 2026-09-01

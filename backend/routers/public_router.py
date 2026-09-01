@@ -10,6 +10,7 @@ from models.public_schemas import (
     SystemStatsOut,
     ResolvedCaseOut,
     AnnouncementOut,
+    StatTrendPoint,
 )
 from services import public_service
 
@@ -19,6 +20,15 @@ router = APIRouter(prefix="/public", tags=["Public"])
 @router.get("/stats", response_model=SystemStatsOut)
 async def get_system_stats(pool: asyncpg.Pool = Depends(get_db_pool)):
     return await public_service.get_system_stats(pool)
+
+
+@router.get("/stats/trend", response_model=list[StatTrendPoint])
+async def get_stats_trend(
+    days: int = Query(14, ge=3, le=90),
+    pool: asyncpg.Pool = Depends(get_db_pool),
+):
+    """แนวโน้มเรื่องใหม่ต่อวัน (ย้อนหลัง N วัน) — ข้อมูลจริงสำหรับ sparkline"""
+    return await public_service.get_stats_trend(pool, days)
 
 
 @router.get("/resolved-cases", response_model=list[ResolvedCaseOut])
