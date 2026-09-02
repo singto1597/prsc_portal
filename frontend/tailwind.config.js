@@ -1,4 +1,6 @@
 /** @type {import('tailwindcss').Config} */
+import daisyui from 'daisyui';
+
 export default {
   content: [
     "./index.html",
@@ -14,7 +16,7 @@ export default {
     },
   },
   plugins: [
-    require('daisyui'),
+    daisyui,
   ],
   daisyui: {
     themes: false, // false = ใช้ default theme ไปก่อน (ปรับทีหลังได้)

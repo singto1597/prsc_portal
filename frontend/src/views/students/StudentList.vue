@@ -29,8 +29,9 @@ async function load() {
       listStudents({ room_id: roomFilter.value || undefined, search: search.value || undefined }),
       listRooms(),
     ]);
-  } catch (e: any) {
-    Swal.fire({ icon: 'error', title: 'โหลดข้อมูลไม่สำเร็จ', text: e.message });
+  } catch (e) {
+    const msg = typeof e === 'string' ? e : e instanceof Error ? e.message : 'โหลดข้อมูลไม่สำเร็จ';
+    Swal.fire({ icon: 'error', title: 'โหลดข้อมูลไม่สำเร็จ', text: msg });
   } finally {
     isLoading.value = false;
   }
@@ -53,8 +54,9 @@ async function changeRole(student: Student) {
     await updateStudent(student.id, { class_role: value });
     Swal.fire({ icon: 'success', title: 'บันทึกแล้ว', timer: 1000, showConfirmButton: false });
     load();
-  } catch (e: any) {
-    Swal.fire({ icon: 'error', title: 'ไม่สำเร็จ', text: e.message });
+  } catch (e) {
+    const msg = typeof e === 'string' ? e : e instanceof Error ? e.message : 'ไม่สำเร็จ';
+    Swal.fire({ icon: 'error', title: 'ไม่สำเร็จ', text: msg });
   }
 }
 </script>

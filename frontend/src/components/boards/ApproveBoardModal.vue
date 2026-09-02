@@ -109,7 +109,7 @@ async function handleConfirm() {
         <div class="mb-4">
           <label class="block text-sm font-medium text-gray-700 mb-1.5">ประเภทบอร์ด</label>
           <div class="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold"
-            :class="boardType === 'vote' ? 'bg-violet-100 text-violet-700' : 'bg-sky-100 text-sky-700'">
+            :class="boardType === 'vote' ? 'bg-red-100 text-red-700' : 'bg-rose-100 text-rose-700'">
             <i :class="boardType === 'vote' ? 'bi bi-bar-chart-fill' : 'bi bi-chat-dots-fill'"></i>
             {{ BOARD_TYPE_LABELS[boardType] }}
           </div>

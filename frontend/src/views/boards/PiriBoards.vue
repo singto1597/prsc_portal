@@ -121,7 +121,7 @@ function fmtDate(iso: string): string {
     </div>
     <div v-else-if="error" class="text-red-500 text-center py-10">{{ error }}</div>
 
-    <div v-else-if="!boards.length" class="bg-white rounded-xl p-12 text-center text-gray-400">
+    <div v-else-if="!boards.length" class="bg-white rounded-2xl p-12 text-center text-gray-400">
       <div class="text-4xl mb-2"><i class="bi bi-columns-gap"></i></div>
       <p>ยังไม่มีบอร์ดในเงื่อนไขนี้</p>
     </div>
@@ -131,11 +131,11 @@ function fmtDate(iso: string): string {
         v-for="b in boards"
         :key="b.id"
         :to="{ name: 'board-detail', params: { id: b.id } }"
-        class="bg-white rounded-xl shadow-sm p-5 hover:shadow-md transition flex flex-col"
+        class="bg-white rounded-2xl shadow-sm p-5 hover:shadow-md transition flex flex-col"
       >
         <div class="flex items-center justify-between mb-2">
           <span class="flex items-center gap-1.5 text-xs font-semibold"
-            :class="b.board_type === 'vote' ? 'text-violet-600' : 'text-sky-600'">
+            :class="b.board_type === 'vote' ? 'text-red-600' : 'text-rose-500'">
             <i :class="boardTypeIcon(b.board_type)"></i> {{ BOARD_TYPE_LABELS[b.board_type] }}
           </span>
           <span class="text-xs text-gray-400">{{ fmtDate(b.created_at) }}</span>

@@ -155,7 +155,7 @@ async function handleResolve(r: ReportItem, action: 'hide' | 'dismiss') {
     </div>
 
     <!-- ไม่มีสิทธิ์ (กันผ่าน URL ตรง) -->
-    <div v-if="!authStore.isCouncilAuthority" class="bg-white rounded-xl p-12 text-center text-gray-400">
+    <div v-if="!authStore.isCouncilAuthority" class="bg-white rounded-2xl p-12 text-center text-gray-400">
       <div class="text-4xl mb-2"><i class="bi bi-shield-lock"></i></div>
       <p>เฉพาะสภานักเรียน/แอดมินที่เข้าถึงหน้านี้ได้</p>
     </div>
@@ -200,7 +200,7 @@ async function handleResolve(r: ReportItem, action: 'hide' | 'dismiss') {
       </div>
       <div v-else-if="error" class="text-red-500 text-center py-10">{{ error }}</div>
 
-      <div v-else-if="!reports.length" class="bg-white rounded-xl p-12 text-center text-gray-400">
+      <div v-else-if="!reports.length" class="bg-white rounded-2xl p-12 text-center text-gray-400">
         <div class="text-4xl mb-2"><i class="bi bi-flag"></i></div>
         <p v-if="statusFilter === 'open'">ไม่มีรายงานค้าง — นักเรียนยังไม่แจ้ง หรือสภาจัดการหมดแล้ว</p>
         <p v-else>ไม่พบรายงานในเงื่อนไขนี้</p>
@@ -211,13 +211,13 @@ async function handleResolve(r: ReportItem, action: 'hide' | 'dismiss') {
           v-for="r in reports"
           :key="r.id"
           :data-testid="'report-card-' + r.id"
-          class="bg-white rounded-xl shadow-sm p-4 border-l-4"
+          class="bg-white rounded-2xl shadow-sm p-4 border-l-4"
           :class="r.status === 'open' ? 'border-amber-400' : r.status === 'resolved' ? 'border-emerald-400' : 'border-gray-200'"
         >
           <div class="flex flex-wrap items-center gap-2 mb-2">
             <RouterLink
               :to="{ name: 'board-detail', params: { id: r.board_id } }"
-              class="text-xs font-semibold text-sky-600 hover:underline flex items-center gap-1"
+              class="text-xs font-semibold text-rose-500 hover:underline flex items-center gap-1"
             >
               <i class="bi bi-chat-dots"></i> {{ r.board_title }}
             </RouterLink>

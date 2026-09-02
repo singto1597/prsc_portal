@@ -199,7 +199,7 @@ function go(n: NotificationItem) {
       <div
         v-for="n in items"
         :key="n.id"
-        class="bg-white rounded-xl border cursor-pointer transition-colors"
+        class="bg-white rounded-2xl border cursor-pointer transition-colors"
         :class="n.read_at
           ? 'border-gray-100 hover:border-gray-200'
           : 'border-red-100 bg-red-50/40 hover:border-red-200'"

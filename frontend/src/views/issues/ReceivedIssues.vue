@@ -308,7 +308,7 @@ function statusColor(s: string) {
     </div>
     <div v-else-if="error" class="text-red-500 text-center py-10">{{ error }}</div>
 
-    <div v-else-if="!issues.length" class="bg-white rounded-xl p-10 text-center text-gray-400">
+    <div v-else-if="!issues.length" class="bg-white rounded-2xl p-10 text-center text-gray-400">
       <div class="text-4xl mb-2"><i class="bi bi-inbox"></i></div>
       <p>ไม่พบเรื่องในเงื่อนไขที่เลือก</p>
     </div>
@@ -318,13 +318,13 @@ function statusColor(s: string) {
         v-for="i in issues"
         :key="i.id"
         :to="{ name: 'issue-detail', params: { id: i.id } }"
-        class="bg-white rounded-xl shadow-sm p-4 hover:shadow-md transition block"
+        class="bg-white rounded-2xl shadow-sm p-4 hover:shadow-md transition block"
       >
         <div class="flex items-start justify-between gap-3">
           <div class="flex-1 min-w-0">
             <div class="flex flex-wrap gap-2 mb-1.5">
               <span class="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">{{ MAIN_CATEGORY_LABELS[i.main_category] }}</span>
-              <span class="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full">{{ subcategoryLabel(i.main_category, i.category) }}</span>
+              <span class="px-2 py-0.5 bg-rose-50 text-rose-600 ring-1 ring-rose-100 text-xs rounded-full">{{ subcategoryLabel(i.main_category, i.category) }}</span>
               <span class="px-2 py-0.5 rounded-full text-xs"
                 :class="{
                   'bg-emerald-100 text-emerald-700': i.current_level === 'room',

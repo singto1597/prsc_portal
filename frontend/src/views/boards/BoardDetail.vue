@@ -136,7 +136,7 @@ const rootComments = computed(() => board.value?.comments ?? [])
     <div class="animate-spin w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full"></div>
   </div>
 
-  <div v-else-if="loadError" class="max-w-3xl mx-auto bg-white rounded-xl shadow-sm p-10 text-center">
+  <div v-else-if="loadError" class="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm p-10 text-center">
     <div class="text-4xl text-gray-300 mb-3"><i class="bi bi-file-earmark-x"></i></div>
     <p class="text-gray-600 font-medium">{{ loadError }}</p>
     <button @click="router.push({ name: 'boards' })" class="mt-4 px-4 py-2 bg-red-600 text-white rounded-xl text-sm hover:bg-red-700">
@@ -151,10 +151,10 @@ const rootComments = computed(() => board.value?.comments ?? [])
     </button>
 
     <!-- Header -->
-    <div class="bg-white rounded-xl shadow-sm p-5">
+    <div class="bg-white rounded-2xl shadow-sm p-5">
       <div class="flex items-center justify-between gap-3 mb-2">
         <span class="flex items-center gap-1.5 text-xs font-semibold"
-          :class="board.board_type === 'vote' ? 'text-violet-600' : 'text-sky-600'">
+          :class="board.board_type === 'vote' ? 'text-red-600' : 'text-rose-500'">
           <i :class="boardTypeIcon(board.board_type)"></i> บอร์ด{{ BOARD_TYPE_LABELS[board.board_type] }}
         </span>
         <div class="flex items-center gap-2">
@@ -181,9 +181,9 @@ const rootComments = computed(() => board.value?.comments ?? [])
     </div>
 
     <!-- ===================== Vote layout ===================== -->
-    <div v-if="board.board_type === 'vote'" class="bg-white rounded-xl shadow-sm p-5">
+    <div v-if="board.board_type === 'vote'" class="bg-white rounded-2xl shadow-sm p-5">
       <div class="flex items-center justify-between mb-1">
-        <h2 class="text-lg font-bold text-gray-800"><i class="bi bi-bar-chart-fill mr-1 text-violet-600"></i> โหวต</h2>
+        <h2 class="text-lg font-bold text-gray-800"><i class="bi bi-bar-chart-fill mr-1 text-red-600"></i> โหวต</h2>
         <span class="text-sm text-gray-500 tabular-nums">{{ board.total_votes.toLocaleString('en-US') }} เสียง</span>
       </div>
 
@@ -222,7 +222,7 @@ const rootComments = computed(() => board.value?.comments ?? [])
           <div class="h-2.5 bg-gray-100 rounded-full overflow-hidden">
             <div
               class="h-full rounded-full transition-all duration-500"
-              :class="board.my_vote_choice_id === c.id ? 'bg-emerald-500' : 'bg-violet-500'"
+              :class="board.my_vote_choice_id === c.id ? 'bg-emerald-500' : 'bg-gradient-to-r from-red-500 to-rose-500'"
               :style="{ width: choicePercent(c) + '%' }"
             ></div>
           </div>
@@ -244,9 +244,9 @@ const rootComments = computed(() => board.value?.comments ?? [])
     </div>
 
     <!-- ===================== Talk layout ===================== -->
-    <div v-else class="bg-white rounded-xl shadow-sm p-5">
+    <div v-else class="bg-white rounded-2xl shadow-sm p-5">
       <h2 class="text-lg font-bold text-gray-800 mb-4">
-        <i class="bi bi-chat-left-text mr-1 text-sky-600"></i> พูดคุย
+        <i class="bi bi-chat-left-text mr-1 text-rose-500"></i> พูดคุย
         <span v-if="rootComments.length" class="text-sm font-normal text-gray-400">({{ board.comment_count }})</span>
       </h2>
 

@@ -1,3 +1,4 @@
+<!-- eslint-disable vue/multi-word-component-names -- ชื่อตาม route/spec -->
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { RouterLink } from 'vue-router';
