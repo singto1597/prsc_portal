@@ -537,13 +537,14 @@ watch([stats, isLoadingStats], () => {
           </button>
         </div>
 
-        <!-- ปุ่มเข้าสู่ระบบ (mobile) — ใช้แทนแฮมเบอร์เกอร์ ตรง CTA ที่อยากให้เห็นชัด -->
+        <!-- ปุ่มเข้าสู่ระบบ (mobile) — มือถือโชว์แค่ไอคอนกล่องเล็ก ๆ (sm+ ถึงเพิ่มข้อความ) -->
         <button
           @click="goLogin"
-          class="flex items-center gap-2 rounded-xl bg-gradient-to-r from-red-600 via-rose-500 to-red-600 bg-[length:200%_auto] px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-rose-500/30 transition-all duration-300 hover:bg-right hover:shadow-rose-500/50 active:scale-[0.97] lg:hidden"
+          aria-label="เข้าสู่ระบบ"
+          class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-r from-red-600 via-rose-500 to-red-600 bg-[length:200%_auto] text-white shadow-lg shadow-rose-500/30 transition-all duration-300 hover:bg-right hover:shadow-rose-500/50 active:scale-[0.97] sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2.5 lg:hidden"
         >
-          <i class="bi bi-box-arrow-in-right text-base"></i>
-          เข้าสู่ระบบ
+          <i class="bi bi-box-arrow-in-right text-lg sm:text-base"></i>
+          <span class="hidden text-sm font-bold sm:inline">เข้าสู่ระบบ</span>
         </button>
       </nav>
     </header>
