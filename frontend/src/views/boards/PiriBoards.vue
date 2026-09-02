@@ -81,39 +81,39 @@ function fmtDate(iso: string): string {
   <div>
     <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
       <div>
-        <h1 class="text-xl sm:text-2xl font-bold text-gray-900 leading-tight">
+        <h1 class="text-xl font-black tracking-tight text-slate-900 leading-tight sm:text-2xl">
           <i class="bi bi-columns-gap mr-1 text-red-500"></i> PIRI Boards
         </h1>
-        <p class="text-sm text-gray-500">โหวต + พูดคุยสาธารณะ ที่สภานักเรียนอนุมัติแล้ว</p>
+        <p class="text-sm text-slate-500">โหวต + พูดคุยสาธารณะ ที่สภานักเรียนอนุมัติแล้ว</p>
       </div>
     </div>
 
     <!-- แถบกรอง + ค้นหา -->
     <div class="flex flex-wrap items-center gap-2 mb-5">
-      <div class="flex gap-1 p-1 bg-gray-100 rounded-xl">
+      <div class="flex gap-1 p-1 bg-slate-100 rounded-xl">
         <button
           v-for="t in TABS"
           :key="t.value"
           type="button"
           @click="switchType(t.value)"
           class="px-3.5 py-2 rounded-lg text-sm font-medium transition flex items-center gap-1.5"
-          :class="typeFilter === t.value ? 'bg-white shadow text-red-600' : 'text-gray-500 hover:text-gray-700'"
+          :class="typeFilter === t.value ? 'bg-white shadow text-red-600' : 'text-slate-500 hover:text-slate-700'"
         >
           <i :class="t.icon"></i> {{ t.label }}
         </button>
       </div>
 
       <div class="relative flex-1 min-w-[180px] sm:flex-none sm:w-72">
-        <i class="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+        <i class="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
         <input
           v-model="q"
           type="search"
           placeholder="ค้นหาบอร์ด..."
-          class="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-red-500"
+          class="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-red-500"
         />
       </div>
 
-      <span class="text-sm text-gray-400 ml-auto tabular-nums">{{ total.toLocaleString('en-US') }} บอร์ด</span>
+      <span class="text-sm text-slate-400 ml-auto tabular-nums">{{ total.toLocaleString('en-US') }} บอร์ด</span>
     </div>
 
     <div v-if="isLoading" class="flex justify-center py-16">
@@ -121,7 +121,7 @@ function fmtDate(iso: string): string {
     </div>
     <div v-else-if="error" class="text-red-500 text-center py-10">{{ error }}</div>
 
-    <div v-else-if="!boards.length" class="bg-white rounded-2xl p-12 text-center text-gray-400">
+    <div v-else-if="!boards.length" class="bg-white rounded-2xl p-12 text-center text-slate-400">
       <div class="text-4xl mb-2"><i class="bi bi-columns-gap"></i></div>
       <p>ยังไม่มีบอร์ดในเงื่อนไขนี้</p>
     </div>
@@ -138,19 +138,19 @@ function fmtDate(iso: string): string {
             :class="b.board_type === 'vote' ? 'text-red-600' : 'text-rose-500'">
             <i :class="boardTypeIcon(b.board_type)"></i> {{ BOARD_TYPE_LABELS[b.board_type] }}
           </span>
-          <span class="text-xs text-gray-400">{{ fmtDate(b.created_at) }}</span>
+          <span class="text-xs text-slate-400">{{ fmtDate(b.created_at) }}</span>
         </div>
 
-        <h3 class="font-semibold text-gray-900 leading-snug mb-1 line-clamp-2">{{ b.title }}</h3>
-        <p class="text-sm text-gray-500 mb-3 line-clamp-2">{{ b.description }}</p>
+        <h3 class="font-semibold text-slate-900 leading-snug mb-1 line-clamp-2">{{ b.title }}</h3>
+        <p class="text-sm text-slate-500 mb-3 line-clamp-2">{{ b.description }}</p>
 
         <div class="mt-auto">
           <div v-if="b.tags.length" class="flex flex-wrap gap-1.5 mb-3">
-            <span v-for="tag in b.tags.slice(0, 4)" :key="tag" class="px-2 py-0.5 bg-gray-100 text-gray-600 text-[11px] rounded-full">
+            <span v-for="tag in b.tags.slice(0, 4)" :key="tag" class="px-2 py-0.5 bg-slate-100 text-slate-600 text-[11px] rounded-full">
               #{{ tag }}
             </span>
           </div>
-          <div class="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-gray-100">
+          <div class="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
             <span class="truncate">
               <i class="bi bi-person mr-1"></i>
               {{ b.is_anonymous ? 'ไม่ระบุชื่อ' : b.author_name || 'สภานักเรียน' }}

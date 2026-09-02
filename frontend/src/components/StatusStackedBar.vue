@@ -20,7 +20,7 @@ function grow(s: StatusStat): number {
 
 <template>
   <div
-    class="w-full flex rounded-full overflow-hidden bg-gray-100"
+    class="w-full flex rounded-full overflow-hidden bg-slate-100"
     :class="heightClass || 'h-2.5'"
     role="img"
     :aria-label="stats.map((s) => `${s.label} ${s.count}`).join(', ')"
@@ -30,7 +30,7 @@ function grow(s: StatusStat): number {
       :key="s.status"
       v-show="s.count > 0"
       class="h-full"
-      :class="STATUS_BAR[s.status] ?? 'bg-gray-300'"
+      :class="STATUS_BAR[s.status] ?? 'bg-slate-300'"
       :style="{ flexGrow: grow(s), flexBasis: '0%' }"
       :title="`${s.label}: ${s.count} เรื่อง`"
     ></div>

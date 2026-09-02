@@ -71,7 +71,7 @@ const volumeLabel = computed(() => (playbook.value ? `เล่มที่ ${pl
 <template>
   <div v-if="playbook" ref="rootEl">
     <!-- ⏳ แถบความคืบหน้าการอ่าน (ติดกับ header — ไม่งงกับ mobile header ของ layout) -->
-    <header class="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-gray-100">
+    <header class="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-100">
       <div class="max-w-3xl mx-auto px-3 sm:px-4 py-3 flex items-center gap-3">
         <RouterLink
           to="/playbooks"
@@ -84,7 +84,7 @@ const volumeLabel = computed(() => (playbook.value ? `เล่มที่ ${pl
           <p class="text-[10px] sm:text-[11px] text-red-500 font-bold uppercase tracking-wider leading-none mb-1">
             {{ volumeLabel }} · P.R. Playbooks
           </p>
-          <h1 class="text-sm sm:text-base font-bold text-gray-900 truncate leading-tight">{{ playbook.title }}</h1>
+          <h1 class="text-sm sm:text-base font-bold text-slate-900 truncate leading-tight">{{ playbook.title }}</h1>
         </div>
         <a :href="playbook.pdfUrl" download class="btn-gradient !py-2 !px-3 sm:!px-4 text-xs sm:text-sm shrink-0">
           <i class="bi bi-file-earmark-pdf text-sm sm:text-base"></i>
@@ -92,7 +92,7 @@ const volumeLabel = computed(() => (playbook.value ? `เล่มที่ ${pl
           <span class="sm:hidden">ดาวน์โหลด</span>
         </a>
       </div>
-      <div class="h-0.5 bg-gray-100">
+      <div class="h-0.5 bg-slate-100">
         <div
           class="h-full bg-gradient-to-r from-red-600 to-rose-500 transition-[width] duration-150 ease-out"
           :style="{ width: `${progress}%` }"
@@ -103,7 +103,7 @@ const volumeLabel = computed(() => (playbook.value ? `เล่มที่ ${pl
     <!-- เนื้อหาหนังสือ (Webtoon reader — เลื่อนลงเรื่อย ๆ) -->
     <div class="max-w-3xl mx-auto px-3 sm:px-4 py-5 sm:py-7">
       <!-- 🔖 ปก -->
-      <div class="relative mb-4 sm:mb-6 bg-gray-100 rounded-2xl overflow-hidden shadow-lg">
+      <div class="relative mb-4 sm:mb-6 bg-slate-100 rounded-2xl overflow-hidden shadow-lg">
         <img
           :src="playbook.coverImage"
           :alt="`ปก ${playbook.title}`"
@@ -125,7 +125,7 @@ const volumeLabel = computed(() => (playbook.value ? `เล่มที่ ${pl
             :alt="`${playbook.title} — หน้า ${n}`"
             loading="lazy"
             @error="onPageError(n)"
-            class="w-full max-w-3xl h-auto rounded-xl shadow-md bg-gray-50"
+            class="w-full max-w-3xl h-auto rounded-xl shadow-md bg-slate-50"
           />
         </template>
       </div>
@@ -139,10 +139,10 @@ const volumeLabel = computed(() => (playbook.value ? `เล่มที่ ${pl
       </div>
 
       <!-- 🏁 สิ้นสุดเล่ม -->
-      <div class="mt-8 flex items-center justify-center gap-3 text-gray-400">
-        <div class="h-px w-14 sm:w-20 bg-gray-200"></div>
+      <div class="mt-8 flex items-center justify-center gap-3 text-slate-400">
+        <div class="h-px w-14 sm:w-20 bg-slate-200"></div>
         <span class="text-xs font-semibold tracking-widest">จบเล่ม</span>
-        <div class="h-px w-14 sm:w-20 bg-gray-200"></div>
+        <div class="h-px w-14 sm:w-20 bg-slate-200"></div>
       </div>
 
       <!-- เล่มถัดไป -->
@@ -151,12 +151,12 @@ const volumeLabel = computed(() => (playbook.value ? `เล่มที่ ${pl
         :to="{ name: 'playbook-reader', params: { id: nextPlaybook.id } }"
         class="mt-4 page-card p-4 flex items-center gap-4 hover:shadow-md transition card-hover"
       >
-        <div class="w-12 h-16 rounded-lg overflow-hidden shadow bg-gray-100 shrink-0">
+        <div class="w-12 h-16 rounded-lg overflow-hidden shadow bg-slate-100 shrink-0">
           <img :src="nextPlaybook.coverImage" :alt="`ปก ${nextPlaybook.title}`" loading="lazy" class="w-full h-full object-cover" />
         </div>
         <div class="min-w-0 flex-1">
           <p class="text-[10px] text-red-500 font-bold uppercase tracking-wider mb-0.5">อ่านเล่มถัดไป</p>
-          <p class="font-semibold text-gray-800 truncate">{{ nextPlaybook.title }}</p>
+          <p class="font-semibold text-slate-800 truncate">{{ nextPlaybook.title }}</p>
         </div>
         <i class="bi bi-arrow-right text-xl text-red-500 shrink-0"></i>
       </RouterLink>
@@ -176,9 +176,9 @@ const volumeLabel = computed(() => (playbook.value ? `เล่มที่ ${pl
 
   <!-- 404 เล่มไม่พบ -->
   <div v-else class="text-center py-20">
-    <div class="text-5xl mb-4"><i class="bi bi-journal-x text-gray-300"></i></div>
-    <h1 class="text-lg font-bold text-gray-700 mb-2">ไม่พบเล่มที่ระบุ</h1>
-    <p class="text-sm text-gray-400 mb-6">ลิงก์นี้อาจไม่ถูกต้อง หรือเล่มถูกนำออกจากคู่มือแล้ว</p>
+    <div class="text-5xl mb-4"><i class="bi bi-journal-x text-slate-300"></i></div>
+    <h1 class="text-lg font-bold text-slate-700 mb-2">ไม่พบเล่มที่ระบุ</h1>
+    <p class="text-sm text-slate-400 mb-6">ลิงก์นี้อาจไม่ถูกต้อง หรือเล่มถูกนำออกจากคู่มือแล้ว</p>
     <RouterLink to="/playbooks" class="btn-gradient">กลับไปหน้าคู่มือ</RouterLink>
   </div>
 </template>

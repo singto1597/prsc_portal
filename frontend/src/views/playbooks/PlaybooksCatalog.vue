@@ -14,10 +14,10 @@ const isCoverBroken = (id: string) => failedCovers.value.has(id)
 <template>
   <div>
     <div class="mb-6">
-      <h1 class="text-xl sm:text-2xl font-bold text-gray-900 leading-tight">
+      <h1 class="text-xl font-black tracking-tight text-slate-900 leading-tight sm:text-2xl">
         <i class="bi bi-journal-bookmark-fill mr-1 text-red-500"></i> P.R. Playbooks
       </h1>
-      <p class="text-sm text-gray-500 mt-1">P.R. Playbooks — คู่มือนักเรียนฉบับ E-book อ่านเลื่อนลงได้ ครอบคลุม 6 หมวดหมู่</p>
+      <p class="text-sm text-slate-500 mt-1">P.R. Playbooks — คู่มือนักเรียนฉบับ E-book อ่านเลื่อนลงได้ ครอบคลุม 6 หมวดหมู่</p>
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -49,11 +49,11 @@ const isCoverBroken = (id: string) => failedCovers.value.has(id)
 
         <!-- ข้อมูลเล่ม -->
         <div class="p-4 flex flex-col flex-1">
-          <h3 class="font-bold text-gray-900 leading-snug mb-1.5">{{ pb.title }}</h3>
-          <p class="text-sm text-gray-500 mb-3 line-clamp-2">{{ pb.description }}</p>
+          <h3 class="font-bold text-slate-900 leading-snug mb-1.5">{{ pb.title }}</h3>
+          <p class="text-sm text-slate-500 mb-3 line-clamp-2">{{ pb.description }}</p>
 
-          <div class="mt-auto flex items-center justify-between pt-3 border-t border-gray-100">
-            <span class="text-xs text-gray-400 flex items-center gap-1.5">
+          <div class="mt-auto flex items-center justify-between pt-3 border-t border-slate-100">
+            <span class="text-xs text-slate-400 flex items-center gap-1.5">
               <i class="bi bi-file-earmark-text"></i> {{ pb.totalPages }} หน้า
             </span>
             <span class="inline-flex items-center gap-1.5 text-xs font-bold text-red-600">

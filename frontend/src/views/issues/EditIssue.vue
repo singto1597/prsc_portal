@@ -143,14 +143,14 @@ async function handleSubmit() {
     </div>
 
     <template v-else>
-      <h1 class="text-xl sm:text-2xl font-bold text-gray-900 mb-1 leading-tight">
+      <h1 class="text-xl font-black tracking-tight text-slate-900 leading-tight mb-2 sm:text-2xl">
         <i class="bi bi-pencil-square mr-1 text-red-500"></i> แก้ไขเรื่อง
       </h1>
-      <p class="text-gray-500 text-sm mb-6">แก้ไขข้อมูลเรื่องที่แจ้งไปแล้ว (เฉพาะผู้แจ้ง)</p>
+      <p class="text-slate-500 text-sm mb-6">แก้ไขข้อมูลเรื่องที่แจ้งไปแล้ว (เฉพาะผู้แจ้ง)</p>
 
       <!-- Step 1: หมวดหลัก -->
       <div class="mb-6">
-        <label class="block text-sm font-medium text-gray-700 mb-2">1. เลือกหมวดหลัก</label>
+        <label class="block text-sm font-medium text-slate-700 mb-2">1. เลือกหมวดหลัก</label>
         <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
           <button
             v-for="(info, key) in MAIN_CATEGORIES"
@@ -161,7 +161,7 @@ async function handleSubmit() {
             :class="
               mainCategory === key
                 ? 'border-red-600 bg-red-50 text-red-700'
-                : 'border-gray-200 hover:border-red-300'
+                : 'border-slate-200 hover:border-red-300'
             "
           >
             <div class="text-xl sm:text-2xl mb-1">
@@ -178,7 +178,7 @@ async function handleSubmit() {
 
       <!-- Step 2: หมวดหมู่ย่อย -->
       <div v-if="mainCategory" class="mb-6">
-        <label class="block text-sm font-medium text-gray-700 mb-2">2. เลือกหมวดหมู่</label>
+        <label class="block text-sm font-medium text-slate-700 mb-2">2. เลือกหมวดหมู่</label>
         <div class="flex flex-wrap gap-2">
           <button
             v-for="c in availableCategories"
@@ -189,7 +189,7 @@ async function handleSubmit() {
             :class="
               category === c
                 ? 'bg-red-600 text-white border-red-600'
-                : 'border-gray-300 hover:border-red-400'
+                : 'border-slate-300 hover:border-red-400'
             "
           >
             {{ MAIN_CATEGORIES[mainCategory as MainCategory].subcategories[c] }}
@@ -200,30 +200,30 @@ async function handleSubmit() {
       <!-- Step 3: รายละเอียด -->
       <form @submit.prevent="handleSubmit" class="space-y-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">3. หัวข้อ</label>
+          <label class="block text-sm font-medium text-slate-700 mb-1">3. หัวข้อ</label>
           <input
             v-model="title"
             type="text"
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500"
             placeholder="สรุปสั้นๆ ว่าเรื่องอะไร"
             maxlength="200"
           />
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">4. รายละเอียด</label>
+          <label class="block text-sm font-medium text-slate-700 mb-1">4. รายละเอียด</label>
           <textarea
             v-model="description"
             rows="5"
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500"
             placeholder="อธิบายปัญหาหรือความคิดเห็นให้ละเอียด..."
           ></textarea>
         </div>
 
-        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
+        <label class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none">
           <input
             v-model="isAnonymous"
             type="checkbox"
-            class="w-4 h-4 rounded bg-white border-gray-300 text-red-600 focus:ring-red-500 accent-red-600"
+            class="w-4 h-4 rounded bg-white border-slate-300 text-red-600 focus:ring-red-500 accent-red-600"
           />
           <span>ซ่อนชื่อฉัน (แจ้งแบบไม่ระบุชื่อ)</span>
         </label>
@@ -232,7 +232,7 @@ async function handleSubmit() {
           <button
             type="button"
             @click="router.push({ name: 'issue-detail', params: { id: issueId } })"
-            class="px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+            class="px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-medium"
           >
             ยกเลิก
           </button>

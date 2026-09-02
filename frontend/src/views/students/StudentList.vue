@@ -65,20 +65,20 @@ async function changeRole(student: Student) {
   <div>
     <div class="flex items-center justify-between mb-5">
       <div>
-        <h1 class="text-xl sm:text-2xl font-bold text-gray-900 leading-tight"><i class="bi bi-mortarboard mr-1 text-red-500"></i> รายชื่อนักเรียน</h1>
-        <p class="text-sm text-gray-500">ค้นหาและจัดการตำแหน่งในห้องเรียน</p>
+        <h1 class="text-xl font-black tracking-tight text-slate-900 leading-tight sm:text-2xl"><i class="bi bi-mortarboard mr-1 text-red-500"></i> รายชื่อนักเรียน</h1>
+        <p class="text-sm text-slate-500">ค้นหาและจัดการตำแหน่งในห้องเรียน</p>
       </div>
     </div>
 
     <!-- Filters (mobile = แนวตั้งเต็มแถว, sm+ = แนวนอน) -->
     <div class="grid grid-cols-1 sm:flex sm:items-center gap-2 sm:gap-3 mb-4">
-      <select v-model="roomFilter" @change="load" class="w-full sm:w-auto px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white">
+      <select v-model="roomFilter" @change="load" class="w-full sm:w-auto px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white">
         <option value="">ทุกห้อง</option>
         <option v-for="r in rooms" :key="r.id" :value="r.id">{{ r.room_code }}</option>
       </select>
       <input v-model="search" @keyup.enter="load" type="text" placeholder="ค้นหา รหัสนักเรียน/ชื่อ..."
-        class="w-full sm:flex-1 px-3 py-2.5 border border-gray-300 rounded-xl text-sm" />
-      <button @click="load" class="px-4 py-2.5 bg-gray-100 rounded-xl text-sm hover:bg-gray-200 font-medium">
+        class="w-full sm:flex-1 px-3 py-2.5 border border-slate-300 rounded-xl text-sm" />
+      <button @click="load" class="px-4 py-2.5 bg-slate-100 rounded-xl text-sm hover:bg-slate-200 font-medium">
         <i class="bi bi-search"></i> ค้นหา
       </button>
     </div>
@@ -99,22 +99,22 @@ async function changeRole(student: Student) {
             {{ (s.first_name || 'ส').charAt(0).toUpperCase() }}
           </div>
           <div class="flex-1 min-w-0">
-            <p class="font-semibold text-gray-900 truncate">
+            <p class="font-semibold text-slate-900 truncate">
               {{ s.prefix || '' }} {{ s.first_name || '' }} {{ s.last_name || '' }}
             </p>
-            <p class="text-xs text-gray-500 mt-0.5">
+            <p class="text-xs text-slate-500 mt-0.5">
               <span class="font-mono">{{ s.student_id }}</span>
               <span v-if="s.student_no" class="ml-1.5">เลขที่ {{ s.student_no }}</span>
               <span class="ml-1.5">· {{ s.room_code }}</span>
             </p>
           </div>
           <button @click="changeRole(s)" class="px-2.5 py-1 rounded-full text-xs font-medium shrink-0"
-            :class="s.class_role === 'student' ? 'bg-gray-100 text-gray-600' : 'bg-red-100 text-red-700'">
+            :class="s.class_role === 'student' ? 'bg-slate-100 text-slate-600' : 'bg-red-100 text-red-700'">
             {{ ROLE_LABELS[s.class_role] || s.class_role }} <i class="bi bi-pencil-square text-[10px]"></i>
           </button>
         </div>
-        <div v-if="!students.length" class="bg-white rounded-2xl p-8 text-center text-gray-400">
-          <i class="bi bi-people text-3xl block mb-2 text-gray-300"></i>
+        <div v-if="!students.length" class="bg-white rounded-2xl p-8 text-center text-slate-400">
+          <i class="bi bi-people text-3xl block mb-2 text-slate-300"></i>
           ไม่พบนักเรียน
         </div>
       </div>
@@ -122,7 +122,7 @@ async function changeRole(student: Student) {
       <!-- ===== เดสก์ท็อป: ตาราง ===== -->
       <div class="hidden md:block bg-white rounded-2xl shadow-sm overflow-hidden">
         <table class="w-full text-sm">
-          <thead class="bg-gray-50 text-gray-500">
+          <thead class="bg-slate-50 text-slate-500">
             <tr>
               <th class="px-4 py-3 text-left">เลขที่</th>
               <th class="px-4 py-3 text-left">รหัสนักเรียน</th>
@@ -131,23 +131,23 @@ async function changeRole(student: Student) {
               <th class="px-4 py-3 text-left">ตำแหน่ง</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-100">
-            <tr v-for="s in students" :key="s.id" class="hover:bg-gray-50">
-              <td class="px-4 py-2.5 text-gray-500">{{ s.student_no }}</td>
-              <td class="px-4 py-2.5 font-mono text-gray-600">{{ s.student_id }}</td>
-              <td class="px-4 py-2.5 font-medium text-gray-800">
+          <tbody class="divide-y divide-slate-100">
+            <tr v-for="s in students" :key="s.id" class="hover:bg-slate-50">
+              <td class="px-4 py-2.5 text-slate-500">{{ s.student_no }}</td>
+              <td class="px-4 py-2.5 font-mono text-slate-600">{{ s.student_id }}</td>
+              <td class="px-4 py-2.5 font-medium text-slate-800">
                 {{ s.prefix || '' }} {{ s.first_name || '' }} {{ s.last_name || '' }}
               </td>
               <td class="px-4 py-2.5">{{ s.room_code }}</td>
               <td class="px-4 py-2.5">
                 <button @click="changeRole(s)" class="px-2.5 py-1 rounded-full text-xs font-medium"
-                  :class="s.class_role === 'student' ? 'bg-gray-100 text-gray-600' : 'bg-red-100 text-red-700'">
+                  :class="s.class_role === 'student' ? 'bg-slate-100 text-slate-600' : 'bg-red-100 text-red-700'">
                   {{ ROLE_LABELS[s.class_role] || s.class_role }} <i class="bi bi-pencil-square text-[10px]"></i>
                 </button>
               </td>
             </tr>
             <tr v-if="!students.length">
-              <td colspan="5" class="px-4 py-8 text-center text-gray-400">ไม่พบนักเรียน</td>
+              <td colspan="5" class="px-4 py-8 text-center text-slate-400">ไม่พบนักเรียน</td>
             </tr>
           </tbody>
         </table>

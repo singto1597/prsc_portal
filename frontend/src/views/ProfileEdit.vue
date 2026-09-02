@@ -64,7 +64,7 @@ async function saveProfile() {
 
 const goBack = () => router.push({ name: 'profile' });
 
-const inputCls = 'w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm mt-1 focus:ring-2 focus:ring-red-500 focus:border-red-500 transition';
+const inputCls = 'w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm mt-1 focus:ring-2 focus:ring-red-500 focus:border-red-500 transition';
 </script>
 
 <template>
@@ -76,12 +76,12 @@ const inputCls = 'w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm
     <form v-else @submit.prevent="saveProfile" class="space-y-4">
       <!-- Header -->
       <div class="flex items-center gap-3">
-        <button type="button" @click="goBack" class="w-9 h-9 rounded-xl bg-white border border-gray-200 text-gray-500 hover:text-red-600 hover:border-red-300 flex items-center justify-center transition shrink-0">
+        <button type="button" @click="goBack" class="w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-red-600 hover:border-red-300 flex items-center justify-center transition shrink-0">
           <i class="bi bi-arrow-left text-lg"></i>
         </button>
         <div>
-          <h1 class="text-xl sm:text-2xl font-bold text-gray-900 leading-tight"><i class="bi bi-pencil-square mr-1 text-red-500"></i> แก้ไขโปรไฟล์</h1>
-          <p class="text-sm text-gray-500">แก้ข้อมูลส่วนตัวของคุณ</p>
+          <h1 class="text-xl font-black tracking-tight text-slate-900 leading-tight sm:text-2xl"><i class="bi bi-pencil-square mr-1 text-red-500"></i> แก้ไขโปรไฟล์</h1>
+          <p class="text-sm text-slate-500">แก้ข้อมูลส่วนตัวของคุณ</p>
         </div>
       </div>
 
@@ -89,31 +89,31 @@ const inputCls = 'w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm
         <!-- ชื่อ: คำนำหน้า / ชื่อ / นามสกุล (mobile = 1 คอลัมน์) -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
-            <label class="text-xs font-medium text-gray-500">คำนำหน้า</label>
+            <label class="text-xs font-medium text-slate-500">คำนำหน้า</label>
             <input v-model="editPrefix" :class="inputCls" placeholder="นาย / นางสาว" />
           </div>
           <div>
-            <label class="text-xs font-medium text-gray-500">ชื่อ <span class="text-red-500">*</span></label>
+            <label class="text-xs font-medium text-slate-500">ชื่อ <span class="text-red-500">*</span></label>
             <input v-model="editFirstName" :class="inputCls" required />
           </div>
           <div>
-            <label class="text-xs font-medium text-gray-500">นามสกุล <span class="text-red-500">*</span></label>
+            <label class="text-xs font-medium text-slate-500">นามสกุล <span class="text-red-500">*</span></label>
             <input v-model="editLastName" :class="inputCls" required />
           </div>
         </div>
 
         <div>
-          <label class="text-xs font-medium text-gray-500">ชื่อเล่น</label>
+          <label class="text-xs font-medium text-slate-500">ชื่อเล่น</label>
           <input v-model="editNickname" :class="inputCls" placeholder="ชื่อที่เพื่อนเรียก" />
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label class="text-xs font-medium text-gray-500">เบอร์โทร</label>
+            <label class="text-xs font-medium text-slate-500">เบอร์โทร</label>
             <input v-model="editPhone" :class="inputCls" type="tel" placeholder="08x-xxx-xxxx" />
           </div>
           <div>
-            <label class="text-xs font-medium text-gray-500">อีเมล</label>
+            <label class="text-xs font-medium text-slate-500">อีเมล</label>
             <input v-model="editEmail" :class="inputCls" type="email" placeholder="example@mail.com" />
           </div>
         </div>
@@ -131,7 +131,7 @@ const inputCls = 'w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm
         <button
           type="button"
           @click="goBack"
-          class="px-5 py-3 bg-white border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50 text-sm font-medium transition"
+          class="px-5 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 text-sm font-medium transition"
         >
           ยกเลิก
         </button>

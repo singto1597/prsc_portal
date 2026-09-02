@@ -6,7 +6,7 @@ export const STATUS_DOT: Record<string, string> = {
   in_progress: 'bg-blue-500',
   escalated: 'bg-orange-500',
   resolved: 'bg-green-500',
-  cancelled: 'bg-gray-400',
+  cancelled: 'bg-slate-400',
   rejected: 'bg-rose-500',
 };
 
@@ -15,7 +15,7 @@ export const STATUS_BAR: Record<string, string> = {
   in_progress: 'bg-blue-500',
   escalated: 'bg-orange-500',
   resolved: 'bg-green-500',
-  cancelled: 'bg-gray-300',
+  cancelled: 'bg-slate-300',
   rejected: 'bg-rose-400',
 };
 
@@ -24,7 +24,7 @@ export const STATUS_BADGE: Record<string, string> = {
   in_progress: 'bg-blue-100 text-blue-700',
   escalated: 'bg-orange-100 text-orange-700',
   resolved: 'bg-green-100 text-green-700',
-  cancelled: 'bg-gray-200 text-gray-500',
+  cancelled: 'bg-slate-200 text-slate-500',
   rejected: 'bg-rose-100 text-rose-700',
 };
 

@@ -58,9 +58,9 @@ function statusColor(s: string) {
     in_progress: 'bg-blue-100 text-blue-700',
     resolved: 'bg-green-100 text-green-700',
     escalated: 'bg-orange-100 text-orange-700',
-    cancelled: 'bg-gray-200 text-gray-500',
+    cancelled: 'bg-slate-200 text-slate-500',
     rejected: 'bg-rose-100 text-rose-700',
-  }[s] || 'bg-gray-100 text-gray-600';
+  }[s] || 'bg-slate-100 text-slate-600';
 }
 </script>
 
@@ -68,8 +68,8 @@ function statusColor(s: string) {
   <div>
     <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
       <div>
-        <h1 class="text-xl sm:text-2xl font-bold text-gray-900 leading-tight"><i class="bi bi-file-earmark-text mr-1 text-red-500"></i> เรื่องของฉัน</h1>
-        <p class="text-sm text-gray-500">ติดตามสถานะเรื่องที่คุณแจ้ง</p>
+        <h1 class="text-xl font-black tracking-tight text-slate-900 leading-tight sm:text-2xl"><i class="bi bi-file-earmark-text mr-1 text-red-500"></i> เรื่องของฉัน</h1>
+        <p class="text-sm text-slate-500">ติดตามสถานะเรื่องที่คุณแจ้ง</p>
       </div>
       <RouterLink to="/app/issues/new" class="btn-gradient text-sm shrink-0">
         <i class="bi bi-plus-lg"></i> แจ้งเรื่องใหม่
@@ -88,9 +88,9 @@ function statusColor(s: string) {
     >
       <template #filters>
         <div>
-          <label class="block text-xs font-semibold text-gray-500 mb-1.5">สถานะ</label>
+          <label class="block text-xs font-semibold text-slate-500 mb-1.5">สถานะ</label>
           <select v-model="statusFilter" @change="onToolbarChange"
-            class="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm bg-white">
+            class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white">
             <option value="">ทุกสถานะ</option>
             <option value="pending">รอรับเรื่อง</option>
             <option value="in_progress">กำลังดำเนินการ</option>
@@ -108,7 +108,7 @@ function statusColor(s: string) {
     </div>
     <div v-else-if="error" class="text-red-500 text-center py-10">{{ error }}</div>
 
-    <div v-else-if="!issues.length" class="bg-white rounded-2xl p-10 text-center text-gray-400">
+    <div v-else-if="!issues.length" class="bg-white rounded-2xl p-10 text-center text-slate-400">
       <div class="text-4xl mb-2"><i class="bi bi-inbox"></i></div>
       <p>ยังไม่มีเรื่องที่คุณแจ้ง</p>
       <RouterLink to="/app/issues/new" class="inline-block mt-3 text-red-600 hover:underline">แจ้งเรื่องแรกของคุณ <i class="bi bi-arrow-right"></i></RouterLink>
@@ -127,8 +127,8 @@ function statusColor(s: string) {
               <span class="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">{{ MAIN_CATEGORY_LABELS[i.main_category] }}</span>
               <span class="px-2 py-0.5 bg-rose-50 text-rose-600 ring-1 ring-rose-100 text-xs rounded-full">{{ subcategoryLabel(i.main_category, i.category) }}</span>
             </div>
-            <h3 class="font-semibold text-gray-900 truncate">{{ i.title }}</h3>
-            <p class="text-xs text-gray-500 mt-1">ตอนนี้อยู่ที่: {{ LEVEL_LABELS[i.current_level] }}</p>
+            <h3 class="font-semibold text-slate-900 truncate">{{ i.title }}</h3>
+            <p class="text-xs text-slate-500 mt-1">ตอนนี้อยู่ที่: {{ LEVEL_LABELS[i.current_level] }}</p>
           </div>
           <div class="text-right shrink-0">
             <span class="px-2.5 py-1 text-xs font-medium rounded-full whitespace-nowrap" :class="statusColor(i.status)">

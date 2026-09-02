@@ -43,13 +43,13 @@ function go(n: number) {
       :disabled="page <= 1 || loading"
       @click="go(page - 1)"
       class="w-9 h-9 flex items-center justify-center rounded-xl border text-sm disabled:opacity-40 disabled:cursor-not-allowed"
-      :class="page > 1 ? 'border-gray-300 text-gray-600 hover:bg-gray-50' : 'border-gray-100 text-gray-300'"
+      :class="page > 1 ? 'border-slate-300 text-slate-600 hover:bg-slate-50' : 'border-slate-100 text-slate-300'"
     >
       <i class="bi bi-chevron-left"></i>
     </button>
 
     <template v-for="(it, i) in items" :key="`${it}-${i}`">
-      <span v-if="it === 'ellipsis'" class="px-0.5 text-gray-400">…</span>
+      <span v-if="it === 'ellipsis'" class="px-0.5 text-slate-400">…</span>
       <button
         v-else
         type="button"
@@ -59,7 +59,7 @@ function go(n: number) {
         :class="
           it === page
             ? 'bg-red-600 text-white'
-            : 'border border-gray-200 text-gray-600 hover:border-red-300 hover:text-red-600'
+            : 'border border-slate-200 text-slate-600 hover:border-red-300 hover:text-red-600'
         "
       >
         {{ it }}
@@ -71,7 +71,7 @@ function go(n: number) {
       :disabled="page >= pages || loading"
       @click="go(page + 1)"
       class="w-9 h-9 flex items-center justify-center rounded-xl border text-sm disabled:opacity-40 disabled:cursor-not-allowed"
-      :class="page < pages ? 'border-gray-300 text-gray-600 hover:bg-gray-50' : 'border-gray-100 text-gray-300'"
+      :class="page < pages ? 'border-slate-300 text-slate-600 hover:bg-slate-50' : 'border-slate-100 text-slate-300'"
     >
       <i class="bi bi-chevron-right"></i>
     </button>

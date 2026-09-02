@@ -83,31 +83,31 @@ async function handleConfirm() {
   <Transition name="modal">
     <div v-if="open && issue" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="open = false">
       <!-- overlay -->
-      <div class="absolute inset-0 bg-gray-900/50 backdrop-blur-sm"></div>
+      <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"></div>
 
       <!-- card -->
       <div class="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl p-5 sm:p-6 max-h-[90vh] overflow-y-auto">
         <div class="flex items-start justify-between gap-3 mb-4">
           <div>
-            <h2 class="text-lg font-bold text-gray-900">
+            <h2 class="text-lg font-bold text-slate-900">
               <i class="bi bi-people-fill text-red-500 mr-1"></i> อนุมัติเผยแพร่สาธารณะ
             </h2>
-            <p class="text-sm text-gray-500 mt-0.5">สภานักเรียน/แอดมิน พิจารณาเรื่องนี้เป็น PIRI Board</p>
+            <p class="text-sm text-slate-500 mt-0.5">สภานักเรียน/แอดมิน พิจารณาเรื่องนี้เป็น PIRI Board</p>
           </div>
-          <button type="button" class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600" @click="open = false">
+          <button type="button" class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600" @click="open = false">
             <i class="bi bi-x-lg"></i>
           </button>
         </div>
 
         <!-- สรุปเรื่อง -->
-        <div class="bg-gray-50 rounded-xl p-3 mb-4">
-          <p class="text-sm font-semibold text-gray-800 break-words">{{ issue.title }}</p>
-          <p class="text-xs text-gray-500 mt-0.5">ประเภทที่ขอ: {{ DESTINATION_LABELS[issue.requested_destination || 'normal'] }}</p>
+        <div class="bg-slate-50 rounded-xl p-3 mb-4">
+          <p class="text-sm font-semibold text-slate-800 break-words">{{ issue.title }}</p>
+          <p class="text-xs text-slate-500 mt-0.5">ประเภทที่ขอ: {{ DESTINATION_LABELS[issue.requested_destination || 'normal'] }}</p>
         </div>
 
         <!-- ประเภท board (lock ตามที่ผู้แจ้งขอ — backend บังคับให้ตรง) -->
         <div class="mb-4">
-          <label class="block text-sm font-medium text-gray-700 mb-1.5">ประเภทบอร์ด</label>
+          <label class="block text-sm font-medium text-slate-700 mb-1.5">ประเภทบอร์ด</label>
           <div class="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold"
             :class="boardType === 'vote' ? 'bg-red-100 text-red-700' : 'bg-rose-100 text-rose-700'">
             <i :class="boardType === 'vote' ? 'bi bi-bar-chart-fill' : 'bi bi-chat-dots-fill'"></i>
@@ -117,8 +117,8 @@ async function handleConfirm() {
 
         <!-- vote board → ตั้งค่าตัวเลือกโหวต -->
         <div v-if="boardType === 'vote'" class="mb-4">
-          <label class="block text-sm font-medium text-gray-700 mb-1.5">
-            ตัวเลือกโหวต <span class="text-gray-400 font-normal">(อย่างน้อย 2 ตัวเลือก)</span>
+          <label class="block text-sm font-medium text-slate-700 mb-1.5">
+            ตัวเลือกโหวต <span class="text-slate-400 font-normal">(อย่างน้อย 2 ตัวเลือก)</span>
           </label>
           <div class="space-y-2">
             <div v-for="(c, idx) in voteChoices" :key="idx" class="flex gap-2">
@@ -128,14 +128,14 @@ async function handleConfirm() {
                 :data-testid="'choice-input-' + idx"
                 :placeholder="`ตัวเลือกที่ ${idx + 1}`"
                 maxlength="200"
-                class="flex-1 px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-red-500"
+                class="flex-1 px-3 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-red-500"
               />
               <button
                 type="button"
                 :disabled="voteChoices.length <= 2"
                 @click="removeChoice(idx)"
                 title="ลบตัวเลือก"
-                class="w-10 h-10 flex items-center justify-center rounded-xl border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                class="w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-200 disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 <i class="bi bi-trash"></i>
               </button>
@@ -148,16 +148,16 @@ async function handleConfirm() {
 
         <!-- talk board → เปิด/ปิดคอมเมนต์ -->
         <div v-else class="mb-4">
-          <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
-            <input v-model="allowComments" type="checkbox" class="w-4 h-4 rounded bg-white border-gray-300 text-red-600 focus:ring-red-500 accent-red-600" />
+          <label class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none">
+            <input v-model="allowComments" type="checkbox" class="w-4 h-4 rounded bg-white border-slate-300 text-red-600 focus:ring-red-500 accent-red-600" />
             เปิดให้คอมเมนต์บนบอร์ดได้
           </label>
-          <p class="text-xs text-gray-400 mt-1 ml-6">ปิดถ้าอยากให้เป็นบอร์ดอ่านอย่างเดียว (ไม่ให้คอมเมนต์)</p>
+          <p class="text-xs text-slate-400 mt-1 ml-6">ปิดถ้าอยากให้เป็นบอร์ดอ่านอย่างเดียว (ไม่ให้คอมเมนต์)</p>
         </div>
 
         <!-- actions -->
         <div class="flex gap-2 pt-2">
-          <button type="button" @click="open = false" class="flex-1 py-2.5 rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 text-sm font-medium">
+          <button type="button" @click="open = false" class="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 text-sm font-medium">
             ยกเลิก
           </button>
           <button
