@@ -1,18 +1,25 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { RouterView, RouterLink, useRouter, useRoute } from 'vue-router';
 import Swal from 'sweetalert2';
 import { useAuthStore } from '@/stores/auth';
 import { useNotificationsStore } from '@/stores/notifications';
 import PlaybookSidebarMenu from '@/components/playbooks/PlaybookSidebarMenu.vue';
+import { PLAYBOOKS } from '@/types/playbook';
 
 const authStore = useAuthStore();
 const notificationsStore = useNotificationsStore();
 const router = useRouter();
 const route = useRoute();
 
-const isSidebarOpen = ref(false);
-const activeDropdown = ref<string | null>(null);
+const isMoreOpen = ref(false);
+const scrollEl = ref<HTMLElement | null>(null);
+
+// ปรับ scroll ขึ้นบนสุดทุกครั้งที่เปลี่ยนหน้า (iOS-like push)
+watch(
+  () => route.path,
+  () => nextTick(() => scrollEl.value?.scrollTo({ top: 0 })),
+);
 
 onMounted(async () => {
   if (authStore.isAuthenticated) {
@@ -50,27 +57,47 @@ const roleLabel = computed(() => {
     level_president: 'ประธานระดับ',
     council_member: 'สภานักเรียน',
     council_president: 'ประธานสภา',
+    teacher_council: 'ครูสภานักเรียน',
+    teacher: 'ครู',
   };
   return first ? map[first.role || ''] || first.role || 'นักเรียน' : 'นักเรียน';
 });
 
-const toggleDropdown = (name: string) => {
-  activeDropdown.value = activeDropdown.value === name ? null : name;
-};
-const closeDropdowns = () => { activeDropdown.value = null; };
+// 📍 ตำแหน่ง/ห้องสำหรับทักทาย (เช่น "หัวหน้าห้อง ม.4/1")
+const roleLine = computed(() => {
+  const first = authStore.roles[0];
+  if (!first) return roleLabel.value;
+  if (first.room_name) return `${roleLabel.value} · ${first.room_name}`;
+  if (first.level) return `${roleLabel.value} · ${first.level}`;
+  return roleLabel.value;
+});
 
-const goToProfile = () => {
-  closeDropdowns();
-  router.push({ name: 'profile' });
+// หน้า title บน top bar (iOS navigation bar)
+const routeTitles: Record<string, string> = {
+  home: 'หน้าแรก',
+  dashboard: 'แดชบอร์ด',
+  profile: 'โปรไฟล์',
+  'profile-edit': 'แก้ไขโปรไฟล์',
+  'profile-password': 'เปลี่ยนรหัสผ่าน',
+  'new-issue': 'แจ้งปัญหา / ความคิดเห็น',
+  'my-issues': 'เรื่องของฉัน',
+  'received-issues': 'เรื่องที่รับ / ระดับฉัน',
+  'issue-detail': 'รายละเอียดเรื่อง',
+  'issue-edit': 'แก้ไขเรื่อง',
+  boards: 'PIRI Boards',
+  'board-detail': 'PIRI Boards',
+  'board-reports': 'จัดการรายงาน',
+  playbooks: 'P.R. Playbooks',
+  'playbook-reader': 'อ่านหนังสือ',
+  notifications: 'การแจ้งเตือน',
+  students: 'รายชื่อนักเรียน',
+  'import-students': 'นำเข้านักเรียน',
+  'audit-logs': 'บันทึกการใช้งาน',
 };
-
-const goToPassword = () => {
-  closeDropdowns();
-  router.push({ name: 'profile-password' });
-};
+const routeTitle = computed(() => routeTitles[(route.name as string) || ''] || 'PIRIvoice');
 
 function logout() {
-  closeDropdowns();
+  isMoreOpen.value = false;
   Swal.fire({
     icon: 'question',
     title: 'ออกจากระบบ?',
@@ -85,6 +112,11 @@ function logout() {
   });
 }
 
+// 🔔 จำนวน仍未อ่านตามกลุ่ม (guard — counts[x] อาจ undefined)
+function unread(key: string): number {
+  return notificationsStore.counts[key] || 0;
+}
+
 // 🔔 unread badge ตามเมนู (map path → group_type จาก store)
 const menuBadge = (path: string): number => {
   const g = {
@@ -97,20 +129,29 @@ const menuBadge = (path: string): number => {
   return group ? notificationsStore.counts[group] || 0 : 0;
 };
 
-// เมนูตาม permission
-const menuItems = computed(() => {
-  const items: Array<{ name: string; path: string; icon: string; badge: number }> = [];
+interface NavItem {
+  name: string;
+  path: string;
+  icon: string;
+  badge: number;
+  label?: string; // ป้ายสั้น (bottom bar)
+}
+
+// เมนูตาม permission (ใช้ร่วม: sidebar desktop + sheet มือถือ)
+const menuItems = computed<NavItem[]>(() => {
+  const items: NavItem[] = [];
+  items.push({ name: 'หน้าแรก', path: '/app/home', icon: 'bi-house-door-fill', badge: 0 });
   if (authStore.hasPermission('VIEW_DASHBOARD')) {
     items.push({ name: 'แดชบอร์ด', path: '/app/dashboard', icon: 'bi-grid-1x2', badge: 0 });
   }
   items.push({ name: 'แจ้งปัญหา / ความคิดเห็น', path: '/app/issues/new', icon: 'bi-pencil-square', badge: 0 });
   items.push({ name: 'เรื่องของฉัน', path: '/app/issues/mine', icon: 'bi-file-earmark-text', badge: menuBadge('/app/issues/mine') });
   items.push({ name: 'PIRI Boards', path: '/app/boards', icon: 'bi-columns-gap', badge: menuBadge('/app/boards') });
-  if (authStore.isCouncilAuthority) {
-    items.push({ name: 'จัดการรายงาน', path: '/app/boards/reports', icon: 'bi-flag-fill', badge: menuBadge('/app/boards/reports') });
-  }
   if (authStore.hasPermission('RECEIVE_ISSUES')) {
     items.push({ name: 'เรื่องที่รับ / ระดับฉัน', path: '/app/issues/received', icon: 'bi-inbox', badge: menuBadge('/app/issues/received') });
+  }
+  if (authStore.isCouncilAuthority) {
+    items.push({ name: 'จัดการรายงาน', path: '/app/boards/reports', icon: 'bi-flag-fill', badge: menuBadge('/app/boards/reports') });
   }
   if (authStore.hasPermission('MANAGE_STUDENTS')) {
     items.push({ name: 'นักเรียน', path: '/app/students', icon: 'bi-people', badge: 0 });
@@ -122,223 +163,402 @@ const menuItems = computed(() => {
   return items;
 });
 
-const isActive = (path: string) => {
+const isActive = (path: string): boolean => {
   if (path === '/app/dashboard') return route.path === '/app/dashboard';
+  if (path === '/app/home') return route.path === '/app/home';
+  if (path === '/app/boards') return route.path === '/app/boards';
   return route.path.startsWith(path);
+};
+
+const goHome = () => {
+  isMoreOpen.value = false;
+  router.push({ name: 'home' });
 };
 </script>
 
 <template>
-  <div class="flex h-screen bg-gray-50 overflow-hidden relative">
-    <!-- overlay ปิด dropdown -->
-    <div v-if="activeDropdown" class="fixed inset-0 z-20" @click="closeDropdowns"></div>
+  <div class="relative flex h-screen overflow-hidden bg-[#FAFAFC] font-sans text-slate-900 selection:bg-rose-500/30 selection:text-rose-900">
+    <!-- 🎨 พื้นหลังพรีเมียม (แสงเรืองเบลอ) — เบื้องหลังทุกหน้า -->
+    <div class="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+      <div class="animate-blob absolute -right-[6%] -top-[14%] h-[680px] w-[680px] rounded-full bg-gradient-to-b from-red-200/45 via-rose-100/20 to-transparent opacity-60 blur-[110px] max-lg:h-[420px] max-lg:w-[420px] max-lg:blur-[80px]"></div>
+      <div class="animate-blob animation-delay-4000 absolute -left-[8%] top-[48%] h-[540px] w-[540px] rounded-full bg-gradient-to-tr from-rose-200/35 to-transparent opacity-50 blur-[95px] max-lg:h-[360px] max-lg:w-[360px] max-lg:blur-[70px]"></div>
+    </div>
 
-    <!-- Sidebar (desktop) -->
-    <aside class="hidden md:flex md:flex-shrink-0 relative z-50">
-      <div class="flex flex-col w-64 bg-white border-r border-gray-100 shadow-sm h-full">
+    <!-- ============ Sidebar (desktop ≥ lg) ============ -->
+    <aside class="relative z-30 hidden flex-shrink-0 p-4 lg:block">
+      <div class="flex h-full w-[290px] flex-col overflow-hidden rounded-[1.75rem] border border-white/70 bg-white/85 shadow-[0_25px_70px_-30px_rgba(190,18,60,0.35)] backdrop-blur-2xl">
         <!-- Brand -->
-        <RouterLink to="/app" class="flex items-center h-16 px-5 bg-gradient-to-r from-red-600 to-red-700 shrink-0">
-          <img src="/logos/school-logo.png" alt="โลโก้โรงเรียน" class="w-9 h-9 rounded-full object-cover mr-3 border border-white/30" />
-          <div>
-            <span class="text-white text-base font-black tracking-wider leading-none">PIRIvoice</span>
-            <p class="text-[10px] text-red-100 leading-none mt-1">เสียงจากชาวพิริยาลัย</p>
-          </div>
-        </RouterLink>
+        <div class="flex items-center gap-3 px-5 pb-4 pt-6">
+          <RouterLink to="/app/home" class="flex items-center gap-2.5 group">
+            <div class="flex -space-x-2">
+              <img src="/logos/school-logo.png" alt="โลโก้โรงเรียน" class="h-9 w-9 rounded-xl border border-white object-cover shadow-md" />
+              <img src="/logos/council-logo.png" alt="โลโก้สภานักเรียน" class="h-9 w-9 rounded-xl border border-white object-cover shadow-md" />
+            </div>
+            <div class="leading-none">
+              <span class="text-[15px] font-black tracking-tight text-slate-800">
+                PIRI<span class="bg-gradient-to-r from-red-600 to-rose-600 bg-clip-text text-transparent">voice</span>
+              </span>
+              <p class="mt-1 text-[10px] font-medium tracking-wide text-slate-400">เสียงจากชาวพิริยาลัย</p>
+            </div>
+          </RouterLink>
+        </div>
 
-        <div class="flex-1 flex flex-col overflow-y-auto">
-          <nav class="flex-1 px-3 py-4 space-y-1">
+        <!-- Nav -->
+        <nav class="flex-1 overflow-y-auto px-3 pb-2">
+          <p class="px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">เมนู</p>
+          <div class="space-y-1">
             <RouterLink
               v-for="item in menuItems"
               :key="item.path"
               :to="item.path"
-              class="flex items-center px-3.5 py-3 text-sm font-semibold rounded-xl transition-all group"
+              class="flex items-center gap-3 rounded-2xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200"
               :class="isActive(item.path)
-                ? 'bg-red-50 text-red-600 shadow-sm border border-red-100/50'
-                : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'"
+                ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-lg shadow-red-500/25'
+                : 'text-slate-600 hover:bg-rose-50/80 hover:text-red-600'"
             >
-              <i :class="['bi', item.icon, 'text-lg mr-3', isActive(item.path) ? '' : 'transition-transform group-hover:scale-110']"></i>
-              {{ item.name }}
+              <i :class="['bi', item.icon, 'text-[17px]']"></i>
+              <span class="min-w-0 flex-1 truncate">{{ item.name }}</span>
               <span
                 v-if="item.badge > 0"
-                class="ml-auto min-w-[20px] h-5 px-1.5 rounded-full bg-red-600 text-white text-[11px] font-bold flex items-center justify-center"
+                class="min-w-[20px] rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold"
+                :class="isActive(item.path) ? 'bg-white/25 text-white' : 'bg-red-600 text-white'"
               >
                 {{ item.badge > 99 ? '99+' : item.badge }}
               </span>
             </RouterLink>
+          </div>
 
-            <!-- 📖 P.R. Playbooks — 6 เล่ม -->
-            <PlaybookSidebarMenu class="pt-1" />
-          </nav>
+          <!-- 📖 P.R. Playbooks — 6 เล่ม -->
+          <div class="mt-3">
+            <PlaybookSidebarMenu />
+          </div>
+        </nav>
 
-          <!-- User footer -->
-          <div class="p-3 border-t border-gray-100 bg-gray-50/50 relative">
-            <div class="flex items-center justify-between p-2 rounded-xl hover:bg-white border border-transparent hover:border-gray-200 transition-all group">
-              <div class="flex items-center overflow-hidden flex-1 cursor-pointer" @click="goToProfile">
-                <div class="w-9 h-9 rounded-full bg-gradient-to-br from-red-100 to-red-50 text-red-600 flex items-center justify-center font-bold shadow-inner border border-red-100 shrink-0">
-                  {{ avatarChar }}
-                </div>
-                <div class="ml-3 overflow-hidden">
-                  <p class="text-sm font-bold text-gray-800 truncate leading-none mb-1">{{ displayName }}</p>
-                  <p class="text-[10px] tracking-wider text-red-500 font-bold uppercase truncate leading-none">{{ roleLabel }}</p>
-                </div>
-              </div>
-              <!-- 🔔 กระดิ่งแจ้งเตือน (badge = unread ทั้งหมด) -->
-              <RouterLink
-                to="/app/notifications"
-                title="การแจ้งเตือน"
-                class="relative w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors shrink-0 ml-1"
-              >
-                <i class="bi bi-bell-fill text-lg"></i>
-                <span
-                  v-if="notificationsStore.total > 0"
-                  class="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold flex items-center justify-center"
-                >
-                  {{ notificationsStore.total > 99 ? '99+' : notificationsStore.total }}
-                </span>
-              </RouterLink>
-              <button
-                @click.stop="toggleDropdown('sidebarSettings')"
-                class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors shrink-0 ml-1"
-                :class="{'bg-gray-200 text-gray-800': activeDropdown === 'sidebarSettings'}"
-              >
-                <i class="bi bi-gear-fill text-lg"></i>
-              </button>
+        <!-- User footer -->
+        <div class="border-t border-slate-100 p-3">
+          <div class="flex items-center gap-3 rounded-2xl bg-gradient-to-br from-rose-50/80 to-white p-3 ring-1 ring-red-100/60">
+            <button @click="goHome" class="h-11 w-11 shrink-0 rounded-2xl bg-gradient-to-br from-red-500 to-rose-600 text-sm font-black text-white shadow-lg shadow-red-500/30 ring-2 ring-white">
+              {{ avatarChar }}
+            </button>
+            <div class="min-w-0 flex-1 text-left" @click="router.push({ name: 'profile' })">
+              <p class="truncate text-sm font-bold leading-tight text-slate-800">{{ displayName }}</p>
+              <p class="mt-0.5 truncate text-[11px] font-semibold text-rose-500">{{ roleLine }}</p>
             </div>
-
-            <!-- Dropdown -->
-            <transition name="fade-up">
-              <div v-if="activeDropdown === 'sidebarSettings'"
-                class="absolute bottom-full left-4 mb-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50">
-                <div class="px-4 py-2 mb-1 border-b border-gray-50">
-                  <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">การจัดการ</p>
-                </div>
-                <button @click="goToProfile" class="w-full text-left px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors flex items-center gap-3">
-                  <i class="bi bi-person-badge text-lg"></i> โปรไฟล์ของฉัน
-                </button>
-                <button @click="goToPassword" class="w-full text-left px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors flex items-center gap-3">
-                  <i class="bi bi-key text-lg"></i> เปลี่ยนรหัสผ่าน
-                </button>
-                <div class="h-px bg-gray-100 my-1"></div>
-                <button @click="logout" class="w-full text-left px-4 py-2.5 text-sm font-bold text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors flex items-center gap-3">
-                  <i class="bi bi-box-arrow-right text-lg"></i> ออกจากระบบ
-                </button>
-              </div>
-            </transition>
+            <button
+              @click="logout"
+              title="ออกจากระบบ"
+              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-rose-50 hover:text-red-600"
+            >
+              <i class="bi bi-box-arrow-right text-lg"></i>
+            </button>
           </div>
         </div>
       </div>
     </aside>
 
-    <!-- Mobile overlay -->
-    <Transition name="fade">
-      <div v-if="isSidebarOpen" class="fixed inset-0 z-40 md:hidden bg-gray-900/40 backdrop-blur-sm" @click="isSidebarOpen = false"></div>
-    </Transition>
-
-    <!-- Mobile sidebar drawer -->
-    <Transition name="slide">
-      <div v-if="isSidebarOpen" class="fixed inset-y-0 left-0 z-50 md:hidden w-64 bg-white shadow-2xl flex flex-col">
-        <div class="flex items-center h-14 px-4 bg-gradient-to-r from-red-600 to-red-700">
-          <img src="/logos/school-logo.png" alt="โลโก้โรงเรียน" class="w-8 h-8 rounded-full object-cover mr-3" />
-          <span class="text-white font-black">PIRIvoice</span>
-        </div>
-        <nav class="flex-1 p-3 space-y-1 overflow-y-auto">
+    <!-- ============ Main column ============ -->
+    <div class="relative z-10 flex min-w-0 flex-1 flex-col">
+      <!-- ⚡ Top app bar (glass เหมือน navbar Landing) -->
+      <header
+        class="relative z-30 shrink-0 border-b backdrop-blur-2xl"
+        :class="route.path === '/app/home' ? 'border-transparent bg-transparent' : 'border-white/60 bg-white/70'"
+        style="padding-top: env(safe-area-inset-top, 0px)"
+      >
+        <div class="mx-auto flex h-16 w-full max-w-7xl items-center gap-3 px-4 lg:px-6">
+          <!-- Brand (มือถือ) -->
           <RouterLink
-            v-for="item in menuItems"
-            :key="item.path"
-            :to="item.path"
-            @click="isSidebarOpen = false"
-            class="flex items-center px-3.5 py-3 text-sm font-semibold rounded-xl"
-            :class="isActive(item.path) ? 'bg-red-50 text-red-600' : 'text-gray-500 hover:bg-gray-50'"
+            to="/app/home"
+            class="flex shrink-0 items-center gap-2 lg:hidden"
+            aria-label="หน้าแรก"
           >
-            <i :class="['bi', item.icon, 'text-lg mr-3']"></i>
-            {{ item.name }}
-            <span
-              v-if="item.badge > 0"
-              class="ml-auto min-w-[20px] h-5 px-1.5 rounded-full bg-red-600 text-white text-[11px] font-bold flex items-center justify-center"
-            >
-              {{ item.badge > 99 ? '99+' : item.badge }}
+            <span class="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-white bg-white p-0.5 shadow-md shadow-red-500/10">
+              <img src="/logos/school-logo.png" alt="โลโก้โรงเรียน" class="h-full w-full object-contain" />
             </span>
           </RouterLink>
 
-          <!-- 📖 P.R. Playbooks — 6 เล่ม (มือถือ: ปิด drawer หลังคลิก) -->
-          <PlaybookSidebarMenu close-on-navigate @navigate="isSidebarOpen = false" class="pt-1" />
-        </nav>
-        <div class="p-3 border-t border-gray-100">
-          <button @click="isSidebarOpen = false; goToProfile()" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-gray-700 hover:bg-red-50">
-            <i class="bi bi-person-badge text-lg"></i> โปรไฟล์ของฉัน
-          </button>
-          <button @click="isSidebarOpen = false; goToPassword()" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-gray-700 hover:bg-red-50">
-            <i class="bi bi-key text-lg"></i> เปลี่ยนรหัสผ่าน
-          </button>
-          <button @click="isSidebarOpen = false; logout()" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold text-red-500 hover:bg-red-50 mt-1">
-            <i class="bi bi-box-arrow-right text-lg"></i> ออกจากระบบ
-          </button>
-        </div>
-      </div>
-    </Transition>
+          <!-- Title -->
+          <div class="min-w-0 flex-1">
+            <h1 class="truncate text-[15px] font-bold text-slate-800 sm:text-base lg:text-lg">
+              {{ routeTitle }}
+            </h1>
+            <p class="hidden truncate text-[10px] font-semibold tracking-wide text-rose-500/90 sm:block lg:hidden">
+              {{ roleLine }}
+            </p>
+          </div>
 
-    <!-- Main -->
-    <div class="flex-1 flex flex-col overflow-hidden">
-      <!-- Mobile header -->
-      <header class="md:hidden fixed top-0 left-0 right-0 z-30 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-        <button @click="isSidebarOpen = true" class="text-2xl text-gray-600">
-          <i class="bi bi-list"></i>
-        </button>
-        <div class="flex items-center gap-2">
-          <img src="/logos/school-logo.png" alt="โลโก้โรงเรียน" class="w-7 h-7 rounded-full object-cover" />
-          <span class="font-bold text-red-700">PIRIvoice</span>
-        </div>
-        <div class="flex items-center gap-2">
-          <!-- 🔔 กระดิ่งแจ้งเตือน (mobile) -->
-          <RouterLink to="/app/notifications" class="relative w-8 h-8 flex items-center justify-center text-gray-600">
-            <i class="bi bi-bell-fill text-lg"></i>
-            <span
-              v-if="notificationsStore.total > 0"
-              class="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold flex items-center justify-center"
+          <!-- Actions -->
+          <div class="flex shrink-0 items-center gap-2">
+            <RouterLink
+              to="/app/issues/new"
+              class="hidden items-center gap-1.5 rounded-xl bg-gradient-to-r from-red-600 via-rose-500 to-red-600 bg-[length:200%_auto] px-4 py-2 text-sm font-bold text-white shadow-lg shadow-rose-500/25 transition-all duration-300 hover:bg-right hover:shadow-rose-500/40 active:scale-[0.97] xl:flex"
             >
-              {{ notificationsStore.total > 99 ? '99+' : notificationsStore.total }}
-            </span>
-          </RouterLink>
-          <button @click="goToProfile" class="w-8 h-8 rounded-full bg-gradient-to-br from-red-100 to-red-50 text-red-600 flex items-center justify-center text-sm font-bold">
-            {{ avatarChar }}
-          </button>
+              <i class="bi bi-pencil-square"></i>
+               แจ้งปัญหา
+            </RouterLink>
+
+            <!-- 🔔 กระดิ่ง -->
+            <RouterLink
+              to="/app/notifications"
+              title="การแจ้งเตือน"
+              class="relative flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-rose-50 hover:text-red-600"
+            >
+              <i class="bi bi-bell text-xl"></i>
+              <span
+                v-if="notificationsStore.total > 0"
+                class="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white shadow-md shadow-red-500/40 ring-2 ring-white"
+              >
+                {{ notificationsStore.total > 99 ? '99+' : notificationsStore.total }}
+              </span>
+            </RouterLink>
+
+            <!-- Avatar → โปรไฟล์ -->
+            <RouterLink
+              to="/app/profile"
+              title="โปรไฟล์ของฉัน"
+              class="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-red-500 to-rose-600 text-sm font-black text-white shadow-lg shadow-red-500/25 ring-2 ring-white/80 transition-transform hover:scale-105 active:scale-95"
+            >
+              {{ avatarChar }}
+            </RouterLink>
+          </div>
         </div>
       </header>
 
-      <main class="flex-1 overflow-y-auto p-4 md:p-6 mt-14 md:mt-0 max-w-7xl w-full mx-auto">
-        <RouterView v-slot="{ Component }">
-          <Transition name="page" mode="out-in" appear>
-            <component :is="Component" :key="route.fullPath" />
-          </Transition>
-        </RouterView>
+      <!-- Content -->
+      <main ref="scrollEl" class="flex-1 overflow-y-auto overscroll-contain pb-28 lg:pb-8">
+        <div class="mx-auto w-full max-w-7xl px-4 pt-4 sm:px-6 lg:px-8 lg:pt-6">
+          <RouterView v-slot="{ Component }">
+            <Transition name="page" mode="out-in" appear>
+              <component :is="Component" :key="route.fullPath" />
+            </Transition>
+          </RouterView>
+        </div>
       </main>
-
-      <!-- 🏫 Footer ทุกหน้าในระบบ — ตัวหนังสือเล็กๆ เงียบๆ คล้ายเครดิตหน้า login -->
-      <footer class="shrink-0 px-4 py-2.5 md:py-3 text-center border-t border-gray-100/80 bg-white/40">
-        <p class="text-[11px] text-gray-400 leading-relaxed">
-          คณะกรรมการสภานักเรียน · โรงเรียนพิริยาลัยจังหวัดแพร่
-          <span class="text-gray-300">© 2026</span>
-        </p>
-        <p class="text-[10px] text-gray-300 leading-relaxed mt-0.5">
-          151 ถ.ยันตรกิจโกศล ต.ในเวียง อ.เมือง จ.แพร่ 54000
-        </p>
-      </footer>
     </div>
+
+    <!-- ============ Mobile bottom tab bar (iOS-style, < lg) ============ -->
+    <nav
+      class="pointer-events-none fixed inset-x-0 bottom-0 z-40 lg:hidden"
+      style="bottom: calc(env(safe-area-inset-bottom, 0px) + 0.6rem)"
+      aria-label="เมนูหลัก"
+    >
+      <div class="pointer-events-auto mx-auto w-[calc(100%-1.5rem)] max-w-[440px] rounded-[2rem] border border-white/60 bg-white/85 px-1.5 pb-1.5 pt-2.5 shadow-[0_20px_50px_-15px_rgba(190,18,60,0.45)] backdrop-blur-2xl">
+        <div class="flex items-end justify-between">
+          <!-- หน้าแรก -->
+          <RouterLink
+            to="/app/home"
+            class="flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-2xl px-1 py-1.5 text-[10px] font-bold transition-colors"
+            :class="route.path === '/app/home' ? 'text-red-600' : 'text-slate-400'"
+          >
+            <i :class="['bi text-xl', route.path === '/app/home' ? 'bi-house-door-fill' : 'bi-house-door']"></i>
+            <span class="truncate">หน้าแรก</span>
+          </RouterLink>
+
+          <!-- เรื่องของฉัน -->
+          <RouterLink
+            to="/app/issues/mine"
+            class="relative flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-2xl px-1 py-1.5 text-[10px] font-bold transition-colors"
+            :class="isActive('/app/issues/mine') ? 'text-red-600' : 'text-slate-400'"
+          >
+            <span class="relative">
+              <i :class="['bi text-xl', isActive('/app/issues/mine') ? 'bi-file-earmark-text-fill' : 'bi-file-earmark-text']"></i>
+              <span
+                v-if="unread('issue_mine') > 0"
+                class="absolute -right-2.5 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-600 px-1 text-[9px] font-bold text-white ring-2 ring-white"
+              >
+                {{ unread('issue_mine') > 99 ? '99+' : unread('issue_mine') }}
+              </span>
+            </span>
+            <span class="truncate">ของฉัน</span>
+          </RouterLink>
+
+          <!-- ➕ FAB แจ้งเรื่อง (กลาง) -->
+          <RouterLink
+            to="/app/issues/new"
+            class="relative flex min-w-0 flex-1 flex-col items-center text-[10px] font-bold text-rose-600"
+          >
+            <span class="-mt-8 flex h-14 w-14 items-center justify-center rounded-[1.1rem] bg-gradient-to-br from-red-600 via-rose-500 to-rose-600 text-2xl text-white shadow-xl shadow-rose-500/45 ring-4 ring-white/90 transition-transform active:scale-95">
+              <i class="bi bi-plus-lg"></i>
+            </span>
+            <span class="mt-0.5">แจ้งเรื่อง</span>
+          </RouterLink>
+
+          <!-- PIRI Boards -->
+          <RouterLink
+            to="/app/boards"
+            class="relative flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-2xl px-1 py-1.5 text-[10px] font-bold transition-colors"
+            :class="isActive('/app/boards') ? 'text-red-600' : 'text-slate-400'"
+          >
+            <span class="relative">
+              <i class="bi text-xl bi-columns-gap"></i>
+              <span
+                v-if="unread('board') > 0"
+                class="absolute -right-2.5 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-600 px-1 text-[9px] font-bold text-white ring-2 ring-white"
+              >
+                {{ unread('board') > 99 ? '99+' : unread('board') }}
+              </span>
+            </span>
+            <span class="truncate">Boards</span>
+          </RouterLink>
+
+          <!-- เพิ่มเติม (เปิด sheet เมนูทั้งหมด) -->
+          <button
+            type="button"
+            @click="isMoreOpen = true"
+            class="flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-2xl px-1 py-1.5 text-[10px] font-bold transition-colors"
+            :class="isMoreOpen ? 'text-red-600' : 'text-slate-400'"
+          >
+            <i :class="['bi text-xl', isMoreOpen ? 'bi-x-lg' : 'bi-grid-3x3-gap-fill']"></i>
+            <span class="truncate">เพิ่มเติม</span>
+          </button>
+        </div>
+      </div>
+    </nav>
+
+    <!-- ============ Bottom sheet: เมนูทั้งหมด (มือถือ) ============ -->
+    <Transition name="sheet">
+      <div v-if="isMoreOpen" class="fixed inset-0 z-50 lg:hidden">
+        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" @click="isMoreOpen = false"></div>
+        <div class="absolute inset-x-0 bottom-0 max-h-[86vh] overflow-y-auto rounded-t-[2rem] border-t border-white/70 bg-white/95 pb-safe shadow-[0_-20px_60px_-20px_rgba(190,18,60,0.4)] backdrop-blur-2xl">
+          <!-- Handle -->
+          <div class="mx-auto mt-3 h-1.5 w-10 rounded-full bg-slate-200"></div>
+
+          <!-- User header -->
+          <div class="flex items-center gap-3 px-6 pb-4 pt-4">
+            <button
+              @click="isMoreOpen = false; router.push({ name: 'profile' })"
+              class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-red-500 to-rose-600 text-base font-black text-white shadow-lg shadow-red-500/30"
+            >
+              {{ avatarChar }}
+            </button>
+            <div class="min-w-0 flex-1" @click="isMoreOpen = false; router.push({ name: 'profile' })">
+              <p class="truncate text-base font-bold text-slate-800">สวัสดี, {{ displayName }}</p>
+              <p class="truncate text-xs font-semibold text-rose-500">{{ roleLine }}</p>
+            </div>
+            <button
+              @click="isMoreOpen = false"
+              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100"
+              aria-label="ปิดเมนู"
+            >
+              <i class="bi bi-x-lg text-lg"></i>
+            </button>
+          </div>
+
+          <div class="mx-6 h-px bg-slate-100"></div>
+
+          <!-- Menu items -->
+          <div class="space-y-1 px-3 py-3">
+            <p class="px-3 pb-1 pt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">เมนูทั้งหมด</p>
+            <button
+              v-for="item in menuItems"
+              :key="item.path"
+              type="button"
+              @click="isMoreOpen = false; router.push(item.path)"
+              class="flex w-full items-center gap-3 rounded-2xl px-3.5 py-3 text-left text-sm font-semibold transition-colors"
+              :class="isActive(item.path) ? 'bg-gradient-to-r from-red-50 to-rose-50 text-red-600' : 'text-slate-600 hover:bg-slate-50'"
+            >
+              <i :class="['bi', item.icon, 'text-lg', isActive(item.path) ? 'text-red-600' : 'text-slate-400']"></i>
+              <span class="min-w-0 flex-1 truncate">{{ item.name }}</span>
+              <span
+                v-if="item.badge > 0"
+                class="min-w-[20px] rounded-full bg-red-600 px-1.5 py-0.5 text-center text-[10px] font-bold text-white"
+              >
+                {{ item.badge > 99 ? '99+' : item.badge }}
+              </span>
+              <i class="bi bi-chevron-right text-xs text-slate-300"></i>
+            </button>
+          </div>
+
+          <!-- 📖 P.R. Playbooks -->
+          <div class="mx-6 h-px bg-slate-100"></div>
+          <div class="px-3 py-3">
+            <div class="flex items-center justify-between px-3 pb-1">
+              <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">P.R. Playbooks</p>
+              <button
+                type="button"
+                class="text-[11px] font-bold text-red-600 hover:underline"
+                @click="isMoreOpen = false; router.push({ name: 'playbooks' })"
+              >
+                ดูทั้งหมด
+              </button>
+            </div>
+            <div class="space-y-0.5">
+              <button
+                v-for="pb in PLAYBOOKS"
+                :key="pb.id"
+                type="button"
+                @click="isMoreOpen = false; router.push({ name: 'playbook-reader', params: { id: pb.id } })"
+                class="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-600 transition-colors hover:bg-rose-50/70 hover:text-red-600"
+              >
+                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-red-100 to-rose-50 text-red-600">
+                  <i class="bi bi-journal-bookmark text-sm"></i>
+                </span>
+                <span class="truncate">{{ pb.title }}</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Account -->
+          <div class="mx-6 h-px bg-slate-100"></div>
+          <div class="grid grid-cols-2 gap-2 px-6 py-4">
+            <button
+              type="button"
+              @click="isMoreOpen = false; router.push({ name: 'profile-edit' })"
+              class="btn-ghost-ui !justify-start !px-3 !py-3 text-sm"
+            >
+              <i class="bi bi-person-badge text-base"></i> แก้ไขโปรไฟล์
+            </button>
+            <button
+              type="button"
+              @click="isMoreOpen = false; router.push({ name: 'profile-password' })"
+              class="btn-ghost-ui !justify-start !px-3 !py-3 text-sm"
+            >
+              <i class="bi bi-key text-base"></i> เปลี่ยนรหัสผ่าน
+            </button>
+            <button
+              type="button"
+              @click="logout"
+              class="col-span-2 flex w-full items-center justify-center gap-2 rounded-xl border border-rose-100 bg-rose-50 py-3 text-sm font-bold text-red-600 transition-colors hover:bg-rose-100"
+            >
+              <i class="bi bi-box-arrow-right text-base"></i> ออกจากระบบ
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
 <style scoped>
-.fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
-.fade-up-enter-active, .fade-up-leave-active { transition: all 0.2s; }
-.fade-up-enter-from, .fade-up-leave-to { opacity: 0; transform: translateY(8px); }
-.slide-enter-active, .slide-leave-active { transition: transform 0.25s; }
-.slide-enter-from, .slide-leave-to { transform: translateX(-100%); }
+/* fade สำหรับ backdrop + slide สำหรับ sheet (มือถือ) */
+.sheet-enter-active,
+.sheet-leave-active {
+  transition: opacity 0.25s ease;
+}
+.sheet-enter-active .absolute.inset-x-0,
+.sheet-leave-active .absolute.inset-x-0 {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.sheet-enter-from,
+.sheet-leave-to {
+  opacity: 0;
+}
+.sheet-enter-from .absolute.inset-x-0,
+.sheet-leave-to .absolute.inset-x-0 {
+  transform: translateY(100%);
+}
+
+/* ♿ เคารพผู้ที่ปิดแอนิเมชัน */
+@media (prefers-reduced-motion: reduce) {
+  .sheet-enter-active,
+  .sheet-leave-active {
+    transition: none !important;
+  }
+}
 </style>
 
 <style>
-/* ✨ หน้าเปลี่ยนแบบ smooth (เฉพาะ content — ไม่แตะ sidebar)
-   mode="out-in" + appear → หน้าใหม่ fade+เลื่อนขึ้นชัดเจน */
+/* ✨ หน้าเปลี่ยนแบบ smooth (เฉพาะ content) — global เพราะ Transition อยู่ใน MainLayout
+   mode="out-in" + appear → fade + เลื่อนขึ้นนุ่ม ๆ */
 .page-enter-active {
   transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1), transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -347,7 +567,7 @@ const isActive = (path: string) => {
 }
 .page-enter-from {
   opacity: 0;
-  transform: translateY(20px);
+  transform: translateY(16px);
 }
 .page-leave-to {
   opacity: 0;
