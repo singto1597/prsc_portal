@@ -1049,6 +1049,65 @@ async def list_issues(
     return {"items": [_issue_to_dict(r) for r in rows], "total": total}
 
 
+# ลำดับสถานะมาตรฐาน (zero-fill หน้า Welcome) — เรียงตามชีวิตของเรื่อง
+_MY_SUMMARY_STATUS_ORDER = ["pending", "in_progress", "escalated", "rejected", "resolved", "cancelled"]
+
+
+async def my_issue_summary(pool: asyncpg.Pool, user_id: int) -> dict:
+    """
+    สรุปเรื่องที่ฉันแจ้ง (ทุกบทบาทใช้ได้ — ทุกคนแจ้งเรื่องได้):
+    - total_issues: จำนวนรวม
+    - by_status: นับแยกตามสถานะทั้ง 6 (zero-fill) — query GROUP BY + เติม 0 ฝั่ง Python
+    - recent: 5 เรื่องล่าสุดของฉัน (เรียง created_at DESC)
+
+    1 query กลุ่ม + 1 query ล่าสุด — แทนการเรียก GET /api/issues?mine=true หลายครั้ง
+    """
+    async with pool.acquire() as conn:
+        status_rows = await conn.fetch(
+            """
+            SELECT status, COUNT(*)::int AS count
+            FROM issues
+            WHERE deleted_at IS NULL AND reporter_id = $1
+            GROUP BY status
+            """,
+            user_id,
+        )
+        counts = {r["status"]: int(r["count"]) for r in status_rows}
+        total = sum(counts.values())
+        by_status = [
+            {"status": st, "count": int(counts.get(st, 0))}
+            for st in _MY_SUMMARY_STATUS_ORDER
+        ]
+
+        recent_rows = await conn.fetch(
+            """
+            SELECT
+                i.id, i.room_id, i.main_category, i.category, i.title, i.description,
+                i.image_url, i.reporter_id, i.reporter_name, i.current_level,
+                i.current_assignee_id, i.current_assignee_role, i.status, i.priority,
+                i.is_anonymous, i.resolved_at, i.created_at, i.updated_at,
+                i.requested_destination, i.published_board_id,
+                r.room_name,
+                reporter_r.room_name AS reporter_room,
+                u.full_name AS assignee_name
+            FROM issues i
+            JOIN rooms r ON r.id = i.room_id
+            LEFT JOIN rooms reporter_r ON reporter_r.id = i.reporter_room_id
+            LEFT JOIN users u ON u.id = i.current_assignee_id
+            WHERE i.deleted_at IS NULL AND i.reporter_id = $1
+            ORDER BY i.created_at DESC, i.id DESC
+            LIMIT 5
+            """,
+            user_id,
+        )
+
+    return {
+        "total_issues": total,
+        "by_status": by_status,
+        "recent": [_issue_to_dict(r) for r in recent_rows],
+    }
+
+
 def _issue_to_dict(row, with_details=False) -> dict:
     """แปลงแถว issues → dict ตาม IssueOut shape"""
     d = {

@@ -219,3 +219,16 @@ class IssueListOut(BaseModel):
     page: int           # 1-based
     page_size: int
     pages: int
+
+
+class IssueStatusCountOut(BaseModel):
+    """จำนวนเรื่องแยกตามสถานะเดียว (zero-fill ให้ครบทุกสถานะ)"""
+    status: str
+    count: int
+
+
+class MyIssueSummaryOut(BaseModel):
+    """สรุปเรื่องที่ฉันแจ้ง (สำหรับหน้า Home/Welcome) — 1 request แทนการเรียก list หลายครั้ง"""
+    total_issues: int                              # จำนวนเรื่องที่ฉันแจ้งทั้งหมด
+    by_status: List[IssueStatusCountOut]           # นับแยกตามสถานะทั้ง 6 (zero-fill)
+    recent: List[IssueOut]                         # 5 เรื่องล่าสุด (การ์ดบนหน้า Welcome)
