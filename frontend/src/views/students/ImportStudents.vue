@@ -277,7 +277,7 @@ onBeforeUnmount(stopPolling);
     </div>
 
     <!-- ขั้นตอนที่ 1: อัปโหลดเข้า Queue -->
-    <div class="bg-white rounded-xl shadow-sm p-5 space-y-4">
+    <div class="bg-white rounded-2xl shadow-sm p-5 space-y-4">
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">
           1. เลือกไฟล์ Excel <span class="text-gray-400 font-normal">(.xlsx)</span>
@@ -320,7 +320,7 @@ onBeforeUnmount(stopPolling);
     </div>
 
     <!-- ขั้นตอนที่ 2: Queue List + Progress Bar -->
-    <div class="bg-white rounded-xl shadow-sm p-5 mt-5">
+    <div class="bg-white rounded-2xl shadow-sm p-5 mt-5">
       <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
         <h2 class="text-lg font-semibold text-gray-900">
           <i class="bi bi-list-ul mr-1"></i> Queue List — คิวนำเข้านักเรียน

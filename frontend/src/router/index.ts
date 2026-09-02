@@ -3,16 +3,12 @@ import { useAuthStore } from '@/stores/auth'
 import MainLayout from '@/layouts/MainLayout.vue'
 
 /**
- * หน้าแรกหลัง login ตามบทบาท:
- * - นักเรียน (ไม่มีสิทธิ์รับเรื่อง): ไปหน้า "แจ้งปัญหา" ทันที (ภารกิจหลัก)
- * - ผู้มี Dashboard: ไปแดชบอร์ด
- * - ระดับอื่น (หัวหน้าห้อง/ประธานระดับ/สภา): ไป "เรื่องที่รับ"
+ * หน้าแรกหลัง login = หน้า Welcome/Home กลางเดียว (ทุกบทบาท)
+ * — หน้า Welcome จะปรับเนื้อหา/ทางลัดตามสิทธิ์ของคนนั้นเอง
+ *    แดชบอร์ด / เรื่องที่รับ / ฯลฯ ยังเข้าได้จากเมนู sidebar / bottom bar ปกติ
  */
 function getHomeRoute(): { name: string } {
-  const auth = useAuthStore()
-  if (auth.hasPermission('VIEW_DASHBOARD')) return { name: 'dashboard' }
-  if (auth.hasPermission('RECEIVE_ISSUES')) return { name: 'received-issues' }
-  return { name: 'new-issue' } // นักเรียน → แจ้งปัญหาก่อน
+  return { name: 'home' }
 }
 
 const router = createRouter({
@@ -56,6 +52,12 @@ const router = createRouter({
       meta: { requiresAuth: true },
       redirect: () => getHomeRoute(),
       children: [
+        {
+          path: 'home',
+          name: 'home',
+          component: () => import('@/views/Home.vue'),
+          meta: { requiresAuth: true },
+        },
         {
           path: 'dashboard',
           name: 'dashboard',
@@ -178,7 +180,7 @@ router.beforeEach(async (to) => {
   }
 
   if (to.path === '/login' && isAuthenticated) {
-    return { name: 'dashboard' }
+    return getHomeRoute()
   }
   // เข้า Landing แล้ว แต่ล็อกอินอยู่แล้ว → ข้ามไปหน้าแรกตามบทบาท
   if (to.name === 'landing' && isAuthenticated) {

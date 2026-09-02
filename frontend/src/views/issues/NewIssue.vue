@@ -136,7 +136,7 @@ async function handleSubmit() {
     <!-- Step 1: หมวดหลัก -->
     <div class="mb-6">
       <label class="block text-sm font-medium text-gray-700 mb-2">1. เลือกหมวดหลัก</label>
-      <div class="grid grid-cols-3 gap-2 sm:gap-3">
+      <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
         <button
           v-for="(info, key) in MAIN_CATEGORIES"
           :key="key"

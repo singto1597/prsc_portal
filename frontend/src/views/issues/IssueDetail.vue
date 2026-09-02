@@ -484,14 +484,14 @@ function historyStatusBadge(s: string): string {
 
   <div v-else-if="issue" class="max-w-3xl mx-auto space-y-5">
     <!-- Header -->
-    <div class="bg-white rounded-xl shadow-sm p-5">
+    <div class="bg-white rounded-2xl shadow-sm p-5">
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0">
           <div class="flex flex-wrap gap-2 mb-2">
             <span class="px-2.5 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">
               {{ MAIN_CATEGORY_LABELS[issue.main_category] }}
             </span>
-            <span class="px-2.5 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full">
+            <span class="px-2.5 py-0.5 bg-rose-50 text-rose-600 ring-1 ring-rose-100 text-xs rounded-full">
               {{ subcategoryLabel(issue.main_category, issue.category) }}
             </span>
             <span class="px-2.5 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
@@ -554,7 +554,7 @@ function historyStatusBadge(s: string): string {
         v-if="canApprove"
         @click="approveOpen = true"
         data-testid="approve-public-btn"
-        class="px-4 py-2.5 bg-violet-600 text-white rounded-xl hover:bg-violet-700 text-sm font-medium"
+        class="px-4 py-2.5 bg-gradient-to-r from-red-600 to-rose-600 text-white rounded-xl hover:from-red-700 hover:to-rose-700 shadow-md shadow-red-500/20 text-sm font-medium"
       >
         <i class="bi bi-people-fill mr-1"></i> อนุมัติเผยแพร่สาธารณะ
       </button>
@@ -610,7 +610,7 @@ function historyStatusBadge(s: string): string {
     <!-- Countdown -->
     <div
       v-if="issue.countdown"
-      class="bg-white rounded-xl shadow-sm p-5 border-l-4"
+      class="bg-white rounded-2xl shadow-sm p-5 border-l-4"
       :class="issue.countdown.is_overdue ? 'border-red-500' : 'border-red-500'"
     >
       <div class="flex items-center justify-between">
@@ -641,7 +641,7 @@ function historyStatusBadge(s: string): string {
     </div>
 
     <!-- Steps -->
-    <div class="bg-white rounded-xl shadow-sm p-5">
+    <div class="bg-white rounded-2xl shadow-sm p-5">
       <h2 class="text-lg font-bold text-gray-800 mb-3">
         <i class="bi bi-diagram-3 mr-1"></i> ขั้นตอนการดำเนินงาน
       </h2>
@@ -705,7 +705,7 @@ function historyStatusBadge(s: string): string {
     </div>
 
     <!-- Comments (แบบ YouTube — ชื่อ + เวลา + ข้อความ) -->
-    <div class="bg-white rounded-xl shadow-sm p-5">
+    <div class="bg-white rounded-2xl shadow-sm p-5">
       <h2 class="text-lg font-bold text-gray-800 mb-3">
         <i class="bi bi-chat-left-text mr-1"></i> คอมเมนต์
         <span v-if="issue.comments?.length" class="text-sm font-normal text-gray-400"
@@ -779,7 +779,7 @@ function historyStatusBadge(s: string): string {
     </div>
 
     <!-- Timeline -->
-    <div class="bg-white rounded-xl shadow-sm p-5">
+    <div class="bg-white rounded-2xl shadow-sm p-5">
       <h2 class="text-lg font-bold text-gray-800 mb-3">
         <i class="bi bi-clock-history mr-1"></i> ประวัติการดำเนินงาน
       </h2>

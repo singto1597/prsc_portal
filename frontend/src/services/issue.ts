@@ -4,6 +4,7 @@ import type {
   IssueComment,
   IssueListResponse,
   IssueStep,
+  MyIssueSummary,
   RequestedDestination,
   UpdateIssuePayload,
 } from '@/types/issue'
@@ -52,6 +53,11 @@ export async function listIssues(params: {
 
 export async function getIssue(id: number): Promise<Issue> {
   return (await api.get(`/api/issues/${id}`)) as Issue
+}
+
+// 📊 สรุปเรื่องที่ฉันแจ้ง (หน้า Home/Welcome) — 1 request แทนการเรียก list หลายครั้ง
+export async function getMyIssueSummary(): Promise<MyIssueSummary> {
+  return (await api.get('/api/issues/summary')) as MyIssueSummary
 }
 
 export async function createIssue(payload: CreateIssuePayload): Promise<Issue> {

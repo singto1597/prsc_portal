@@ -13,11 +13,10 @@ const password = ref('');
 const isLoading = ref(false);
 const showPassword = ref(false);
 
-// ฟังก์ชันหา Route ปลายทางหลัง login
+// ฟังก์ชันหา Route ปลายทางหลัง login — ทุกบทบาทเข้าหน้า Welcome/Home
+// (หน้า Welcome ปรับเนื้อหาตามสิทธิ์ของแต่ละคนเอง)
 function homeRouteName(): string {
-  if (authStore.hasPermission('VIEW_DASHBOARD')) return 'dashboard';
-  if (authStore.hasPermission('RECEIVE_ISSUES')) return 'received-issues';
-  return 'new-issue';
+  return 'home';
 }
 
 async function handleLogin() {

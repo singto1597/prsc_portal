@@ -86,6 +86,19 @@ export interface IssueListResponse {
   pages: number
 }
 
+// จำนวนเรื่องแยกตามสถานะเดียว (zero-fill — response มีครบทั้ง 6 สถานะ)
+export interface IssueStatusCount {
+  status: IssueStatus
+  count: number
+}
+
+// สรุปเรื่องที่ฉันแจ้ง (GET /api/issues/summary — หน้า Home/Welcome)
+export interface MyIssueSummary {
+  total_issues: number
+  by_status: IssueStatusCount[]
+  recent: Issue[]
+}
+
 export interface Issue {
   id: number
   room_id: number | null

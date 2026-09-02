@@ -8,6 +8,7 @@ from models.issue_schemas import (
     IssueCreateRequest, IssueUpdateRequest, IssueOut, IssueStepOut, IssueCountdownOut,
     StepCreateRequest, CountdownSetRequest, ChangeDestinationRequest, EscalateRequest,
     ApproveToPublicRequest, CommentCreateRequest, CommentOut, IssueListOut,
+    MyIssueSummaryOut,
 )
 from services import issue_service
 from services import audit_service
@@ -89,6 +90,24 @@ async def list_issues(
         items=[IssueOut(**i) for i in result["items"]],
         total=total, page=page, page_size=limit, pages=pages,
     )
+
+
+@router.get("/summary", response_model=MyIssueSummaryOut)
+async def my_issue_summary(
+    user_ctx: dict = Depends(get_current_user),
+    pool: asyncpg.Pool = Depends(get_db_pool),
+):
+    """
+    สรุปเรื่องที่ฉันแจ้ง (หน้า Home/Welcome): จำนวนรวม + นับตามสถานะ 6 สถานะ + 5 เรื่องล่าสุด
+    — แทนการเรียก listIssues({mine:true}) หลายครั้ง ต้องอยู่ก่อน GET /{issue_id} กัน route ชน
+    """
+    uid = _ensure_user(user_ctx)
+    result = await issue_service.my_issue_summary(pool, uid)
+    # 🛡️ Audit: อ่านสรุปเรื่องของตัวเอง (best-effort)
+    await audit_service.log_read(
+        pool, uid, "READ_ISSUES", "issue", endpoint="GET /api/issues/summary"
+    )
+    return MyIssueSummaryOut(**result)
 
 
 @router.get("/{issue_id}", response_model=IssueOut)
