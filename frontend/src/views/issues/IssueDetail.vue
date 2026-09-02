@@ -468,9 +468,9 @@ function historyStatusBadge(s: string): string {
       in_progress: 'bg-blue-100 text-blue-700',
       escalated: 'bg-orange-100 text-orange-700',
       resolved: 'bg-green-100 text-green-700',
-      cancelled: 'bg-gray-200 text-gray-500',
+      cancelled: 'bg-slate-200 text-slate-500',
       rejected: 'bg-rose-100 text-rose-700',
-    }[s] || 'bg-gray-100 text-gray-600'
+    }[s] || 'bg-slate-100 text-slate-600'
   )
 }
 </script>
@@ -494,7 +494,7 @@ function historyStatusBadge(s: string): string {
             <span class="px-2.5 py-0.5 bg-rose-50 text-rose-600 ring-1 ring-rose-100 text-xs rounded-full">
               {{ subcategoryLabel(issue.main_category, issue.category) }}
             </span>
-            <span class="px-2.5 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
+            <span class="px-2.5 py-0.5 bg-slate-100 text-slate-600 text-xs rounded-full">
               {{ LEVEL_LABELS[issue.current_level] }}
             </span>
             <span v-if="issue.requested_destination && issue.requested_destination !== 'normal'"
@@ -502,10 +502,10 @@ function historyStatusBadge(s: string): string {
               {{ DESTINATION_LABELS[issue.requested_destination] }}
             </span>
           </div>
-          <h1 class="text-lg sm:text-xl font-bold text-gray-900 leading-snug break-words">
+          <h1 class="text-lg sm:text-xl font-bold text-slate-900 leading-snug break-words">
             {{ issue.title }}
           </h1>
-          <p class="text-gray-500 text-sm mt-1 break-words">
+          <p class="text-slate-500 text-sm mt-1 break-words">
             โดย {{ issue.reporter_name || 'ไม่ระบุชื่อ' }}
             {{ issue.reporter_room ? `(${issue.reporter_room})` : '' }}
           </p>
@@ -517,15 +517,15 @@ function historyStatusBadge(s: string): string {
             'bg-blue-100 text-blue-700': issue.status === 'in_progress',
             'bg-green-100 text-green-700': issue.status === 'resolved',
             'bg-orange-100 text-orange-700': issue.status === 'escalated',
-            'bg-gray-200 text-gray-500': issue.status === 'cancelled',
+            'bg-slate-200 text-slate-500': issue.status === 'cancelled',
             'bg-rose-100 text-rose-700': issue.status === 'rejected',
           }"
         >
           {{ STATUS_LABELS[issue.status] }}
         </span>
       </div>
-      <p class="text-gray-700 mt-4 whitespace-pre-wrap">{{ issue.description }}</p>
-      <p class="text-xs text-gray-400 mt-3">
+      <p class="text-slate-700 mt-4 whitespace-pre-wrap">{{ issue.description }}</p>
+      <p class="text-xs text-slate-400 mt-3">
         แจ้งเมื่อ {{ fmtDate(issue.created_at) }} · ห้อง {{ issue.room_name }}
       </p>
     </div>
@@ -538,7 +538,7 @@ function historyStatusBadge(s: string): string {
       <button
         v-if="canEditIssue"
         @click="router.push({ name: 'issue-edit', params: { id: issue.id } })"
-        class="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 text-sm font-medium"
+        class="px-4 py-2.5 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 text-sm font-medium"
       >
         <i class="bi bi-pencil-square mr-1"></i> แก้ไขเรื่อง
       </button>
@@ -593,7 +593,7 @@ function historyStatusBadge(s: string): string {
       <button
         v-if="canManage && issue.countdown && issue.status === 'in_progress'"
         @click="handleExtendCountdown"
-        class="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 text-sm font-medium"
+        class="px-4 py-2.5 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 text-sm font-medium"
       >
         <i class="bi bi-clock-history mr-1"></i> ยืดเวลา
       </button>
@@ -620,8 +620,8 @@ function historyStatusBadge(s: string): string {
             :class="issue.countdown.is_overdue ? 'text-red-500' : 'text-red-500'"
           ></i>
           <div>
-            <p class="text-sm font-medium text-gray-700">การนับถอยหลัง</p>
-            <p class="text-xs text-gray-400">
+            <p class="text-sm font-medium text-slate-700">การนับถอยหลัง</p>
+            <p class="text-xs text-slate-400">
               ตั้งไว้ {{ issue.countdown.estimated_days }} วัน · ถึง
               {{ fmtDate(issue.countdown.deadline) }}
             </p>
@@ -642,7 +642,7 @@ function historyStatusBadge(s: string): string {
 
     <!-- Steps -->
     <div class="bg-white rounded-2xl shadow-sm p-5">
-      <h2 class="text-lg font-bold text-gray-800 mb-3">
+      <h2 class="text-lg font-bold text-slate-800 mb-3">
         <i class="bi bi-diagram-3 mr-1"></i> ขั้นตอนการดำเนินงาน
       </h2>
       <div v-if="issue.steps && issue.steps.length" class="space-y-2">
@@ -650,12 +650,12 @@ function historyStatusBadge(s: string): string {
           v-for="s in issue.steps"
           :key="s.id"
           class="flex items-center gap-3 p-2.5 rounded-lg"
-          :class="s.is_completed ? 'bg-green-50' : 'bg-gray-50'"
+          :class="s.is_completed ? 'bg-green-50' : 'bg-slate-50'"
         >
           <button
             v-if="canManage && !s.is_completed"
             @click="handleCompleteStep(s.id)"
-            class="w-6 h-6 rounded-full border-2 border-gray-300 hover:border-green-500 flex items-center justify-center text-xs"
+            class="w-6 h-6 rounded-full border-2 border-slate-300 hover:border-green-500 flex items-center justify-center text-xs"
             title="ทำขั้นตอนนี้สำเร็จ"
           >
             <i class="bi bi-check text-green-500 hidden"></i>
@@ -663,41 +663,41 @@ function historyStatusBadge(s: string): string {
           <div
             v-else
             class="w-6 h-6 rounded-full flex items-center justify-center"
-            :class="s.is_completed ? 'bg-green-500 text-white' : 'bg-gray-200'"
+            :class="s.is_completed ? 'bg-green-500 text-white' : 'bg-slate-200'"
           >
             <i v-if="s.is_completed" class="bi bi-check text-xs"></i>
           </div>
           <div class="flex-1">
             <p
               class="text-sm font-medium"
-              :class="s.is_completed ? 'text-gray-500 line-through' : 'text-gray-800'"
+              :class="s.is_completed ? 'text-slate-500 line-through' : 'text-slate-800'"
             >
               {{ s.step_title }}
             </p>
-            <p v-if="s.step_detail" class="text-xs text-gray-500">{{ s.step_detail }}</p>
+            <p v-if="s.step_detail" class="text-xs text-slate-500">{{ s.step_detail }}</p>
           </div>
         </div>
       </div>
-      <p v-else class="text-sm text-gray-400">ยังไม่มีขั้นตอนการดำเนินงาน</p>
+      <p v-else class="text-sm text-slate-400">ยังไม่มีขั้นตอนการดำเนินงาน</p>
 
       <div v-if="canManage" class="mt-3 grid grid-cols-1 sm:flex gap-2">
         <input
           v-model="newStepTitle"
           type="text"
           placeholder="เพิ่มขั้นตอน..."
-          class="w-full sm:flex-1 px-3 py-2.5 border border-gray-300 rounded-xl text-sm"
+          class="w-full sm:flex-1 px-3 py-2.5 border border-slate-300 rounded-xl text-sm"
           @keyup.enter="handleAddStep"
         />
         <input
           v-model="newStepDetail"
           type="text"
           placeholder="รายละเอียด (ไม่บังคับ)"
-          class="w-full sm:w-48 px-3 py-2.5 border border-gray-300 rounded-xl text-sm"
+          class="w-full sm:w-48 px-3 py-2.5 border border-slate-300 rounded-xl text-sm"
           @keyup.enter="handleAddStep"
         />
         <button
           @click="handleAddStep"
-          class="px-4 py-2.5 bg-gray-100 rounded-xl text-sm hover:bg-gray-200"
+          class="px-4 py-2.5 bg-slate-100 rounded-xl text-sm hover:bg-slate-200"
         >
           <i class="bi bi-plus-lg"></i>
         </button>
@@ -706,15 +706,15 @@ function historyStatusBadge(s: string): string {
 
     <!-- Comments (แบบ YouTube — ชื่อ + เวลา + ข้อความ) -->
     <div class="bg-white rounded-2xl shadow-sm p-5">
-      <h2 class="text-lg font-bold text-gray-800 mb-3">
+      <h2 class="text-lg font-bold text-slate-800 mb-3">
         <i class="bi bi-chat-left-text mr-1"></i> คอมเมนต์
-        <span v-if="issue.comments?.length" class="text-sm font-normal text-gray-400"
+        <span v-if="issue.comments?.length" class="text-sm font-normal text-slate-400"
           >({{ issue.comments.length }})</span
         >
       </h2>
 
       <div v-if="issue.comments && issue.comments.length" class="space-y-3">
-        <div v-for="c in issue.comments" :key="c.id" class="p-3 rounded-lg bg-gray-50">
+        <div v-for="c in issue.comments" :key="c.id" class="p-3 rounded-lg bg-slate-50">
           <div class="flex items-center justify-between gap-2">
             <div class="flex items-center gap-2 min-w-0">
               <div
@@ -723,13 +723,13 @@ function historyStatusBadge(s: string): string {
                 {{ (c.commenter_name || '?').charAt(0) }}
               </div>
               <div class="min-w-0">
-                <p class="text-sm font-medium text-gray-800 truncate">
+                <p class="text-sm font-medium text-slate-800 truncate">
                   {{ c.commenter_name || 'ไม่ระบุชื่อ' }}
-                  <span v-if="c.commenter_room" class="text-xs text-gray-400 font-normal"
+                  <span v-if="c.commenter_room" class="text-xs text-slate-400 font-normal"
                     >({{ c.commenter_room }})</span
                   >
                 </p>
-                <p class="text-xs text-gray-400">
+                <p class="text-xs text-slate-400">
                   {{ fmtDate(c.created_at) }}
                   <span v-if="c.updated_at">· แก้ไข {{ fmtDate(c.updated_at) }}</span>
                 </p>
@@ -740,7 +740,7 @@ function historyStatusBadge(s: string): string {
               <button
                 @click="handleEditComment(c.id, c.body)"
                 title="แก้ไขคอมเมนต์"
-                class="w-8 h-8 rounded-lg hover:bg-gray-200 text-gray-500 text-sm"
+                class="w-8 h-8 rounded-lg hover:bg-slate-200 text-slate-500 text-sm"
               >
                 <i class="bi bi-pencil"></i>
               </button>
@@ -753,10 +753,10 @@ function historyStatusBadge(s: string): string {
               </button>
             </div>
           </div>
-          <p class="text-sm text-gray-700 mt-2 whitespace-pre-wrap break-words">{{ c.body }}</p>
+          <p class="text-sm text-slate-700 mt-2 whitespace-pre-wrap break-words">{{ c.body }}</p>
         </div>
       </div>
-      <p v-else class="text-sm text-gray-400">ยังไม่มีคอมเมนต์ — เป็นคนแรกที่รับทราบเรื่องนี้</p>
+      <p v-else class="text-sm text-slate-400">ยังไม่มีคอมเมนต์ — เป็นคนแรกที่รับทราบเรื่องนี้</p>
 
       <!-- ช่องพิมพ์คอมเมนต์ -->
       <div class="mt-4 flex gap-2">
@@ -764,7 +764,7 @@ function historyStatusBadge(s: string): string {
           v-model="newComment"
           type="text"
           placeholder="พิมพ์คอมเมนต์..."
-          class="flex-1 px-3 py-2.5 border border-gray-300 rounded-xl text-sm"
+          class="flex-1 px-3 py-2.5 border border-slate-300 rounded-xl text-sm"
           maxlength="1000"
           @keyup.enter="handleAddComment"
         />
@@ -780,12 +780,12 @@ function historyStatusBadge(s: string): string {
 
     <!-- Timeline -->
     <div class="bg-white rounded-2xl shadow-sm p-5">
-      <h2 class="text-lg font-bold text-gray-800 mb-3">
+      <h2 class="text-lg font-bold text-slate-800 mb-3">
         <i class="bi bi-clock-history mr-1"></i> ประวัติการดำเนินงาน
       </h2>
       <div
         v-if="issue.status_history && issue.status_history.length"
-        class="relative pl-5 border-l-2 border-gray-200 space-y-4"
+        class="relative pl-5 border-l-2 border-slate-200 space-y-4"
       >
         <div v-for="h in issue.status_history" :key="h.id" class="relative">
           <div class="absolute -left-[25px] top-1 w-3 h-3 rounded-full bg-red-500"></div>
@@ -795,11 +795,11 @@ function historyStatusBadge(s: string): string {
           >
             {{ STATUS_LABELS[h.status] || h.status }}
           </span>
-          <p class="text-sm text-gray-700 mt-1">{{ h.note }}</p>
-          <p class="text-xs text-gray-400">{{ fmtDate(h.created_at) }}</p>
+          <p class="text-sm text-slate-700 mt-1">{{ h.note }}</p>
+          <p class="text-xs text-slate-400">{{ fmtDate(h.created_at) }}</p>
         </div>
       </div>
-      <p v-else class="text-sm text-gray-400">ไม่มีประวัติ</p>
+      <p v-else class="text-sm text-slate-400">ไม่มีประวัติ</p>
     </div>
 
     <!-- 🏛️ Modal อนุมัติเผยแพร่ PIRI Board -->

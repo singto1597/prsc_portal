@@ -482,7 +482,7 @@ const hasActiveIssues = computed(() => {
           <RouterLink
             v-if="(statusMap['cancelled'] ?? 0) > 0"
             :to="{ name: 'my-issues', query: { status: 'cancelled' } }"
-            class="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1.5 text-[11px] font-bold text-gray-500 ring-1 ring-gray-200 transition-colors hover:bg-gray-200"
+            class="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-[11px] font-bold text-slate-500 ring-1 ring-slate-200 transition-colors hover:bg-slate-200"
           >
             <i class="bi bi-x-octagon text-xs"></i> ยกเลิก {{ statusMap['cancelled'] }}
           </RouterLink>

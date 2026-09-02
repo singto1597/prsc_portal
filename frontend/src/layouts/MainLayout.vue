@@ -324,7 +324,7 @@ const goHome = () => {
       </header>
 
       <!-- Content -->
-      <main ref="scrollEl" class="flex-1 overflow-y-auto overscroll-contain pb-28 lg:pb-8">
+      <main ref="scrollEl" class="flex-1 overflow-y-auto overscroll-contain pb-[calc(env(safe-area-inset-bottom,0px)+9rem)] lg:pb-8">
         <div class="mx-auto w-full max-w-7xl px-4 pt-4 sm:px-6 lg:px-8 lg:pt-6">
           <RouterView v-slot="{ Component }">
             <Transition name="page" mode="out-in" appear>
@@ -371,15 +371,15 @@ const goHome = () => {
             <span class="truncate">ของฉัน</span>
           </RouterLink>
 
-          <!-- ➕ FAB แจ้งเรื่อง (กลาง) -->
+          <!-- ➕ FAB แจ้งเรื่อง (กลาง) — กะทัดรัด ไม่ทับเนื้อหา -->
           <RouterLink
             to="/app/issues/new"
-            class="relative flex min-w-0 flex-1 flex-col items-center text-[10px] font-bold text-rose-600"
+            class="relative flex min-w-0 flex-1 flex-col items-center gap-1 pb-0.5 text-[9px] font-bold text-rose-600"
           >
-            <span class="-mt-8 flex h-14 w-14 items-center justify-center rounded-[1.1rem] bg-gradient-to-br from-red-600 via-rose-500 to-rose-600 text-2xl text-white shadow-xl shadow-rose-500/45 ring-4 ring-white/90 transition-transform active:scale-95">
+            <span class="-mt-5 flex h-10 w-10 items-center justify-center rounded-[0.85rem] bg-gradient-to-br from-red-600 via-rose-500 to-rose-600 text-base text-white shadow-lg shadow-rose-500/40 ring-[3px] ring-white/90 transition-transform active:scale-95">
               <i class="bi bi-plus-lg"></i>
             </span>
-            <span class="mt-0.5">แจ้งเรื่อง</span>
+            <span class="leading-none">แจ้งเรื่อง</span>
           </RouterLink>
 
           <!-- PIRI Boards -->

@@ -126,7 +126,7 @@ async function handleHide() {
 </script>
 
 <template>
-  <div data-testid="comment-node" class="pl-4 border-l-2 border-gray-100">
+  <div data-testid="comment-node" class="pl-4 border-l-2 border-slate-100">
     <!-- ตัวคอมเมนต์ -->
     <div class="flex gap-2.5">
       <div
@@ -136,18 +136,18 @@ async function handleHide() {
       </div>
       <div class="min-w-0 flex-1">
         <div class="flex items-center gap-2 flex-wrap">
-          <span class="text-sm font-semibold text-gray-800">{{ comment.commenter_name || 'ไม่ระบุชื่อ' }}</span>
-          <span class="text-xs text-gray-400">{{ fmtTime(comment.created_at) }}</span>
-          <span v-if="comment.is_edited" class="text-[11px] text-gray-400">· แก้ไขแล้ว</span>
+          <span class="text-sm font-semibold text-slate-800">{{ comment.commenter_name || 'ไม่ระบุชื่อ' }}</span>
+          <span class="text-xs text-slate-400">{{ fmtTime(comment.created_at) }}</span>
+          <span v-if="comment.is_edited" class="text-[11px] text-slate-400">· แก้ไขแล้ว</span>
         </div>
-        <p class="text-sm text-gray-700 mt-0.5 whitespace-pre-wrap break-words">{{ comment.body }}</p>
+        <p class="text-sm text-slate-700 mt-0.5 whitespace-pre-wrap break-words">{{ comment.body }}</p>
         <!-- action: ตอบกลับ / แจ้ง (ทุกคน ยกเว้นตัวเอง) / ซ่อน (สภา/แอดมิน) -->
         <div class="mt-1 flex items-center gap-3 text-xs">
           <button
             type="button"
             data-testid="reply-btn"
             @click="replying = !replying"
-            class="text-gray-400 hover:text-red-600 font-medium flex items-center gap-1"
+            class="text-slate-400 hover:text-red-600 font-medium flex items-center gap-1"
           >
             <i class="bi bi-reply"></i> ตอบกลับ
           </button>
@@ -157,7 +157,7 @@ async function handleHide() {
             data-testid="report-btn"
             @click="handleReport"
             :disabled="acting"
-            class="text-gray-400 hover:text-amber-600 font-medium flex items-center gap-1 disabled:opacity-40"
+            class="text-slate-400 hover:text-amber-600 font-medium flex items-center gap-1 disabled:opacity-40"
           >
             <i class="bi bi-flag"></i> แจ้ง
           </button>
@@ -167,7 +167,7 @@ async function handleHide() {
             data-testid="hide-btn"
             @click="handleHide"
             :disabled="acting"
-            class="text-gray-400 hover:text-red-600 font-medium flex items-center gap-1 disabled:opacity-40"
+            class="text-slate-400 hover:text-red-600 font-medium flex items-center gap-1 disabled:opacity-40"
           >
             <i class="bi bi-eye-slash"></i> ซ่อน
           </button>
@@ -180,7 +180,7 @@ async function handleHide() {
             type="text"
             placeholder="พิมพ์คำตอบ..."
             maxlength="1000"
-            class="flex-1 px-3 py-2 border border-gray-300 rounded-xl text-sm"
+            class="flex-1 px-3 py-2 border border-slate-300 rounded-xl text-sm"
             @keyup.enter="submitReply"
           />
           <button

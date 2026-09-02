@@ -62,7 +62,7 @@ async function submit() {
 
 const goBack = () => router.push({ name: 'profile' });
 
-const inputCls = 'w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm mt-1 focus:ring-2 focus:ring-red-500 focus:border-red-500 transition';
+const inputCls = 'w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm mt-1 focus:ring-2 focus:ring-red-500 focus:border-red-500 transition';
 </script>
 
 <template>
@@ -70,12 +70,12 @@ const inputCls = 'w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm
     <form @submit.prevent="submit" class="space-y-4">
       <!-- Header -->
       <div class="flex items-center gap-3">
-        <button type="button" @click="goBack" class="w-9 h-9 rounded-xl bg-white border border-gray-200 text-gray-500 hover:text-red-600 hover:border-red-300 flex items-center justify-center transition shrink-0">
+        <button type="button" @click="goBack" class="w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-red-600 hover:border-red-300 flex items-center justify-center transition shrink-0">
           <i class="bi bi-arrow-left text-lg"></i>
         </button>
         <div>
-          <h1 class="text-xl sm:text-2xl font-bold text-gray-900 leading-tight"><i class="bi bi-shield-lock mr-1 text-red-500"></i> เปลี่ยนรหัสผ่าน</h1>
-          <p class="text-sm text-gray-500">ตั้งรหัสผ่านใหม่เพื่อความปลอดภัย</p>
+          <h1 class="text-xl font-black tracking-tight text-slate-900 leading-tight sm:text-2xl"><i class="bi bi-shield-lock mr-1 text-red-500"></i> เปลี่ยนรหัสผ่าน</h1>
+          <p class="text-sm text-slate-500">ตั้งรหัสผ่านใหม่เพื่อความปลอดภัย</p>
         </div>
       </div>
 
@@ -90,16 +90,16 @@ const inputCls = 'w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm
 
       <div class="bg-white rounded-2xl shadow-sm p-5 space-y-4">
         <div>
-          <label class="text-xs font-medium text-gray-500">รหัสผ่านเดิม</label>
+          <label class="text-xs font-medium text-slate-500">รหัสผ่านเดิม</label>
           <input v-model="oldPass" type="password" :class="inputCls" placeholder="••••••" autocomplete="current-password" />
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label class="text-xs font-medium text-gray-500">รหัสผ่านใหม่</label>
+            <label class="text-xs font-medium text-slate-500">รหัสผ่านใหม่</label>
             <input v-model="newPass" type="password" :class="inputCls" placeholder="อย่างน้อย 4 ตัว" autocomplete="new-password" />
           </div>
           <div>
-            <label class="text-xs font-medium text-gray-500">ยืนยันรหัสผ่านใหม่</label>
+            <label class="text-xs font-medium text-slate-500">ยืนยันรหัสผ่านใหม่</label>
             <input v-model="confirmPass" type="password" :class="inputCls" placeholder="พิมพ์ซ้ำอีกครั้ง" autocomplete="new-password" />
           </div>
         </div>

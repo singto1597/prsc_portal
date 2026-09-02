@@ -24,13 +24,11 @@ export interface MyProfile {
 }
 
 export async function getMyProfile(): Promise<MyProfile> {
-  const res: any = await api.get('/api/students/me/profile');
-  return res;
+  return (await api.get('/api/students/me/profile')) as MyProfile;
 }
 
 export async function updateMyProfile(data: Partial<MyProfile>): Promise<MyProfile> {
-  const res: any = await api.patch('/api/students/me/profile', data);
-  return res;
+  return (await api.patch('/api/students/me/profile', data)) as MyProfile;
 }
 
 export async function changePassword(old_password: string, new_password: string): Promise<void> {

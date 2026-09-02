@@ -134,10 +134,10 @@ function go(n: NotificationItem) {
   <div>
     <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
       <div>
-        <h1 class="text-xl sm:text-2xl font-bold text-gray-900 leading-tight">
+        <h1 class="text-xl font-black tracking-tight text-slate-900 leading-tight sm:text-2xl">
           <i class="bi bi-bell-fill mr-1 text-red-500"></i> การแจ้งเตือน
         </h1>
-        <p class="text-sm text-gray-500">
+        <p class="text-sm text-slate-500">
           เรื่องที่ยังไม่ได้อ่าน {{ notificationsStore.total > 0 ? `(${notificationsStore.total})` : '' }}
         </p>
       </div>
@@ -145,7 +145,7 @@ function go(n: NotificationItem) {
         <button
           @click="unreadOnly = !unreadOnly"
           class="px-3 py-2 rounded-xl text-sm font-semibold border transition-colors"
-          :class="unreadOnly ? 'bg-red-600 text-white border-red-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'"
+          :class="unreadOnly ? 'bg-red-600 text-white border-red-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'"
         >
           <i class="bi bi-envelope mr-1"></i> ยังไม่อ่าน
         </button>
@@ -168,7 +168,7 @@ function go(n: NotificationItem) {
         class="px-4 py-2 rounded-xl text-sm font-bold transition-all border"
         :class="activeTab === tab.value
           ? 'bg-red-600 text-white border-red-600 shadow-sm'
-          : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'"
+          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'"
       >
         <i :class="[tab.icon, 'mr-1.5']"></i> {{ tab.label }}
         <span v-if="tab.value && (notificationsStore.counts[tab.value] ?? 0) > 0"
@@ -188,7 +188,7 @@ function go(n: NotificationItem) {
     <div v-else-if="error" class="bg-red-50 text-red-600 rounded-xl p-6 text-center text-sm">{{ error }}</div>
 
     <!-- ว่าง -->
-    <div v-else-if="items.length === 0" class="bg-white rounded-2xl p-12 text-center text-gray-400">
+    <div v-else-if="items.length === 0" class="bg-white rounded-2xl p-12 text-center text-slate-400">
       <div class="text-4xl mb-3"><i class="bi bi-bell-slash"></i></div>
       <p class="font-semibold">ไม่มีการแจ้งเตือน</p>
       <p class="text-sm">เมื่อมีเรื่องใหม่/บอร์ดใหม่/คอมเมนต์ตอบกลับ จะขึ้นตรงนี้</p>
@@ -201,23 +201,23 @@ function go(n: NotificationItem) {
         :key="n.id"
         class="bg-white rounded-2xl border cursor-pointer transition-colors"
         :class="n.read_at
-          ? 'border-gray-100 hover:border-gray-200'
+          ? 'border-slate-100 hover:border-slate-200'
           : 'border-red-100 bg-red-50/40 hover:border-red-200'"
         @click="go(n)"
       >
         <div class="flex items-start gap-3 p-4">
           <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-            :class="n.read_at ? 'bg-gray-100 text-gray-400' : 'bg-red-100 text-red-600'">
+            :class="n.read_at ? 'bg-slate-100 text-slate-400' : 'bg-red-100 text-red-600'">
             <i :class="[iconFor(n), 'text-lg']"></i>
           </div>
           <div class="flex-1 min-w-0">
             <div class="flex items-start justify-between gap-2">
-              <p class="font-bold text-sm text-gray-900 leading-snug">{{ n.title }}</p>
-              <span class="text-[11px] text-gray-400 whitespace-nowrap shrink-0">{{ fmtDate(n.created_at) }}</span>
+              <p class="font-bold text-sm text-slate-900 leading-snug">{{ n.title }}</p>
+              <span class="text-[11px] text-slate-400 whitespace-nowrap shrink-0">{{ fmtDate(n.created_at) }}</span>
             </div>
-            <p class="text-sm text-gray-500 mt-0.5 leading-snug line-clamp-2">{{ n.body }}</p>
+            <p class="text-sm text-slate-500 mt-0.5 leading-snug line-clamp-2">{{ n.body }}</p>
             <div class="mt-1.5 flex items-center gap-2">
-              <span class="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-semibold">{{ n.actor_name || 'ระบบ' }}</span>
+              <span class="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 font-semibold">{{ n.actor_name || 'ระบบ' }}</span>
               <span v-if="!n.read_at" class="w-2 h-2 rounded-full bg-red-500 inline-block"></span>
             </div>
           </div>

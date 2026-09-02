@@ -198,10 +198,10 @@ onBeforeUnmount(stopPolling);
     <!-- หัวข้อ + ปุ่มดาวน์โหลด Template -->
     <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
       <div>
-        <h1 class="text-xl sm:text-2xl font-bold text-gray-900 leading-tight">
+        <h1 class="text-xl font-black tracking-tight text-slate-900 leading-tight sm:text-2xl">
           <i class="bi bi-file-earmark-excel mr-1 text-red-500"></i> นำเข้านักเรียนจาก Excel
         </h1>
-        <p class="text-sm text-gray-500">อัปโหลดรายชื่อ + ตำแหน่งในห้องเรียนเป็นชุด</p>
+        <p class="text-sm text-slate-500">อัปโหลดรายชื่อ + ตำแหน่งในห้องเรียนเป็นชุด</p>
       </div>
       <button
         @click="handleDownloadTemplate"
@@ -279,8 +279,8 @@ onBeforeUnmount(stopPolling);
     <!-- ขั้นตอนที่ 1: อัปโหลดเข้า Queue -->
     <div class="bg-white rounded-2xl shadow-sm p-5 space-y-4">
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">
-          1. เลือกไฟล์ Excel <span class="text-gray-400 font-normal">(.xlsx)</span>
+        <label class="block text-sm font-medium text-slate-700 mb-1">
+          1. เลือกไฟล์ Excel <span class="text-slate-400 font-normal">(.xlsx)</span>
         </label>
         <div class="flex flex-wrap items-center gap-2">
           <input
@@ -292,16 +292,16 @@ onBeforeUnmount(stopPolling);
           <!-- แสดงชื่อไฟล์ที่เลือก — custom file input ซ่อนข้อความ "No file chosen" ของ browser -->
           <span
             v-if="file"
-            class="inline-flex items-center gap-1.5 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 max-w-full"
+            class="inline-flex items-center gap-1.5 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 max-w-full"
             :title="file.name"
           >
             <i class="bi bi-file-earmark-excel text-red-600"></i>
             <span class="truncate max-w-[260px]">{{ file.name }}</span>
-            <button type="button" class="text-gray-400 hover:text-red-600" title="ล้างไฟล์ที่เลือก" @click="file = null">
+            <button type="button" class="text-slate-400 hover:text-red-600" title="ล้างไฟล์ที่เลือก" @click="file = null">
               <i class="bi bi-x-lg"></i>
             </button>
           </span>
-          <span v-else class="text-xs text-gray-400">ยังไม่ได้เลือกไฟล์ (.xlsx)</span>
+          <span v-else class="text-xs text-slate-400">ยังไม่ได้เลือกไฟล์ (.xlsx)</span>
         </div>
       </div>
       <button
@@ -312,7 +312,7 @@ onBeforeUnmount(stopPolling);
         <i v-if="isUploading" class="loading loading-spinner loading-sm mr-1"></i>
         {{ isUploading ? 'กำลังตรวจสอบและอัปโหลดเข้า Queue...' : 'อัปโหลดเข้า Queue' }}
       </button>
-      <p class="text-xs text-gray-400">
+      <p class="text-xs text-slate-400">
         <i class="bi bi-arrow-clockwise mr-1"></i>
         อัปโหลดเสร็จ ไฟล์จะถูกส่งเข้า <b>Queue</b> ทันที — ไม่ต้องค้างหน้านี้รอ
         จากนั้นกด <b>"เริ่มเดี๋ยวนี้"</b> ใน Queue List เพื่อสั่งให้ระบบทำงานเบื้องหลัง
@@ -322,9 +322,9 @@ onBeforeUnmount(stopPolling);
     <!-- ขั้นตอนที่ 2: Queue List + Progress Bar -->
     <div class="bg-white rounded-2xl shadow-sm p-5 mt-5">
       <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-        <h2 class="text-lg font-semibold text-gray-900">
+        <h2 class="text-lg font-semibold text-slate-900">
           <i class="bi bi-list-ul mr-1"></i> Queue List — คิวนำเข้านักเรียน
-          <span v-if="jobs.length" class="ml-1 text-sm font-normal text-gray-400">({{ jobs.length }})</span>
+          <span v-if="jobs.length" class="ml-1 text-sm font-normal text-slate-400">({{ jobs.length }})</span>
         </h2>
         <div class="flex items-center gap-2">
           <span v-if="runningJobs.length" class="badge badge-info badge-sm gap-1">
@@ -381,14 +381,14 @@ onBeforeUnmount(stopPolling);
         </div>
       </div>
 
-      <div v-else-if="jobs.length === 0" class="text-sm text-gray-400 text-center py-8">
+      <div v-else-if="jobs.length === 0" class="text-sm text-slate-400 text-center py-8">
         ยังไม่มีไฟล์ในคิว — อัปโหลดไฟล์ด้านบนก่อน
       </div>
 
       <div v-else class="overflow-x-auto">
         <table class="table table-sm w-full">
           <thead>
-            <tr class="text-gray-500 text-xs">
+            <tr class="text-slate-500 text-xs">
               <th>ไฟล์</th>
               <th>สถานะ</th>
               <th class="min-w-[220px]">ความคืบหน้า</th>
@@ -401,7 +401,7 @@ onBeforeUnmount(stopPolling);
               <tr class="align-middle">
                 <td class="font-medium text-sm">
                   {{ job.file_name }}
-                  <div class="text-xs text-gray-400">
+                  <div class="text-xs text-slate-400">
                     {{ new Date(job.created_at).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }) }}
                   </div>
                 </td>
@@ -417,7 +417,7 @@ onBeforeUnmount(stopPolling);
                 <td>
                   <!-- หลอดเปอร์เซ็นต์: เติมตาม progress_percent, เขียวเต็มหลอดเมื่อเสร็จ -->
                   <div class="flex items-center gap-2">
-                    <div class="relative h-5 flex-1 min-w-[130px] rounded-full bg-gray-100 border border-gray-200 overflow-hidden">
+                    <div class="relative h-5 flex-1 min-w-[130px] rounded-full bg-slate-100 border border-slate-200 overflow-hidden">
                       <div
                         class="absolute inset-y-0 left-0 rounded-full transition-all duration-500 ease-out"
                         :class="[IMPORT_BAR_FILL[job.status], isImportJobRunning(job.status) ? 'animate-pulse' : '']"
@@ -434,11 +434,11 @@ onBeforeUnmount(stopPolling);
                       {{ job.progress_percent }}%
                     </span>
                   </div>
-                  <div class="text-xs text-gray-500 mt-1">
+                  <div class="text-xs text-slate-500 mt-1">
                     {{ job.processed_rows }}/{{ job.total_rows }} แถว
                   </div>
                 </td>
-                <td class="text-sm text-gray-600 whitespace-nowrap">
+                <td class="text-sm text-slate-600 whitespace-nowrap">
                   <span class="text-green-600 font-semibold">{{ job.imported_count }}</span>
                   /
                   <span class="text-amber-600 font-semibold">{{ job.skipped_count }}</span>
@@ -470,7 +470,7 @@ onBeforeUnmount(stopPolling);
                   <span v-else-if="isImportJobRunning(job.status)" class="inline-flex items-center gap-1 text-xs text-blue-500">
                     <span class="loading loading-spinner loading-xs"></span> ทำงานอยู่
                   </span>
-                  <span v-else class="text-xs text-gray-400">—</span>
+                  <span v-else class="text-xs text-slate-400">—</span>
                 </td>
               </tr>
               <!-- error_logs รายแถว (แถวที่ข้อมูลผิด/ถูกข้าม) -->

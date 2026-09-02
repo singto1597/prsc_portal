@@ -129,7 +129,7 @@ const infoRows = computed(() => {
               </div>
               <!-- ชื่อ + ตำแหน่ง: pt ชัดเจน → อยู่ใต้ cover บนพื้นขาว อ่านง่ายเสมอ -->
               <div class="min-w-0 flex-1 pt-3 sm:pt-5">
-                <h1 class="text-lg sm:text-2xl font-bold text-gray-900 leading-snug break-words">{{ fullName }}</h1>
+                <h1 class="text-lg sm:text-2xl font-bold text-slate-900 leading-snug break-words">{{ fullName }}</h1>
                 <div class="flex flex-wrap gap-1.5 mt-2">
                   <span class="px-2.5 py-1 bg-red-100 text-red-700 text-xs font-semibold rounded-full">
                     <i class="bi bi-mortarboard mr-1"></i>{{ roleLabel }}
@@ -137,7 +137,7 @@ const infoRows = computed(() => {
                   <span v-if="profile.staff_level" class="px-2.5 py-1 bg-amber-100 text-amber-700 text-xs font-semibold rounded-full">
                     <i class="bi bi-clipboard-check mr-1"></i>ระดับ {{ profile.staff_level }}
                   </span>
-                  <span v-if="profile.room_code" class="px-2.5 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded-full">
+                  <span v-if="profile.room_code" class="px-2.5 py-1 bg-slate-100 text-slate-600 text-xs font-medium rounded-full">
                     <i class="bi bi-door-closed mr-1"></i>{{ profile.room_code }}
                   </span>
                 </div>
@@ -158,17 +158,17 @@ const infoRows = computed(() => {
           </button>
 
           <transition name="fade-up">
-            <div v-if="menuOpen" class="absolute right-0 top-11 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50">
-              <div class="px-4 py-1.5 mb-1 border-b border-gray-50">
-                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">การจัดการบัญชี</p>
+            <div v-if="menuOpen" class="absolute right-0 top-11 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50">
+              <div class="px-4 py-1.5 mb-1 border-b border-slate-50">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">การจัดการบัญชี</p>
               </div>
-              <button @click="goEdit" class="w-full text-left px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors flex items-center gap-3">
+              <button @click="goEdit" class="w-full text-left px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-red-50 hover:text-red-600 transition-colors flex items-center gap-3">
                 <i class="bi bi-pencil-square text-lg"></i> แก้ไขโปรไฟล์
               </button>
-              <button @click="goPassword" class="w-full text-left px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors flex items-center gap-3">
+              <button @click="goPassword" class="w-full text-left px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-red-50 hover:text-red-600 transition-colors flex items-center gap-3">
                 <i class="bi bi-shield-lock text-lg"></i> เปลี่ยนรหัสผ่าน
               </button>
-              <div class="h-px bg-gray-100 my-1"></div>
+              <div class="h-px bg-slate-100 my-1"></div>
               <button @click="logout" class="w-full text-left px-4 py-2.5 text-sm font-bold text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors flex items-center gap-3">
                 <i class="bi bi-box-arrow-right text-lg"></i> ออกจากระบบ
               </button>
@@ -182,10 +182,10 @@ const infoRows = computed(() => {
 
       <!-- ===== ข้อมูลส่วนตัว ===== -->
       <div class="bg-white rounded-3xl shadow-sm p-5 sm:p-6">
-        <h2 class="text-base font-bold text-gray-800 mb-1 flex items-center gap-2">
+        <h2 class="text-base font-bold text-slate-800 mb-1 flex items-center gap-2">
           <i class="bi bi-person-lines-fill text-red-500"></i> ข้อมูลส่วนตัว
         </h2>
-        <p class="text-xs text-gray-400 mb-4">ข้อมูลและช่องทางการติดต่อของคุณ</p>
+        <p class="text-xs text-slate-400 mb-4">ข้อมูลและช่องทางการติดต่อของคุณ</p>
         <div class="grid sm:grid-cols-2 gap-x-6 gap-y-3">
           <div
             v-for="row in infoRows"
@@ -196,14 +196,14 @@ const infoRows = computed(() => {
               <i :class="['bi', row.icon]"></i>
             </span>
             <div class="min-w-0">
-              <p class="text-[11px] text-gray-400 font-medium leading-tight">{{ row.label }}</p>
-              <p class="text-sm text-gray-800 font-medium break-words leading-snug">{{ row.value }}</p>
+              <p class="text-[11px] text-slate-400 font-medium leading-tight">{{ row.label }}</p>
+              <p class="text-sm text-slate-800 font-medium break-words leading-snug">{{ row.value }}</p>
             </div>
           </div>
         </div>
       </div>
 
-      <p class="text-center text-[11px] text-gray-300 pb-4">
+      <p class="text-center text-[11px] text-slate-300 pb-4">
         แก้ไขโปรไฟล์หรือเปลี่ยนรหัสผ่านได้จากเมนู <i class="bi bi-three-dots-vertical"></i> มุมขวาบน
       </p>
     </div>

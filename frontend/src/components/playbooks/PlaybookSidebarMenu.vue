@@ -36,7 +36,7 @@ function onChildClick() {
     <!-- หัวข้อหลัก: คลิก → หน้าหนังสือ, กด chevron → ขยาย/ย่อเมนู -->
     <div
       class="flex items-center rounded-xl transition-all"
-      :class="parentActive() ? 'bg-red-50 text-red-600 border border-red-100/50 shadow-sm' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'"
+      :class="parentActive() ? 'bg-red-50 text-red-600 border border-red-100/50 shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'"
     >
       <RouterLink to="/app/playbooks" class="flex-1 flex items-center px-3.5 py-3 text-sm font-semibold min-w-0">
         <i class="bi bi-journal-bookmark-fill text-lg mr-3"></i>
@@ -46,7 +46,7 @@ function onChildClick() {
         type="button"
         :title="isOpen ? 'ย่อเมนู' : 'ขยายเมนู'"
         :aria-expanded="isOpen"
-        class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:bg-white/70 hover:text-gray-700 transition-colors shrink-0 mr-1.5"
+        class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-white/70 hover:text-slate-700 transition-colors shrink-0 mr-1.5"
         @click="isOpen = !isOpen"
       >
         <i :class="['bi text-xs transition-transform', isOpen ? 'bi-chevron-up' : 'bi-chevron-down']"></i>
@@ -62,7 +62,7 @@ function onChildClick() {
           :to="{ name: 'playbook-reader', params: { id: pb.id } }"
           @click="onChildClick"
           class="flex items-center px-3 py-2 text-[13px] font-medium rounded-lg transition-colors"
-          :class="isChildActive(pb.id) ? 'bg-red-50 text-red-600' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'"
+          :class="isChildActive(pb.id) ? 'bg-red-50 text-red-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'"
         >
           <i class="bi bi-book-half text-sm mr-2.5 text-red-400"></i>
           <span class="truncate">{{ pb.title }}</span>

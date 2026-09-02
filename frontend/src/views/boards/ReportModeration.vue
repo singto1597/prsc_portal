@@ -147,15 +147,15 @@ async function handleResolve(r: ReportItem, action: 'hide' | 'dismiss') {
   <div>
     <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
       <div>
-        <h1 class="text-xl sm:text-2xl font-bold text-gray-900 leading-tight">
+        <h1 class="text-xl font-black tracking-tight text-slate-900 leading-tight sm:text-2xl">
           <i class="bi bi-flag-fill mr-1 text-red-500"></i> จัดการรายงาน
         </h1>
-        <p class="text-sm text-gray-500">คอมเมนต์ที่นักเรียนแจ้งความไม่เหมาะสม — สภานักเรียน/แอดมินตรวจสอบ</p>
+        <p class="text-sm text-slate-500">คอมเมนต์ที่นักเรียนแจ้งความไม่เหมาะสม — สภานักเรียน/แอดมินตรวจสอบ</p>
       </div>
     </div>
 
     <!-- ไม่มีสิทธิ์ (กันผ่าน URL ตรง) -->
-    <div v-if="!authStore.isCouncilAuthority" class="bg-white rounded-2xl p-12 text-center text-gray-400">
+    <div v-if="!authStore.isCouncilAuthority" class="bg-white rounded-2xl p-12 text-center text-slate-400">
       <div class="text-4xl mb-2"><i class="bi bi-shield-lock"></i></div>
       <p>เฉพาะสภานักเรียน/แอดมินที่เข้าถึงหน้านี้ได้</p>
     </div>
@@ -163,36 +163,36 @@ async function handleResolve(r: ReportItem, action: 'hide' | 'dismiss') {
     <template v-else>
       <!-- แถบกรอง + ค้นหา -->
       <div class="flex flex-wrap items-center gap-2 mb-5">
-        <div class="flex gap-1 p-1 bg-gray-100 rounded-xl">
+        <div class="flex gap-1 p-1 bg-slate-100 rounded-xl">
           <button
             v-for="t in STATUS_TABS"
             :key="t.value"
             type="button"
             @click="switchStatus(t.value)"
             class="px-3 py-2 rounded-lg text-sm font-medium transition flex items-center gap-1.5"
-            :class="statusFilter === t.value ? 'bg-white shadow text-red-600' : 'text-gray-500 hover:text-gray-700'"
+            :class="statusFilter === t.value ? 'bg-white shadow text-red-600' : 'text-slate-500 hover:text-slate-700'"
           >
             <i :class="t.icon"></i> {{ t.label }}
           </button>
         </div>
 
         <select v-model="reasonFilter" @change="onReasonChange"
-          class="px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white text-gray-600">
+          class="px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white text-slate-600">
           <option value="">ทุกเหตุผล</option>
           <option v-for="r in REPORT_REASONS" :key="r" :value="r">{{ REPORT_REASON_LABELS[r] }}</option>
         </select>
 
         <div class="relative flex-1 min-w-[180px] sm:flex-none sm:w-64">
-          <i class="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+          <i class="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
           <input
             v-model="q"
             type="search"
             placeholder="ค้นหา: ชื่อบอร์ด / คอมเมนต์..."
-            class="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-red-500"
+            class="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-red-500"
           />
         </div>
 
-        <span class="text-sm text-gray-400 ml-auto tabular-nums">{{ total.toLocaleString('en-US') }} รายการ</span>
+        <span class="text-sm text-slate-400 ml-auto tabular-nums">{{ total.toLocaleString('en-US') }} รายการ</span>
       </div>
 
       <div v-if="isLoading" class="flex justify-center py-16">
@@ -200,7 +200,7 @@ async function handleResolve(r: ReportItem, action: 'hide' | 'dismiss') {
       </div>
       <div v-else-if="error" class="text-red-500 text-center py-10">{{ error }}</div>
 
-      <div v-else-if="!reports.length" class="bg-white rounded-2xl p-12 text-center text-gray-400">
+      <div v-else-if="!reports.length" class="bg-white rounded-2xl p-12 text-center text-slate-400">
         <div class="text-4xl mb-2"><i class="bi bi-flag"></i></div>
         <p v-if="statusFilter === 'open'">ไม่มีรายงานค้าง — นักเรียนยังไม่แจ้ง หรือสภาจัดการหมดแล้ว</p>
         <p v-else>ไม่พบรายงานในเงื่อนไขนี้</p>
@@ -212,7 +212,7 @@ async function handleResolve(r: ReportItem, action: 'hide' | 'dismiss') {
           :key="r.id"
           :data-testid="'report-card-' + r.id"
           class="bg-white rounded-2xl shadow-sm p-4 border-l-4"
-          :class="r.status === 'open' ? 'border-amber-400' : r.status === 'resolved' ? 'border-emerald-400' : 'border-gray-200'"
+          :class="r.status === 'open' ? 'border-amber-400' : r.status === 'resolved' ? 'border-emerald-400' : 'border-slate-200'"
         >
           <div class="flex flex-wrap items-center gap-2 mb-2">
             <RouterLink
@@ -229,14 +229,14 @@ async function handleResolve(r: ReportItem, action: 'hide' | 'dismiss') {
             </span>
           </div>
 
-          <p class="text-sm text-gray-700 bg-gray-50 rounded-lg px-3 py-2.5 whitespace-pre-wrap break-words">
+          <p class="text-sm text-slate-700 bg-slate-50 rounded-lg px-3 py-2.5 whitespace-pre-wrap break-words">
             “{{ r.comment_body }}”
           </p>
 
           <div class="flex flex-wrap items-center justify-between gap-2 mt-2.5">
-            <p class="text-xs text-gray-400">
+            <p class="text-xs text-slate-400">
               แจ้งโดย {{ r.reporter_name || 'ไม่ระบุชื่อ' }} · {{ fmtDate(r.created_at) }}
-              <span v-if="r.detail" class="block text-gray-500 mt-0.5"><i class="bi bi-info-circle mr-1"></i>{{ r.detail }}</span>
+              <span v-if="r.detail" class="block text-slate-500 mt-0.5"><i class="bi bi-info-circle mr-1"></i>{{ r.detail }}</span>
             </p>
 
             <!-- ปุ่มจัดการ (เฉพาะ open) -->
@@ -246,7 +246,7 @@ async function handleResolve(r: ReportItem, action: 'hide' | 'dismiss') {
                 :disabled="actingId === r.id"
                 data-testid="dismiss-btn"
                 @click="handleResolve(r, 'dismiss')"
-                class="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40"
+                class="px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-40"
               >
                 <i class="bi bi-check2-circle mr-1"></i> ปัดตก
               </button>
@@ -260,7 +260,7 @@ async function handleResolve(r: ReportItem, action: 'hide' | 'dismiss') {
                 <i class="bi bi-eye-slash mr-1"></i> ซ่อนคอมเมนต์
               </button>
             </div>
-            <p v-else-if="r.resolution_note" class="text-xs text-gray-400 shrink-0">
+            <p v-else-if="r.resolution_note" class="text-xs text-slate-400 shrink-0">
               <i class="bi bi-journal-check mr-1"></i>{{ r.resolution_note }}
             </p>
           </div>
