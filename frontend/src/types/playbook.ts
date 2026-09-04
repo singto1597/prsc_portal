@@ -32,8 +32,8 @@ export const PLAYBOOKS: Playbook[] = [
   },
   {
     id: 'vol2',
-    title: 'วินัย',
-    description: 'ระเบียบวินัยและกติกาของโรงเรียนที่นักเรียนทุกคนควรทราบ พร้อมแนวปฏิบัติตนอย่างถูกต้อง',
+    title: 'ปฏิคม',
+    description: 'การดูแลรักษาห้องเรียน สภาพแวดล้อม และสิ่งอำนวยความสะดวกต่างๆ พร้อมแนวทางการดูแลรักษา หรือแนวทางปฏิบัติเมื่อเกิดของชำรุด',
     coverImage: '/playbooks/vol2/cover.webp',
     pdfUrl: '/playbooks/vol2/playbook.pdf',
     totalPages: 17,
@@ -50,8 +50,8 @@ export const PLAYBOOKS: Playbook[] = [
   },
   {
     id: 'vol4',
-    title: 'ปฏิคม',
-    description: 'การต้อนรับและอัธยาศัยไมตรี การเป็นเจ้าภาพจัดงานพิธี และการบริการรับรองแขกของโรงเรียน',
+    title: 'วินัย',
+    description: 'ระเบียบวินัยและกติกาของโรงเรียนที่นักเรียนทุกคนควรทราบ พร้อมแนวปฏิบัติตนอย่างถูกต้อง',
     coverImage: '/playbooks/vol4/cover.webp',
     pdfUrl: '/playbooks/vol4/playbook.pdf',
     totalPages: 14,
