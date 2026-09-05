@@ -229,9 +229,10 @@ const ledgerStats = computed(() => {
 const SPARK_W = 400;
 const SPARK_H = 100;
 const SPARK_PAD = 8;
+
 const sparkTrend = computed(() => {
   const pts = statsTrend.value;
-  if (pts.length < 2) return null;
+  if (!pts || pts.length < 2) return null;
   const max = Math.max(...pts.map(p => p.count), 1);
   const stepX = (SPARK_W - SPARK_PAD * 2) / (pts.length - 1);
   
@@ -243,16 +244,33 @@ const sparkTrend = computed(() => {
   const line = coords.map(c => `${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(' ');
   const area = `${SPARK_PAD},${SPARK_H} ${line} ${(SPARK_W - SPARK_PAD).toFixed(1)},${SPARK_H}`;
   
+  // ดึงค่ามาพักไว้ในตัวแปรก่อน
+  const firstPt = pts[0];
+  const lastPt = pts[pts.length - 1];
+  const lastCoord = coords[coords.length - 1];
+
+  // แก้ปัญหา Type Error: ยืนยันกับ TypeScript ว่ามีข้อมูลแน่นอน
+  if (!firstPt || !lastPt || !lastCoord) return null;
+
   return {
     line, area,
-    last: coords[coords.length - 1],
+    last: lastCoord,
     total: pts.reduce((acc, p) => acc + p.count, 0),
     days: pts.length,
-    startDate: pts[0].date,
-    endDate: pts[pts.length - 1].date,
+    startDate: firstPt.date,
+    endDate: lastPt.date,
   };
 });
-const sparkDot = computed(() => sparkTrend.value ? { left: (sparkTrend.value.last.x / SPARK_W) * 100, top: (sparkTrend.value.last.y / SPARK_H) * 100 } : null);
+
+const sparkDot = computed(() => {
+  const t = sparkTrend.value;
+  // ยืนยัน Type ความปลอดภัยก่อนนำ .last ไปเรียกใช้ .x และ .y
+  if (!t || !t.last) return null;
+  return { 
+    left: (t.last.x / SPARK_W) * 100, 
+    top: (t.last.y / SPARK_H) * 100 
+  };
+});
 
 /* ============================================================
  * 📣 Annotations & Announcements
