@@ -63,7 +63,7 @@ const roleLabel = computed(() => {
   return first ? map[first.role || ''] || first.role || 'นักเรียน' : 'นักเรียน';
 });
 
-// 📍 ตำแหน่ง/ห้องสำหรับทักทาย (เช่น "หัวหน้าห้อง ม.4/1")
+// 📍 ตำแหน่ง/ห้องสำหรับทักทาย
 const roleLine = computed(() => {
   const first = authStore.roles[0];
   if (!first) return roleLabel.value;
@@ -72,7 +72,6 @@ const roleLine = computed(() => {
   return roleLabel.value;
 });
 
-// หน้า title บน top bar (iOS navigation bar)
 const routeTitles: Record<string, string> = {
   home: 'หน้าแรก',
   dashboard: 'แดชบอร์ด',
@@ -112,12 +111,10 @@ function logout() {
   });
 }
 
-// 🔔 จำนวน仍未อ่านตามกลุ่ม (guard — counts[x] อาจ undefined)
 function unread(key: string): number {
   return notificationsStore.counts[key] || 0;
 }
 
-// 🔔 unread badge ตามเมนู (map path → group_type จาก store)
 const menuBadge = (path: string): number => {
   const g = {
     '/app/issues/mine': 'issue_mine',
@@ -134,10 +131,8 @@ interface NavItem {
   path: string;
   icon: string;
   badge: number;
-  label?: string; // ป้ายสั้น (bottom bar)
 }
 
-// เมนูตาม permission (ใช้ร่วม: sidebar desktop + sheet มือถือ)
 const menuItems = computed<NavItem[]>(() => {
   const items: NavItem[] = [];
   items.push({ name: 'หน้าแรก', path: '/app/home', icon: 'bi-house-door-fill', badge: 0 });
@@ -177,104 +172,118 @@ const goHome = () => {
 </script>
 
 <template>
-  <div class="relative flex h-screen overflow-hidden bg-[#FAFAF9] font-sans text-stone-900 selection:bg-[#B91C1C]/15 selection:text-[#B91C1C]">
+  <div class="relative flex h-screen overflow-hidden bg-[#F5F5F7] font-sans text-stone-900 selection:bg-[#B91C1C]/15 selection:text-[#B91C1C]">
+    
+    <!-- 🟢 SVG Filter สำหรับ Liquid Glass Distortion -->
+    <svg style="display: none;">
+      <filter id="glass-distortion" x="0%" y="0%" width="100%" height="100%" filterUnits="objectBoundingBox">
+        <feTurbulence type="fractalNoise" baseFrequency="0.003 0.005" numOctaves="1" seed="17" result="turbulence" />
+        <feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.1 0" in="turbulence" result="softTurbulence" />
+        <feDisplacementMap in="SourceGraphic" in2="softTurbulence" scale="10" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+    </svg>
 
-    <!-- ============ Sidebar (desktop ≥ lg) ============ -->
+    <!-- ============ Sidebar (Desktop ≥ lg) ============ -->
     <aside class="relative z-30 hidden flex-shrink-0 p-4 lg:block">
-      <div class="flex h-full w-[290px] flex-col overflow-hidden rounded-[1.75rem] border border-stone-200 bg-white">
-        <!-- Brand -->
-        <div class="flex items-center gap-3 px-5 pb-4 pt-6">
-          <RouterLink to="/app/home" class="flex items-center gap-2.5 group">
-            <!-- ลบ border ออก และใช้ drop-shadow-sm คลุมกลุ่มแทน เพิ่มความสมูท -->
-            <div class="flex -space-x-2 drop-shadow-sm">
-              <img src="/logos/school-logo.png" alt="โลโก้โรงเรียน" class="h-9 w-9 rounded-xl object-contain" />
-              <img src="/logos/council-logo.png" alt="โลโก้สภานักเรียน" class="h-9 w-9 rounded-xl object-contain" />
-            </div>
-            <div class="leading-none">
-              <span class="text-[15px] font-bold tracking-tight text-stone-900">
-                PIRI<span class="text-[#B91C1C]">voice</span>
-              </span>
-              <p class="mt-1 text-[10px] font-medium tracking-wide text-stone-400">เสียงจากชาวพิริยาลัย</p>
-            </div>
-          </RouterLink>
-        </div>
+      <!-- 🌟 Glass Panel Sidebar -->
+      <div class="relative flex h-full w-[290px] flex-col overflow-hidden rounded-[1.75rem] shadow-[0_8px_32px_rgba(0,0,0,0.06)] transition-all duration-500">
+        <!-- เลเยอร์กระจก -->
+        <div class="absolute inset-0 z-0 backdrop-blur-2xl" style="filter: url(#glass-distortion); isolation: isolate;"></div>
+        <div class="absolute inset-0 z-10 bg-white/60 supports-[backdrop-filter]:bg-white/40"></div>
+        <div class="absolute inset-0 z-20 rounded-[1.75rem] shadow-[inset_2px_2px_1px_0_rgba(255,255,255,0.8),inset_-1px_-1px_1px_1px_rgba(255,255,255,0.3)] pointer-events-none"></div>
 
-        <!-- Nav -->
-        <nav class="flex-1 overflow-y-auto px-3 pb-2">
-          <p class="px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-stone-400">เมนู</p>
-          <div class="space-y-1">
-            <RouterLink
-              v-for="item in menuItems"
-              :key="item.path"
-              :to="item.path"
-              class="flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-colors duration-200"
-              :class="isActive(item.path)
-                ? 'bg-[#B91C1C] text-white'
-                : 'text-stone-600 hover:bg-stone-100 hover:text-[#B91C1C]'"
-            >
-              <i :class="['bi', item.icon, 'text-[17px]']"></i>
-              <span class="min-w-0 flex-1 truncate">{{ item.name }}</span>
-              <span
-                v-if="item.badge > 0"
-                class="min-w-[20px] rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold"
-                :class="isActive(item.path) ? 'bg-white/20 text-white' : 'bg-[#B91C1C] text-white'"
-              >
-                {{ item.badge > 99 ? '99+' : item.badge }}
-              </span>
+        <!-- เนื้อหา Sidebar (z-30) -->
+        <div class="relative z-30 flex h-full flex-col">
+          <!-- Brand -->
+          <div class="flex items-center gap-3 px-5 pb-4 pt-6">
+            <RouterLink to="/app/home" class="flex items-center gap-2.5 group">
+              <div class="flex -space-x-2 drop-shadow-md transition-transform duration-300 group-hover:scale-105">
+                <img src="/logos/school-logo.png" alt="โลโก้โรงเรียน" class="h-9 w-9 rounded-xl object-contain bg-white/50 backdrop-blur-md" />
+                <img src="/logos/council-logo.png" alt="โลโก้สภานักเรียน" class="h-9 w-9 rounded-xl object-contain bg-white/50 backdrop-blur-md" />
+              </div>
+              <div class="leading-none">
+                <span class="text-[15px] font-bold tracking-tight text-stone-900">
+                  PIRI<span class="text-[#B91C1C]">voice</span>
+                </span>
+                <p class="mt-1 text-[10px] font-medium tracking-wide text-stone-500">เสียงจากชาวพิริยาลัย</p>
+              </div>
             </RouterLink>
           </div>
 
-          <!-- 📖 P.R. Playbooks — 6 เล่ม -->
-          <div class="mt-3">
-            <PlaybookSidebarMenu />
-          </div>
-        </nav>
-
-        <!-- User footer -->
-        <div class="border-t border-stone-200 p-3">
-          <div class="flex items-center gap-3 rounded-xl border border-stone-200 bg-stone-50 p-3">
-            <button @click="goHome" class="h-11 w-11 shrink-0 rounded-xl bg-[#B91C1C] text-sm font-black text-white ring-2 ring-white">
-              {{ avatarChar }}
-            </button>
-            <div class="min-w-0 flex-1 text-left" @click="router.push({ name: 'profile' })">
-              <p class="truncate text-sm font-bold leading-tight text-stone-800">{{ displayName }}</p>
-              <p class="mt-0.5 truncate text-[11px] font-semibold text-stone-500">{{ roleLine }}</p>
+          <!-- Nav -->
+          <nav class="flex-1 overflow-y-auto px-3 pb-2 custom-scrollbar">
+            <p class="px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-stone-400">เมนู</p>
+            <div class="space-y-1">
+              <RouterLink
+                v-for="item in menuItems"
+                :key="item.path"
+                :to="item.path"
+                class="flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-300"
+                :class="isActive(item.path)
+                  ? 'bg-[#B91C1C] text-white shadow-md'
+                  : 'text-stone-600 hover:bg-white/50 hover:shadow-sm hover:text-[#B91C1C]'"
+              >
+                <i :class="['bi', item.icon, 'text-[17px]']"></i>
+                <span class="min-w-0 flex-1 truncate">{{ item.name }}</span>
+                <span
+                  v-if="item.badge > 0"
+                  class="min-w-[20px] rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold"
+                  :class="isActive(item.path) ? 'bg-white/20 text-white' : 'bg-[#B91C1C] text-white'"
+                >
+                  {{ item.badge > 99 ? '99+' : item.badge }}
+                </span>
+              </RouterLink>
             </div>
-            <button
-              @click="logout"
-              title="ออกจากระบบ"
-              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-stone-400 transition-colors hover:bg-stone-100 hover:text-[#B91C1C]"
-            >
-              <i class="bi bi-box-arrow-right text-lg"></i>
-            </button>
+            <div class="mt-3">
+              <PlaybookSidebarMenu />
+            </div>
+          </nav>
+
+          <!-- User footer -->
+          <div class="p-3">
+            <div class="flex items-center gap-3 rounded-xl bg-white/40 p-3 shadow-[inset_0_1px_4px_rgba(0,0,0,0.02)] backdrop-blur-md border border-white/60">
+              <button @click="goHome" class="h-11 w-11 shrink-0 rounded-xl bg-gradient-to-br from-[#B91C1C] to-[#991B1B] text-sm font-black text-white shadow-sm ring-2 ring-white/50 transition-transform hover:scale-105">
+                {{ avatarChar }}
+              </button>
+              <div class="min-w-0 flex-1 text-left cursor-pointer" @click="router.push({ name: 'profile' })">
+                <p class="truncate text-sm font-bold leading-tight text-stone-800">{{ displayName }}</p>
+                <p class="mt-0.5 truncate text-[11px] font-semibold text-stone-500">{{ roleLine }}</p>
+              </div>
+              <button
+                @click="logout"
+                title="ออกจากระบบ"
+                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-stone-500 transition-colors hover:bg-white/60 hover:text-[#B91C1C]"
+              >
+                <i class="bi bi-box-arrow-right text-lg"></i>
+              </button>
+            </div>
           </div>
         </div>
       </div>
     </aside>
 
-    <!-- ============ Main column ============ -->
-    <div class="relative z-10 flex min-w-0 flex-1 flex-col">
-      <!-- ⚡ Top app bar (glass เหมือน navbar Landing) -->
+    <!-- ============ Main Column (เปลี่ยนเป็น relative ให้ Header ลอยทับ) ============ -->
+    <div class="relative z-10 flex min-w-0 flex-1 flex-col overflow-hidden">
+      
+      <!-- 🌟 Top App Bar (iOS Glass) -->
       <header
-        class="relative z-30 shrink-0 border-b transition-colors"
-        :class="route.path === '/app/home' ? 'border-transparent bg-transparent' : 'border-stone-200 bg-white'"
+        class="absolute top-0 inset-x-0 z-30 shrink-0 transition-all duration-500"
         style="padding-top: env(safe-area-inset-top, 0px)"
       >
-        <div class="mx-auto flex h-16 w-full max-w-7xl items-center gap-3 px-4 lg:px-6">
-          <!-- Brand (มือถือ) -->
-          <RouterLink
-            to="/app/home"
-            class="flex shrink-0 items-center gap-2 lg:hidden"
-            aria-label="หน้าแรก"
-          >
-            <span class="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-stone-200 bg-white p-0.5">
+        <!-- เลเยอร์กระจก (ซ่อนที่หน้า home หากต้องการ) -->
+        <div v-if="route.path !== '/app/home'" class="absolute inset-0 z-0 backdrop-blur-xl" style="filter: url(#glass-distortion); isolation: isolate;"></div>
+        <div v-if="route.path !== '/app/home'" class="absolute inset-0 z-10 bg-white/50 supports-[backdrop-filter]:bg-white/30"></div>
+        <div v-if="route.path !== '/app/home'" class="absolute inset-0 z-20 border-b border-white/40 shadow-[0_4px_30px_rgba(0,0,0,0.03)] pointer-events-none"></div>
+
+        <div class="relative z-30 mx-auto flex h-16 w-full max-w-7xl items-center gap-3 px-4 lg:px-6">
+          <RouterLink to="/app/home" class="flex shrink-0 items-center gap-2 lg:hidden" aria-label="หน้าแรก">
+            <span class="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-white/60 backdrop-blur-md border border-white/50 p-0.5 shadow-sm">
               <img src="/logos/school-logo.png" alt="โลโก้โรงเรียน" class="h-full w-full object-contain" />
             </span>
           </RouterLink>
 
-          <!-- Title -->
           <div class="min-w-0 flex-1">
-            <h1 class="truncate text-[15px] font-bold text-stone-900 sm:text-base lg:text-lg">
+            <h1 class="truncate text-[15px] font-bold text-stone-900 sm:text-base lg:text-lg drop-shadow-sm">
               {{ routeTitle }}
             </h1>
             <p class="hidden truncate text-[10px] font-semibold tracking-wide text-stone-500 sm:block lg:hidden">
@@ -282,36 +291,30 @@ const goHome = () => {
             </p>
           </div>
 
-          <!-- Actions -->
           <div class="flex shrink-0 items-center gap-2">
             <RouterLink
               to="/app/issues/new"
-              class="hidden items-center gap-1.5 rounded-xl bg-[#B91C1C] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[#991B1B] active:scale-[0.97] xl:flex"
+              class="hidden items-center gap-1.5 rounded-xl bg-[#B91C1C] px-4 py-2 text-sm font-bold text-white shadow-md transition-all hover:bg-[#991B1B] hover:shadow-lg active:scale-[0.97] xl:flex"
             >
-              <i class="bi bi-pencil-square"></i>
-               แจ้งเรื่อง
+              <i class="bi bi-pencil-square"></i> แจ้งเรื่อง
             </RouterLink>
 
-            <!-- 🔔 กระดิ่ง -->
             <RouterLink
               to="/app/notifications"
-              title="การแจ้งเตือน"
-              class="relative flex h-10 w-10 items-center justify-center rounded-xl text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-900"
+              class="relative flex h-10 w-10 items-center justify-center rounded-xl text-stone-600 transition-all hover:bg-white/50 hover:shadow-sm"
             >
               <i class="bi bi-bell text-xl"></i>
               <span
                 v-if="notificationsStore.total > 0"
-                class="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#B91C1C] px-1 text-[10px] font-bold text-white ring-2 ring-white"
+                class="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#B91C1C] px-1 text-[10px] font-bold text-white shadow-sm ring-2 ring-white/80"
               >
                 {{ notificationsStore.total > 99 ? '99+' : notificationsStore.total }}
               </span>
             </RouterLink>
 
-            <!-- Avatar → โปรไฟล์ -->
             <RouterLink
               to="/app/profile"
-              title="โปรไฟล์ของฉัน"
-              class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#B91C1C] text-sm font-black text-white ring-2 ring-stone-200 transition-transform hover:scale-105 active:scale-95"
+              class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#B91C1C] to-[#991B1B] text-sm font-black text-white shadow-md ring-2 ring-white/50 transition-transform hover:scale-105 active:scale-95"
             >
               {{ avatarChar }}
             </RouterLink>
@@ -319,9 +322,9 @@ const goHome = () => {
         </div>
       </header>
 
-      <!-- Content -->
-      <main ref="scrollEl" class="flex-1 overflow-y-auto overscroll-contain pb-[calc(env(safe-area-inset-bottom,0px)+9rem)] lg:pb-8">
-        <div class="mx-auto w-full max-w-7xl px-4 pt-4 sm:px-6 lg:px-8 lg:pt-6">
+      <!-- Content (ให้ Main มี pt เพื่อดันเนื้อหาลงมาจาก Header ลอย) -->
+      <main ref="scrollEl" class="flex-1 overflow-y-auto overscroll-contain h-full w-full custom-scrollbar pb-[calc(env(safe-area-inset-bottom,0px)+9rem)] lg:pb-8 pt-[calc(4rem+env(safe-area-inset-top,0px))]">
+        <div class="mx-auto w-full max-w-7xl px-4 pt-4 sm:px-6 lg:px-8">
           <RouterView v-slot="{ Component }">
             <Transition name="page" mode="out-in" appear>
               <component :is="Component" :key="route.fullPath" />
@@ -331,35 +334,40 @@ const goHome = () => {
       </main>
     </div>
 
-    <!-- ============ Mobile bottom tab bar (iOS-style, < lg) ============ -->
+    <!-- ============ 🌟 Mobile Bottom Tab Bar (Liquid Glass) ============ -->
     <nav
       class="pointer-events-none fixed inset-x-0 bottom-0 z-40 lg:hidden"
       style="bottom: calc(env(safe-area-inset-bottom, 0px) + 0.6rem)"
       aria-label="เมนูหลัก"
     >
-      <div class="pointer-events-auto mx-auto w-[calc(100%-1.5rem)] max-w-[440px] rounded-[2rem] border border-stone-200 bg-white px-1.5 pb-1.5 pt-2.5">
-        <div class="flex items-end justify-between">
-          <!-- หน้าแรก -->
+      <div class="pointer-events-auto mx-auto w-[calc(100%-1.5rem)] max-w-[440px] relative transition-transform duration-500 hover:scale-[1.01]">
+        
+        <!-- เลเยอร์กระจก Bottom Bar -->
+        <div class="absolute inset-0 z-0 overflow-hidden rounded-[2rem] backdrop-blur-xl supports-[backdrop-filter]:backdrop-blur-2xl" style="filter: url(#glass-distortion); isolation: isolate;"></div>
+        <div class="absolute inset-0 z-10 rounded-[2rem] bg-white/45"></div>
+        <div class="absolute inset-0 z-20 overflow-hidden rounded-[2rem] shadow-[inset_2px_2px_2px_0_rgba(255,255,255,0.8),inset_-1px_-1px_1px_1px_rgba(255,255,255,0.3),0_10px_40px_rgba(0,0,0,0.1)] pointer-events-none"></div>
+
+        <!-- เนื้อหาปุ่มต่างๆ (z-30) -->
+        <div class="relative z-30 flex items-end justify-between px-1.5 pb-1.5 pt-2.5">
           <RouterLink
             to="/app/home"
             class="flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-2xl px-1 py-1.5 text-[10px] font-bold transition-colors"
-            :class="route.path === '/app/home' ? 'text-[#B91C1C]' : 'text-stone-400'"
+            :class="route.path === '/app/home' ? 'text-[#B91C1C] drop-shadow-sm' : 'text-stone-500 hover:text-stone-700'"
           >
             <i :class="['bi text-xl', route.path === '/app/home' ? 'bi-house-door-fill' : 'bi-house-door']"></i>
             <span class="truncate">หน้าแรก</span>
           </RouterLink>
 
-          <!-- เรื่องของฉัน -->
           <RouterLink
             to="/app/issues/mine"
             class="relative flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-2xl px-1 py-1.5 text-[10px] font-bold transition-colors"
-            :class="isActive('/app/issues/mine') ? 'text-[#B91C1C]' : 'text-stone-400'"
+            :class="isActive('/app/issues/mine') ? 'text-[#B91C1C] drop-shadow-sm' : 'text-stone-500 hover:text-stone-700'"
           >
             <span class="relative">
               <i :class="['bi text-xl', isActive('/app/issues/mine') ? 'bi-file-earmark-text-fill' : 'bi-file-earmark-text']"></i>
               <span
                 v-if="unread('issue_mine') > 0"
-                class="absolute -right-2.5 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#B91C1C] px-1 text-[9px] font-bold text-white ring-2 ring-white"
+                class="absolute -right-2.5 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#B91C1C] px-1 text-[9px] font-bold text-white shadow-sm ring-2 ring-white/60"
               >
                 {{ unread('issue_mine') > 99 ? '99+' : unread('issue_mine') }}
               </span>
@@ -367,28 +375,27 @@ const goHome = () => {
             <span class="truncate">ของฉัน</span>
           </RouterLink>
 
-          <!-- ➕ FAB แจ้งเรื่อง (กลาง) — กะทัดรัด ไม่ทับเนื้อหา -->
+          <!-- ➕ FAB กลาง -->
           <RouterLink
             to="/app/issues/new"
             class="relative flex min-w-0 flex-1 flex-col items-center gap-1 pb-0.5 text-[9px] font-bold text-[#B91C1C]"
           >
-            <span class="-mt-5 flex h-10 w-10 items-center justify-center rounded-[0.85rem] bg-[#B91C1C] text-base text-white ring-[3px] ring-white transition-transform active:scale-95">
-              <i class="bi bi-plus-lg"></i>
+            <span class="-mt-5 flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[#B91C1C] to-[#991B1B] text-lg text-white shadow-[0_8px_16px_rgba(185,28,28,0.3)] ring-[3px] ring-white/50 transition-transform active:scale-95">
+              <i class="bi bi-plus-lg drop-shadow-md"></i>
             </span>
-            <span class="leading-none">แจ้งเรื่อง</span>
+            <span class="leading-none drop-shadow-sm">แจ้งเรื่อง</span>
           </RouterLink>
 
-          <!-- PIRI Boards -->
           <RouterLink
             to="/app/boards"
             class="relative flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-2xl px-1 py-1.5 text-[10px] font-bold transition-colors"
-            :class="isActive('/app/boards') ? 'text-[#B91C1C]' : 'text-stone-400'"
+            :class="isActive('/app/boards') ? 'text-[#B91C1C] drop-shadow-sm' : 'text-stone-500 hover:text-stone-700'"
           >
             <span class="relative">
               <i class="bi text-xl bi-columns-gap"></i>
               <span
                 v-if="unread('board') > 0"
-                class="absolute -right-2.5 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#B91C1C] px-1 text-[9px] font-bold text-white ring-2 ring-white"
+                class="absolute -right-2.5 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#B91C1C] px-1 text-[9px] font-bold text-white shadow-sm ring-2 ring-white/60"
               >
                 {{ unread('board') > 99 ? '99+' : unread('board') }}
               </span>
@@ -396,12 +403,11 @@ const goHome = () => {
             <span class="truncate">Boards</span>
           </RouterLink>
 
-          <!-- เพิ่มเติม (เปิด sheet เมนูทั้งหมด) -->
           <button
             type="button"
             @click="isMoreOpen = true"
             class="flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-2xl px-1 py-1.5 text-[10px] font-bold transition-colors"
-            :class="isMoreOpen ? 'text-[#B91C1C]' : 'text-stone-400'"
+            :class="isMoreOpen ? 'text-[#B91C1C] drop-shadow-sm' : 'text-stone-500 hover:text-stone-700'"
           >
             <i :class="['bi text-xl', isMoreOpen ? 'bi-x-lg' : 'bi-grid-3x3-gap-fill']"></i>
             <span class="truncate">เพิ่มเติม</span>
@@ -410,113 +416,94 @@ const goHome = () => {
       </div>
     </nav>
 
-    <!-- ============ Bottom sheet: เมนูทั้งหมด (มือถือ) ============ -->
+    <!-- ============ 🌟 Bottom Sheet (Glass UI) ============ -->
     <Transition name="sheet">
       <div v-if="isMoreOpen" class="fixed inset-0 z-50 lg:hidden">
-        <div class="absolute inset-0 bg-stone-900/40" @click="isMoreOpen = false"></div>
-        <div class="absolute inset-x-0 bottom-0 max-h-[86vh] overflow-y-auto rounded-t-[2rem] border-t border-stone-200 bg-white pb-safe">
-          <!-- Handle -->
-          <div class="mx-auto mt-3 h-1.5 w-10 rounded-full bg-stone-200"></div>
+        <!-- Backdrop -->
+        <div class="absolute inset-0 bg-stone-900/30 backdrop-blur-sm transition-opacity" @click="isMoreOpen = false"></div>
+        
+        <!-- Sheet Container -->
+        <div class="absolute inset-x-0 bottom-0 max-h-[86vh] overflow-y-auto rounded-t-[2rem] pb-safe shadow-[0_-10px_40px_rgba(0,0,0,0.15)]">
+          <!-- เลเยอร์กระจกของ Sheet -->
+          <div class="absolute inset-0 z-0 backdrop-blur-3xl bg-white/70 supports-[backdrop-filter]:bg-white/50"></div>
+          <div class="absolute inset-0 z-10 rounded-t-[2rem] shadow-[inset_0_2px_2px_0_rgba(255,255,255,0.8)] pointer-events-none"></div>
 
-          <!-- User header -->
-          <div class="flex items-center gap-3 px-6 pb-4 pt-4">
-            <button
-              @click="isMoreOpen = false; router.push({ name: 'profile' })"
-              class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#B91C1C] text-base font-black text-white"
-            >
-              {{ avatarChar }}
-            </button>
-            <div class="min-w-0 flex-1" @click="isMoreOpen = false; router.push({ name: 'profile' })">
-              <p class="truncate text-base font-bold text-stone-900">สวัสดี, {{ displayName }}</p>
-              <p class="truncate text-xs font-semibold text-stone-500">{{ roleLine }}</p>
-            </div>
-            <button
-              @click="isMoreOpen = false"
-              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-stone-400 hover:bg-stone-100"
-              aria-label="ปิดเมนู"
-            >
-              <i class="bi bi-x-lg text-lg"></i>
-            </button>
-          </div>
+          <!-- เนื้อหา Sheet (z-20) -->
+          <div class="relative z-20">
+            <div class="mx-auto mt-3 h-1.5 w-10 rounded-full bg-stone-300/60 shadow-inner"></div>
 
-          <div class="mx-6 h-px bg-stone-200"></div>
-
-          <!-- Menu items -->
-          <div class="space-y-1 px-3 py-3">
-            <p class="px-3 pb-1 pt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-stone-400">เมนูทั้งหมด</p>
-            <button
-              v-for="item in menuItems"
-              :key="item.path"
-              type="button"
-              @click="isMoreOpen = false; router.push(item.path)"
-              class="flex w-full items-center gap-3 rounded-xl px-3.5 py-3 text-left text-sm font-semibold transition-colors"
-              :class="isActive(item.path) ? 'bg-stone-100 text-[#B91C1C]' : 'text-stone-600 hover:bg-stone-50'"
-            >
-              <i :class="['bi', item.icon, 'text-lg', isActive(item.path) ? 'text-[#B91C1C]' : 'text-stone-400']"></i>
-              <span class="min-w-0 flex-1 truncate">{{ item.name }}</span>
-              <span
-                v-if="item.badge > 0"
-                class="min-w-[20px] rounded-full bg-[#B91C1C] px-1.5 py-0.5 text-center text-[10px] font-bold text-white"
-              >
-                {{ item.badge > 99 ? '99+' : item.badge }}
-              </span>
-              <i class="bi bi-chevron-right text-xs text-stone-300"></i>
-            </button>
-          </div>
-
-          <!-- 📖 P.R. Playbooks -->
-          <div class="mx-6 h-px bg-stone-200"></div>
-          <div class="px-3 py-3">
-            <div class="flex items-center justify-between px-3 pb-1">
-              <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-stone-400">P.R. Playbooks</p>
+            <div class="flex items-center gap-3 px-6 pb-4 pt-4">
               <button
-                type="button"
-                class="text-[11px] font-bold text-[#B91C1C] hover:underline"
-                @click="isMoreOpen = false; router.push({ name: 'playbooks' })"
+                @click="isMoreOpen = false; router.push({ name: 'profile' })"
+                class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#B91C1C] to-[#991B1B] text-base font-black text-white shadow-md"
               >
-                ดูทั้งหมด
+                {{ avatarChar }}
+              </button>
+              <div class="min-w-0 flex-1" @click="isMoreOpen = false; router.push({ name: 'profile' })">
+                <p class="truncate text-base font-bold text-stone-900">{{ displayName }}</p>
+                <p class="truncate text-xs font-semibold text-stone-500">{{ roleLine }}</p>
+              </div>
+              <button
+                @click="isMoreOpen = false"
+                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-black/5 text-stone-600 transition-colors hover:bg-black/10"
+              >
+                <i class="bi bi-x-lg text-lg"></i>
               </button>
             </div>
-            <div class="space-y-0.5">
+
+            <div class="mx-6 h-px bg-stone-200/50"></div>
+
+            <div class="space-y-1 px-3 py-3">
+              <p class="px-3 pb-1 pt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-stone-500">เมนูทั้งหมด</p>
               <button
-                v-for="pb in PLAYBOOKS"
-                :key="pb.id"
+                v-for="item in menuItems"
+                :key="item.path"
                 type="button"
-                @click="isMoreOpen = false; router.push({ name: 'playbook-reader', params: { id: pb.id } })"
-                class="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-stone-600 transition-colors hover:bg-stone-100 hover:text-[#B91C1C]"
+                @click="isMoreOpen = false; router.push(item.path)"
+                class="flex w-full items-center gap-3 rounded-xl px-3.5 py-3 text-left text-sm font-semibold transition-colors"
+                :class="isActive(item.path) ? 'bg-white/60 text-[#B91C1C] shadow-sm' : 'text-stone-700 hover:bg-white/40'"
               >
-                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-stone-100 text-stone-600">
-                  <i class="bi bi-journal-bookmark text-sm"></i>
+                <i :class="['bi', item.icon, 'text-lg', isActive(item.path) ? 'text-[#B91C1C]' : 'text-stone-400']"></i>
+                <span class="min-w-0 flex-1 truncate">{{ item.name }}</span>
+                <span v-if="item.badge > 0" class="min-w-[20px] rounded-full bg-[#B91C1C] px-1.5 py-0.5 text-center text-[10px] font-bold text-white shadow-sm">
+                  {{ item.badge > 99 ? '99+' : item.badge }}
                 </span>
-                <span class="truncate">{{ pb.title }}</span>
+                <i class="bi bi-chevron-right text-xs text-stone-300"></i>
               </button>
             </div>
-          </div>
 
-          <!-- Account -->
-          <div class="mx-6 h-px bg-stone-200"></div>
-          <div class="grid grid-cols-2 gap-2 px-6 py-4">
-            <button
-              type="button"
-              @click="isMoreOpen = false; router.push({ name: 'profile-edit' })"
-              class="btn-ghost-ui !justify-start !px-3 !py-3 text-sm"
-            >
-              <i class="bi bi-person-badge text-base"></i> แก้ไขโปรไฟล์
-            </button>
-            <button
-              type="button"
-              @click="isMoreOpen = false; router.push({ name: 'profile-password' })"
-              class="btn-ghost-ui !justify-start !px-3 !py-3 text-sm"
-            >
-              <i class="bi bi-key text-base"></i> เปลี่ยนรหัสผ่าน
-            </button>
-            <button
-              type="button"
-              @click="logout"
-              class="col-span-2 flex w-full items-center justify-center gap-2 rounded-xl border border-stone-200 bg-stone-100 py-3 text-sm font-bold text-stone-700 transition-colors hover:bg-stone-200"
-            >
-              <i class="bi bi-box-arrow-right text-base"></i> ออกจากระบบ
-            </button>
+            <!-- 📖 Playbooks ... -->
+            <div class="mx-6 h-px bg-stone-200/50"></div>
+            <div class="px-3 py-3">
+              <!-- ส่วนของ Playbooks ไม่เปลี่ยนแปลงโครงสร้าง -->
+              <div class="flex items-center justify-between px-3 pb-1">
+                <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-stone-500">P.R. Playbooks</p>
+                <button type="button" class="text-[11px] font-bold text-[#B91C1C]" @click="isMoreOpen = false; router.push({ name: 'playbooks' })">ดูทั้งหมด</button>
+              </div>
+              <div class="space-y-0.5">
+                <button
+                  v-for="pb in PLAYBOOKS" :key="pb.id"
+                  @click="isMoreOpen = false; router.push({ name: 'playbook-reader', params: { id: pb.id } })"
+                  class="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-stone-700 transition-colors hover:bg-white/40 hover:text-[#B91C1C]"
+                >
+                  <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-black/5 text-stone-600"><i class="bi bi-journal-bookmark text-sm"></i></span>
+                  <span class="truncate">{{ pb.title }}</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="mx-6 h-px bg-stone-200/50"></div>
+            <div class="grid grid-cols-2 gap-2 px-6 py-4">
+              <button @click="isMoreOpen = false; router.push({ name: 'profile-edit' })" class="flex items-center gap-2 rounded-xl bg-white/40 px-3 py-3 text-sm font-semibold text-stone-700 hover:bg-white/60">
+                <i class="bi bi-person-badge text-base"></i> แก้ไขโปรไฟล์
+              </button>
+              <button @click="isMoreOpen = false; router.push({ name: 'profile-password' })" class="flex items-center gap-2 rounded-xl bg-white/40 px-3 py-3 text-sm font-semibold text-stone-700 hover:bg-white/60">
+                <i class="bi bi-key text-base"></i> เปลี่ยนรหัสผ่าน
+              </button>
+              <button @click="logout" class="col-span-2 flex w-full items-center justify-center gap-2 rounded-xl bg-stone-800/5 py-3 text-sm font-bold text-[#B91C1C] transition-colors hover:bg-stone-800/10">
+                <i class="bi bi-box-arrow-right text-base"></i> ออกจากระบบ
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -525,14 +512,14 @@ const goHome = () => {
 </template>
 
 <style scoped>
-/* fade สำหรับ backdrop + slide สำหรับ sheet (มือถือ) */
+/* fade สำหรับ backdrop + slide สำหรับ sheet */
 .sheet-enter-active,
 .sheet-leave-active {
-  transition: opacity 0.25s ease;
+  transition: opacity 0.3s ease;
 }
 .sheet-enter-active .absolute.inset-x-0,
 .sheet-leave-active .absolute.inset-x-0 {
-  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1);
 }
 .sheet-enter-from,
 .sheet-leave-to {
@@ -543,7 +530,6 @@ const goHome = () => {
   transform: translateY(100%);
 }
 
-/* ♿ เคารพผู้ที่ปิดแอนิเมชัน */
 @media (prefers-reduced-motion: reduce) {
   .sheet-enter-active,
   .sheet-leave-active {
@@ -553,19 +539,33 @@ const goHome = () => {
 </style>
 
 <style>
-/* ✨ หน้าเปลี่ยนแบบ smooth (เฉพาะ content) — global เพราะ Transition อยู่ใน MainLayout
-   mode="out-in" + appear → fade + เลื่อนขึ้นนุ่ม ๆ */
+/* Page Transition นุ่มๆ */
 .page-enter-active {
-  transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1), transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .page-leave-active {
-  transition: opacity 0.15s ease;
+  transition: opacity 0.2s ease;
 }
 .page-enter-from {
   opacity: 0;
-  transform: translateY(16px);
+  transform: translateY(16px) scale(0.99);
 }
 .page-leave-to {
   opacity: 0;
+}
+
+/* Custom Scrollbar เล็กๆ ซ่อนตัวได้เนียนๆ กับดีไซน์กระจก */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+}
+.custom-scrollbar:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
 }
 </style>
