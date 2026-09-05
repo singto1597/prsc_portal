@@ -4,7 +4,7 @@
  * 🏠 Landing.vue — PIRIvoice Homepage
  * สภานักเรียน โรงเรียนพิริยาลัยจังหวัดแพร่
  * 
- * Version: 4.1 (Civic & Editorial Design + Positive Wording)
+ * Version: 4.2 (Refined Red Theme + Smooth Logos + Gradient Text)
  * Focus: Authenticity, Human-crafted layout, Typography, Real-time Data.
  */
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
@@ -275,7 +275,7 @@ const heroAnnouncement = computed(() => announcements.value[0] ?? null);
 const hasUrgent = computed(() => announcements.value.some(a => a.priority === 'urgent'));
 
 function priorityDot(p: AnnouncementPriority) {
-  if (p === 'urgent') return 'bg-[#7A2436] animate-pulse';
+  if (p === 'urgent') return 'bg-[#B91C1C] animate-pulse';
   if (p === 'high') return 'bg-[#D97706]';
   return 'bg-stone-400';
 }
@@ -327,7 +327,7 @@ watch([stats, isLoadingStats], () => {
 </script>
 
 <template>
-  <div class="piri-landing relative min-h-screen overflow-x-clip bg-[#FAFAF9] text-stone-900 selection:bg-[#7A2436]/15 selection:text-[#7A2436]">
+  <div class="piri-landing relative min-h-screen overflow-x-clip bg-[#FAFAF9] text-stone-900 selection:bg-[#B91C1C]/15 selection:text-[#B91C1C]">
     
     <!-- ============================================= -->
     <!-- 🏛️ 1. Header Navigation -->
@@ -338,15 +338,15 @@ watch([stats, isLoadingStats], () => {
     >
       <nav class="mx-auto flex h-[76px] max-w-7xl items-center justify-between px-5 sm:px-6 lg:px-8">
         
-        <!-- Brand -->
+        <!-- Brand (Fix Logos rendering smoothly) -->
         <button type="button" class="group flex items-center gap-3.5 focus-visible:outline-none" @click="scrollToId('hero')">
-          <div class="flex items-center gap-2.5">
-            <img src="/logos/school-logo.png" alt="ตราโรงเรียนพิริยาลัยจังหวัดแพร่" class="h-10 w-10 rounded-md bg-white object-cover shadow-sm ring-1 ring-stone-900/5 transition-transform group-hover:scale-105" />
+          <div class="flex items-center gap-3">
+            <img src="/logos/school-logo.png" alt="ตราโรงเรียนพิริยาลัยจังหวัดแพร่" class="h-[38px] w-auto object-contain drop-shadow-sm transition-transform group-hover:scale-105" />
             <span class="h-6 w-px bg-stone-300"></span>
-            <img src="/logos/council-logo.png" alt="ตราสภานักเรียน" class="h-10 w-10 rounded-md bg-white object-cover shadow-sm ring-1 ring-stone-900/5 transition-transform group-hover:scale-105" />
+            <img src="/logos/council-logo.png" alt="ตราสภานักเรียน" class="h-[38px] w-auto object-contain drop-shadow-sm transition-transform group-hover:scale-105" />
           </div>
           <div class="flex flex-col items-start leading-none text-left">
-            <span class="text-[17px] font-bold tracking-tight text-stone-900">PIRI<span class="text-[#7A2436]">voice</span></span>
+            <span class="text-[17px] font-bold tracking-tight text-stone-900">PIRI<span class="text-[#B91C1C]">voice</span></span>
             <span class="mt-1 hidden text-[11px] font-medium tracking-wide text-stone-500 sm:block">สภานักเรียน โรงเรียนพิริยาลัยจังหวัดแพร่</span>
           </div>
         </button>
@@ -359,14 +359,14 @@ watch([stats, isLoadingStats], () => {
             @click="scrollToId(link.id)"
           >
             {{ link.label }}
-            <span class="absolute -bottom-1 left-0 right-0 h-[2px] origin-left scale-x-0 bg-[#7A2436] transition-transform duration-300 group-hover:scale-x-100 rounded-full"></span>
+            <span class="absolute -bottom-1 left-0 right-0 h-[2px] origin-left scale-x-0 bg-[#B91C1C] transition-transform duration-300 group-hover:scale-x-100 rounded-full"></span>
           </button>
         </div>
 
         <!-- CTA -->
         <button
           type="button"
-          class="inline-flex items-center gap-2.5 rounded-lg bg-stone-900 px-5 py-2.5 text-[13.5px] font-semibold text-white shadow-sm transition-all hover:bg-[#7A2436] hover:shadow-md active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A2436] focus-visible:ring-offset-2"
+          class="inline-flex items-center gap-2.5 rounded-lg bg-stone-900 px-5 py-2.5 text-[13.5px] font-semibold text-white shadow-sm transition-all hover:bg-[#B91C1C] hover:shadow-md active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B91C1C] focus-visible:ring-offset-2"
           @click="goLogin"
         >
           เข้าสู่ระบบ
@@ -411,7 +411,7 @@ watch([stats, isLoadingStats], () => {
                   สร้างสรรค์พิริยาลัย<br />
                   <span class="relative inline-block">
                     ให้ดีกว่าที่เคยเป็น
-                    <span class="absolute -bottom-2 left-0 right-0 h-3 bg-[#7A2436]/10 -skew-x-12"></span>
+                    <span class="absolute -bottom-2 left-0 right-0 h-3 bg-[#B91C1C]/10 -skew-x-12"></span>
                   </span>
                 </span>
               </h1>
@@ -424,7 +424,7 @@ watch([stats, isLoadingStats], () => {
               <div class="mt-10 flex flex-wrap items-center gap-4">
                 <button
                   type="button"
-                  class="inline-flex items-center gap-2.5 rounded-xl bg-[#7A2436] px-7 py-3.5 text-[15px] font-semibold text-white shadow-lg shadow-[#7A2436]/20 transition-all hover:bg-[#5E1B29] hover:shadow-xl hover:-translate-y-0.5 active:scale-95"
+                  class="inline-flex items-center gap-2.5 rounded-xl bg-[#B91C1C] px-7 py-3.5 text-[15px] font-semibold text-white shadow-lg shadow-[#B91C1C]/25 transition-all hover:bg-[#991B1B] hover:shadow-xl hover:-translate-y-0.5 active:scale-95"
                   @click="goLogin"
                 >
                   <i class="bi bi-pencil-square text-lg"></i>
@@ -489,12 +489,12 @@ watch([stats, isLoadingStats], () => {
               <!-- Graphic 3: The Rubber Stamp (Total Issues) -->
               <div
                 v-if="!isLoadingStats && stats"
-                class="settle absolute bottom-6 left-[30%] z-30 flex h-32 w-32 flex-col items-center justify-center rounded-full border-[3px] border-[#7A2436] bg-transparent text-center mix-blend-multiply"
+                class="settle absolute bottom-6 left-[30%] z-30 flex h-32 w-32 flex-col items-center justify-center rounded-full border-[3px] border-[#B91C1C] bg-transparent text-center mix-blend-multiply"
                 style="--rot: -15deg; animation-delay: 0.5s;"
               >
-                <div class="absolute inset-1.5 rounded-full border-[1.5px] border-[#7A2436]/60"></div>
-                <span class="text-3xl font-black tabular-nums text-[#7A2436]">{{ formatStatValue(stats.total_issues) }}</span>
-                <span class="mt-0.5 text-[10.5px] font-bold tracking-wide text-[#7A2436] leading-tight">เรื่องที่แจ้ง<br>เข้ามา</span>
+                <div class="absolute inset-1.5 rounded-full border-[1.5px] border-[#B91C1C]/60"></div>
+                <span class="text-3xl font-black tabular-nums text-[#B91C1C]">{{ formatStatValue(stats.total_issues) }}</span>
+                <span class="mt-0.5 text-[10.5px] font-bold tracking-wide text-[#B91C1C] leading-tight">เรื่องที่แจ้ง<br>เข้ามา</span>
               </div>
             </div>
 
@@ -528,7 +528,7 @@ watch([stats, isLoadingStats], () => {
                   <template v-for="a in announcements" :key="a.id">
                     <span class="mx-6 flex items-center gap-2.5">
                       <span class="h-1.5 w-1.5 rounded-full" :class="priorityDot(a.priority)"></span>
-                      <a v-if="a.link" :href="a.link" target="_blank" rel="noopener" tabindex="-1" class="text-[14.5px] font-medium text-stone-600 transition-colors hover:text-[#7A2436]">
+                      <a v-if="a.link" :href="a.link" target="_blank" rel="noopener" tabindex="-1" class="text-[14.5px] font-medium text-stone-600 transition-colors hover:text-[#B91C1C]">
                         {{ a.message }} <i class="bi bi-arrow-up-right text-[10px] ml-0.5 opacity-50"></i>
                       </a>
                       <span v-else class="text-[14.5px] font-medium text-stone-600">{{ a.message }}</span>
@@ -609,16 +609,16 @@ watch([stats, isLoadingStats], () => {
                   <svg viewBox="0 0 400 100" class="h-full w-full overflow-visible" preserveAspectRatio="none">
                     <defs>
                       <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stop-color="#7A2436" stop-opacity="0.15"></stop>
-                        <stop offset="100%" stop-color="#7A2436" stop-opacity="0"></stop>
+                        <stop offset="0%" stop-color="#B91C1C" stop-opacity="0.15"></stop>
+                        <stop offset="100%" stop-color="#B91C1C" stop-opacity="0"></stop>
                       </linearGradient>
                     </defs>
                     <polygon :points="sparkTrend.area" fill="url(#trendGradient)"></polygon>
-                    <polyline :points="sparkTrend.line" fill="none" stroke="#7A2436" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></polyline>
+                    <polyline :points="sparkTrend.line" fill="none" stroke="#B91C1C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></polyline>
                   </svg>
                   <!-- The live dot indicator -->
                   <span
-                    class="absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#7A2436] ring-4 ring-white shadow-sm"
+                    class="absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#B91C1C] ring-4 ring-white shadow-sm"
                     :style="{ left: sparkDot.left + '%', top: sparkDot.top + '%' }"
                   ></span>
                 </div>
@@ -643,7 +643,7 @@ watch([stats, isLoadingStats], () => {
         <div class="mx-auto max-w-7xl px-5 sm:px-6 lg:px-8">
           
           <div class="mb-16 max-w-2xl">
-            <h2 class="text-[12px] font-bold uppercase tracking-widest text-[#7A2436] mb-2">Escalation Protocol</h2>
+            <h2 class="text-[12px] font-bold uppercase tracking-widest text-[#B91C1C] mb-2">Escalation Protocol</h2>
             <h3 class="text-3xl font-bold tracking-tight text-stone-900 sm:text-4xl">กลไกการส่งต่ออย่างเป็นระบบ</h3>
             <p class="mt-4 text-[16px] leading-relaxed text-stone-600">ทุกเสียงถูกออกแบบให้มีผู้ดูแลที่ชัดเจน ระบบจะทำการยกระดับเรื่องขึ้นไปตามสายงานโดยอัตโนมัติ เพื่อให้มั่นใจว่าจะไม่ถูกเพิกเฉย</p>
           </div>
@@ -655,7 +655,7 @@ watch([stats, isLoadingStats], () => {
             <div class="flex flex-col gap-12">
               <div v-for="(step, i) in workflowSteps" :key="step.title" class="group relative flex gap-6 sm:gap-8">
                 <!-- Step Number (Stamp) -->
-                <div class="relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-stone-200 bg-white text-[18px] font-bold text-stone-400 transition-colors duration-300 group-hover:border-[#7A2436] group-hover:text-[#7A2436] sm:h-14 sm:w-14 sm:text-[20px]">
+                <div class="relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-stone-200 bg-white text-[18px] font-bold text-stone-400 transition-colors duration-300 group-hover:border-[#B91C1C] group-hover:text-[#B91C1C] sm:h-14 sm:w-14 sm:text-[20px]">
                   {{ toThaiNumerals(i + 1) }}
                 </div>
                 <!-- Content -->
@@ -712,7 +712,7 @@ watch([stats, isLoadingStats], () => {
               <div class="grid md:grid-cols-2">
                 <!-- Left: Issue -->
                 <div class="border-b border-stone-100 p-6 sm:p-8 md:border-b-0 md:border-r">
-                  <p class="mb-4 text-[12px] font-bold uppercase tracking-widest text-[#7A2436]">ประเด็นที่รับแจ้ง</p>
+                  <p class="mb-4 text-[12px] font-bold uppercase tracking-widest text-[#B91C1C]">ประเด็นที่รับแจ้ง</p>
                   <p class="text-[18px] font-bold leading-snug text-stone-900">“{{ featuredCase.title }}”</p>
                   <div class="mt-6 inline-flex items-center gap-2 rounded-lg border border-stone-100 bg-stone-50 px-3 py-2 text-[12.5px] font-medium text-stone-600">
                     <i class="bi bi-person-fill text-stone-400"></i> แจ้งโดย {{ featuredCase.reporter_mask }}
@@ -752,7 +752,7 @@ watch([stats, isLoadingStats], () => {
                     {{ reporterInitial(c.reporter_mask) }}
                   </div>
                   <div class="min-w-0 flex-1 pt-0.5">
-                    <p class="line-clamp-2 text-[14px] font-bold leading-snug text-stone-800 group-hover:text-[#7A2436] transition-colors">{{ c.title }}</p>
+                    <p class="line-clamp-2 text-[14px] font-bold leading-snug text-stone-800 group-hover:text-[#B91C1C] transition-colors">{{ c.title }}</p>
                     <p class="mt-1.5 truncate text-[12px] font-medium text-stone-500">{{ c.department_in_charge }}</p>
                   </div>
                 </div>
@@ -780,9 +780,12 @@ watch([stats, isLoadingStats], () => {
               <div class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-bold tracking-widest text-stone-300 uppercase mb-6">
                 <i class="bi bi-box-seam"></i> ระบบนิเวศน์ PIRIvoice
               </div>
-              <h2 class="text-3xl font-bold tracking-tight sm:text-5xl leading-[1.15]">
+              <!-- Added Gradient Text here! -->
+              <h2 class="text-3xl font-bold tracking-tight sm:text-5xl leading-[1.25]">
                 มากกว่าการแจ้งเรื่อง<br>
-                <span class="text-stone-400">คือพื้นที่ของทุกความเห็น</span>
+                <span class="text-transparent bg-clip-text bg-gradient-to-r from-rose-400 to-[#FF8E53]">
+                  คือพื้นที่ของทุกความเห็น
+                </span>
               </h2>
               <p class="mt-6 text-[16px] leading-relaxed text-stone-400">
                 เราเตรียมพื้นที่สำหรับบทสนทนาที่เปิดกว้างและการลงมติร่วมกัน เพื่อขับเคลื่อนนโยบายโรงเรียนด้วยกระบวนการประชาธิปไตย
@@ -837,7 +840,7 @@ watch([stats, isLoadingStats], () => {
           </p>
           <button
             type="button"
-            class="mt-10 inline-flex items-center gap-2.5 rounded-xl bg-[#7A2436] px-9 py-4 text-[16px] font-bold text-white shadow-lg shadow-[#7A2436]/20 transition-all hover:bg-[#5E1B29] hover:shadow-xl hover:-translate-y-0.5 active:scale-95"
+            class="mt-10 inline-flex items-center gap-2.5 rounded-xl bg-[#B91C1C] px-9 py-4 text-[16px] font-bold text-white shadow-lg shadow-[#B91C1C]/20 transition-all hover:bg-[#991B1B] hover:shadow-xl hover:-translate-y-0.5 active:scale-95"
             @click="goLogin"
           >
             ล็อกอินเข้าระบบ
@@ -856,9 +859,10 @@ watch([stats, isLoadingStats], () => {
         
         <div class="mb-12 flex flex-col items-center justify-between gap-8 md:flex-row md:items-end">
           <div class="flex items-center gap-4">
-            <img src="/logos/school-logo.png" alt="" class="h-12 w-12 rounded-lg bg-white object-cover opacity-80 mix-blend-multiply grayscale" />
+            <!-- Clean Footer Logos without background blocks or mix-blend -->
+            <img src="/logos/school-logo.png" alt="" class="h-11 w-auto object-contain opacity-60 grayscale transition-all hover:grayscale-0 hover:opacity-100" />
             <span class="h-8 w-[1.5px] bg-stone-300"></span>
-            <img src="/logos/council-logo.png" alt="" class="h-12 w-12 rounded-lg bg-white object-cover opacity-80 mix-blend-multiply grayscale" />
+            <img src="/logos/council-logo.png" alt="" class="h-11 w-auto object-contain opacity-60 grayscale transition-all hover:grayscale-0 hover:opacity-100" />
             <div class="ml-1 flex flex-col justify-center">
               <span class="text-[16px] font-bold text-stone-800">PIRI<span class="text-stone-500">voice</span></span>
               <span class="mt-0.5 text-[11px] font-semibold uppercase tracking-widest text-stone-400">Student Council</span>
