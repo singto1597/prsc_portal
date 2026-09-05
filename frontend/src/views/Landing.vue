@@ -410,7 +410,7 @@ watch([stats, isLoadingStats], () => {
                 <span class="block text-[2.75rem] font-bold sm:text-6xl lg:text-[4.2rem]">
                   สร้างสรรค์พิริยาลัย<br />
                   <span class="relative inline-block">
-                    ให้ดีกว่าที่เคยเป็น
+                    ให้ดีกว่าเดิม
                     <span class="absolute -bottom-2 left-0 right-0 h-3 bg-[#B91C1C]/10 -skew-x-12"></span>
                   </span>
                 </span>
@@ -836,7 +836,7 @@ watch([stats, isLoadingStats], () => {
             ทุกเสียงพาพิริยาลัย ก้าวไปด้วยกัน
           </h2>
           <p class="mx-auto mt-6 max-w-xl text-[16.5px] leading-relaxed text-stone-600">
-            ลงชื่อเข้าใช้ด้วยบัญชี Google Workspace ของโรงเรียน เพื่อปกป้องสิทธิ์ของนักเรียนตัวจริง (สามารถตั้งค่าการแจ้งเรื่องแบบไม่ประสงค์ออกนามได้ในระบบ)
+            ลงชื่อเข้าใช้ด้วยรหัสนักเรียน ของโรงเรียน เพื่อใช้สิทธิ์ของนักเรียนเพื่อแจ้งเรื่อง (สามารถตั้งค่าการแจ้งเรื่องแบบไม่ประสงค์ออกนามได้ในระบบ)
           </p>
           <button
             type="button"
