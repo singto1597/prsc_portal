@@ -4,7 +4,7 @@
  * 🏠 Landing.vue — PIRIvoice Homepage
  * สภานักเรียน โรงเรียนพิริยาลัยจังหวัดแพร่
  * 
- * Version: 4.0 (Civic & Editorial Design)
+ * Version: 4.1 (Civic & Editorial Design + Positive Wording)
  * Focus: Authenticity, Human-crafted layout, Typography, Real-time Data.
  */
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
@@ -219,13 +219,13 @@ const ledgerStats = computed(() => {
   return [
     { key: 'total', label: 'เรื่องส่งเข้ามาทั้งหมด', target: s.total_issues, decimals: 0, suffix: ' เรื่อง' },
     { key: 'routed', label: 'อยู่ระหว่างดำเนินการ', target: s.routed_issues, decimals: 0, suffix: ' เรื่อง' },
-    { key: 'resolved', label: 'แก้ไขเสร็จสิ้นแล้ว', target: s.resolved_issues, decimals: 0, suffix: ' เรื่อง' },
-    { key: 'rate', label: 'อัตราการปิดสำเร็จ', target: s.resolved_rate_percent, decimals: 0, suffix: '%' },
+    { key: 'resolved', label: 'ดำเนินการเสร็จสิ้น', target: s.resolved_issues, decimals: 0, suffix: ' เรื่อง' },
+    { key: 'rate', label: 'อัตราการปิดเรื่อง', target: s.resolved_rate_percent, decimals: 0, suffix: '%' },
     { key: 'avg', label: 'เวลาเฉลี่ยต่อเคส', target: s.avg_resolve_hours, decimals: 1, suffix: ' ชม.' },
   ];
 });
 
-// Sparkline SVG Calculator
+// Sparkline SVG Calculator (Safe Type-Check Array Access)
 const SPARK_W = 400;
 const SPARK_H = 100;
 const SPARK_PAD = 8;
@@ -244,12 +244,11 @@ const sparkTrend = computed(() => {
   const line = coords.map(c => `${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(' ');
   const area = `${SPARK_PAD},${SPARK_H} ${line} ${(SPARK_W - SPARK_PAD).toFixed(1)},${SPARK_H}`;
   
-  // ดึงค่ามาพักไว้ในตัวแปรก่อน
+  // Safe extraction for TypeScript strict mode
   const firstPt = pts[0];
   const lastPt = pts[pts.length - 1];
   const lastCoord = coords[coords.length - 1];
 
-  // แก้ปัญหา Type Error: ยืนยันกับ TypeScript ว่ามีข้อมูลแน่นอน
   if (!firstPt || !lastPt || !lastCoord) return null;
 
   return {
@@ -264,12 +263,9 @@ const sparkTrend = computed(() => {
 
 const sparkDot = computed(() => {
   const t = sparkTrend.value;
-  // ยืนยัน Type ความปลอดภัยก่อนนำ .last ไปเรียกใช้ .x และ .y
+  // Type-safety before accessing object properties
   if (!t || !t.last) return null;
-  return { 
-    left: (t.last.x / SPARK_W) * 100, 
-    top: (t.last.y / SPARK_H) * 100 
-  };
+  return { left: (t.last.x / SPARK_W) * 100, top: (t.last.y / SPARK_H) * 100 };
 });
 
 /* ============================================================
@@ -303,7 +299,7 @@ const navLinks = [
 ];
 
 const workflowSteps = [
-  { title: 'รับเรื่องเข้าระบบ', desc: 'นักเรียนแจ้งเรื่องราวหรือข้อคิดเห็นผ่านแพลตฟอร์มได้ตลอด 24 ชั่วโมง โดยสามารถเลือกปกปิดตัวตนเพื่อความสบายใจ' },
+  { title: 'รับเรื่องเข้าระบบ', desc: 'นักเรียนแจ้งเรื่องหรือข้อเสนอแนะผ่านแพลตฟอร์มได้ตลอด 24 ชั่วโมง โดยสามารถเลือกปกปิดตัวตนเพื่อความสบายใจ' },
   { title: 'กลั่นกรองระดับห้อง', desc: 'หัวหน้าห้องและผู้แทนฝ่าย เป็นด่านแรกในการรับรู้ปัญหาและบริหารจัดการเบื้องต้นภายในขอบเขตของห้องเรียน' },
   { title: 'ส่งต่อระดับสายชั้น', desc: 'หากเป็นประเด็นที่มีผลกระทบวงกว้าง หรือเกินอำนาจการตัดสินใจระดับห้อง ระบบจะยกระดับเรื่องส่งต่อให้ประธานระดับชั้น' },
   { title: 'พิจารณาโดยสภานักเรียน', desc: 'สภานักเรียนรับช่วงต่อสำหรับวาระสำคัญ เพื่อประสานงานกับคณะผู้บริหารและครู พร้อมติดตามจนกว่าจะปิดกระบวนการ' },
@@ -421,7 +417,7 @@ watch([stats, isLoadingStats], () => {
               </h1>
 
               <p class="mt-8 max-w-lg text-[16px] leading-relaxed text-stone-600 sm:text-[17px]">
-                แพลตฟอร์มรับเรื่องร้องเรียนและข้อเสนอแนะอย่างเป็นทางการ ส่งตรงถึงผู้รับผิดชอบตามสายงานแบบเรียลไทม์ โปร่งใส ตรวจสอบได้ และรับรองความปลอดภัยในการปกปิดตัวตน
+                แพลตฟอร์มรับแจ้งเรื่องและข้อเสนอแนะอย่างเป็นทางการ ส่งตรงถึงผู้รับผิดชอบตามสายงานแบบเรียลไทม์ โปร่งใส ตรวจสอบได้ และรับรองความปลอดภัยในการปกปิดตัวตน
               </p>
 
               <!-- Actions -->
@@ -432,7 +428,7 @@ watch([stats, isLoadingStats], () => {
                   @click="goLogin"
                 >
                   <i class="bi bi-pencil-square text-lg"></i>
-                  ส่งเรื่องเข้าระบบ
+                  แจ้งเรื่องเลย
                 </button>
                 <button
                   type="button"
@@ -475,7 +471,7 @@ watch([stats, isLoadingStats], () => {
               >
                 <div class="mb-3 flex items-center gap-2">
                   <span class="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-[10px] text-emerald-700"><i class="bi bi-check-lg"></i></span>
-                  <p class="text-[12px] font-bold uppercase tracking-wider text-stone-400">เพิ่งแก้ไขสำเร็จ</p>
+                  <p class="text-[12px] font-bold uppercase tracking-wider text-stone-400">เพิ่งดำเนินการสำเร็จ</p>
                 </div>
                 <template v-if="isLoadingCases">
                   <div class="space-y-2">
@@ -490,15 +486,15 @@ watch([stats, isLoadingStats], () => {
                 <p v-else class="text-[14px] text-stone-500 italic">รอการประมวลผลเคสแรก</p>
               </div>
 
-              <!-- Graphic 3: The Rubber Stamp -->
+              <!-- Graphic 3: The Rubber Stamp (Total Issues) -->
               <div
                 v-if="!isLoadingStats && stats"
                 class="settle absolute bottom-6 left-[30%] z-30 flex h-32 w-32 flex-col items-center justify-center rounded-full border-[3px] border-[#7A2436] bg-transparent text-center mix-blend-multiply"
                 style="--rot: -15deg; animation-delay: 0.5s;"
               >
                 <div class="absolute inset-1.5 rounded-full border-[1.5px] border-[#7A2436]/60"></div>
-                <span class="text-3xl font-black tabular-nums text-[#7A2436]">{{ formatStatValue(stats.resolved_rate_percent) }}%</span>
-                <span class="mt-1 text-[10px] font-bold uppercase tracking-widest text-[#7A2436]">Success<br>Rate</span>
+                <span class="text-3xl font-black tabular-nums text-[#7A2436]">{{ formatStatValue(stats.total_issues) }}</span>
+                <span class="mt-0.5 text-[10.5px] font-bold tracking-wide text-[#7A2436] leading-tight">เรื่องที่แจ้ง<br>เข้ามา</span>
               </div>
             </div>
 
@@ -599,7 +595,7 @@ watch([stats, isLoadingStats], () => {
               <template v-else-if="sparkTrend && sparkDot">
                 <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div>
-                    <h3 class="text-[15px] font-bold text-stone-900">ปริมาณเรื่องร้องเรียนที่เข้าสู่ระบบ</h3>
+                    <h3 class="text-[15px] font-bold text-stone-900">ปริมาณการแจ้งเรื่องที่เข้าสู่ระบบ</h3>
                     <p class="text-[12px] font-medium text-stone-500 mt-0.5">ภาพรวมในช่วง {{ sparkTrend.days }} วันย้อนหลัง</p>
                   </div>
                   <div class="inline-flex items-center gap-2 rounded-lg bg-stone-50 px-3 py-1.5 border border-stone-100">
@@ -649,7 +645,7 @@ watch([stats, isLoadingStats], () => {
           <div class="mb-16 max-w-2xl">
             <h2 class="text-[12px] font-bold uppercase tracking-widest text-[#7A2436] mb-2">Escalation Protocol</h2>
             <h3 class="text-3xl font-bold tracking-tight text-stone-900 sm:text-4xl">กลไกการส่งต่ออย่างเป็นระบบ</h3>
-            <p class="mt-4 text-[16px] leading-relaxed text-stone-600">ทุกเสียงถูกออกแบบให้มีผู้ดูแลที่ชัดเจน ระบบจะทำการยกระดับปัญหาขึ้นไปตามสายงานโดยอัตโนมัติ เพื่อให้มั่นใจว่าจะไม่ถูกเพิกเฉย</p>
+            <p class="mt-4 text-[16px] leading-relaxed text-stone-600">ทุกเสียงถูกออกแบบให้มีผู้ดูแลที่ชัดเจน ระบบจะทำการยกระดับเรื่องขึ้นไปตามสายงานโดยอัตโนมัติ เพื่อให้มั่นใจว่าจะไม่ถูกเพิกเฉย</p>
           </div>
 
           <div class="relative mx-auto max-w-3xl">
@@ -683,7 +679,7 @@ watch([stats, isLoadingStats], () => {
           <div class="mb-14 max-w-2xl">
             <h2 class="text-[12px] font-bold uppercase tracking-widest text-stone-500 mb-2">Track Record</h2>
             <h3 class="text-3xl font-bold tracking-tight text-stone-900 sm:text-4xl">ผลลัพธ์ที่เกิดขึ้นจริง</h3>
-            <p class="mt-4 text-[16px] leading-relaxed text-stone-600">แฟ้มข้อมูลสรุปเคสที่ผ่านกระบวนการแก้ไขจนเสร็จสิ้นสมบูรณ์ นี่คือข้อพิสูจน์ว่าทุกเสียงสร้างการเปลี่ยนแปลงได้</p>
+            <p class="mt-4 text-[16px] leading-relaxed text-stone-600">แฟ้มข้อมูลสรุปเรื่องที่ผ่านกระบวนการจัดการจนเสร็จสิ้นสมบูรณ์ นี่คือข้อพิสูจน์ว่าทุกเสียงสร้างการเปลี่ยนแปลงได้</p>
           </div>
 
           <div v-if="isLoadingCases" class="h-[450px] w-full animate-pulse rounded-2xl border border-stone-200 bg-white"></div>
@@ -695,7 +691,7 @@ watch([stats, isLoadingStats], () => {
 
           <div v-else-if="!featuredCase" class="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-stone-200 bg-white py-32 text-center">
             <i class="bi bi-folder2-open text-4xl text-stone-300 mb-4"></i>
-            <p class="text-[16px] font-bold text-stone-700">อยู่ระหว่างดำเนินการแก้ไขเคสแรก</p>
+            <p class="text-[16px] font-bold text-stone-700">อยู่ระหว่างดำเนินการเคสแรก</p>
             <p class="mt-2 text-[14px] text-stone-500">แฟ้มสรุปผลลัพธ์จะปรากฏที่นี่เมื่อกระบวนการเสร็จสิ้น</p>
           </div>
 
@@ -727,7 +723,7 @@ watch([stats, isLoadingStats], () => {
                 <div class="relative bg-emerald-50/30 p-6 sm:p-8">
                   <!-- Rubber Stamp Effect -->
                   <div class="absolute right-6 top-6 flex h-[72px] w-[72px] rotate-[-12deg] flex-col items-center justify-center rounded-full border-[2.5px] border-emerald-600/80 bg-transparent text-center mix-blend-multiply opacity-80 select-none">
-                    <span class="text-[11px] font-black leading-tight text-emerald-700 tracking-wider">แก้ไข<br />แล้ว</span>
+                    <span class="text-[11px] font-black leading-tight text-emerald-700 tracking-wider">จัดการ<br />แล้ว</span>
                   </div>
                   
                   <p class="mb-4 text-[12px] font-bold uppercase tracking-widest text-emerald-700">ผลการดำเนินการ</p>
@@ -739,7 +735,7 @@ watch([stats, isLoadingStats], () => {
                       <p class="text-[13.5px] font-semibold text-stone-800">{{ featuredCase.department_in_charge }}</p>
                     </div>
                     <div v-if="featuredCase.duration_hours">
-                      <p class="mb-1 text-[10.5px] font-bold uppercase tracking-wider text-stone-400">ระยะเวลาแก้ไข</p>
+                      <p class="mb-1 text-[10.5px] font-bold uppercase tracking-wider text-stone-400">ระยะเวลาดำเนินการ</p>
                       <p class="text-[13.5px] font-semibold text-stone-800">{{ formatDuration(featuredCase.duration_hours) }}</p>
                     </div>
                   </div>
@@ -785,7 +781,7 @@ watch([stats, isLoadingStats], () => {
                 <i class="bi bi-box-seam"></i> ระบบนิเวศน์ PIRIvoice
               </div>
               <h2 class="text-3xl font-bold tracking-tight sm:text-5xl leading-[1.15]">
-                มากกว่าการแจ้งปัญหา<br>
+                มากกว่าการแจ้งเรื่อง<br>
                 <span class="text-stone-400">คือพื้นที่ของทุกความเห็น</span>
               </h2>
               <p class="mt-6 text-[16px] leading-relaxed text-stone-400">
@@ -832,7 +828,10 @@ watch([stats, isLoadingStats], () => {
       <!-- ============================================= -->
       <section class="bg-white py-24 sm:py-32">
         <div class="mx-auto max-w-3xl px-5 text-center">
-          <h2 class="text-3xl font-black tracking-tight text-stone-900 sm:text-5xl">เสียงของคุณ เปลี่ยนแปลงได้</h2>
+          <h2 class="text-3xl font-black tracking-tight text-stone-900 sm:text-4xl lg:text-5xl leading-tight">
+            ทุกเสียงมีความหมาย<br class="hidden sm:block" />
+            ทุกเสียงพาพิริยาลัย ก้าวไปด้วยกัน
+          </h2>
           <p class="mx-auto mt-6 max-w-xl text-[16.5px] leading-relaxed text-stone-600">
             ลงชื่อเข้าใช้ด้วยบัญชี Google Workspace ของโรงเรียน เพื่อปกป้องสิทธิ์ของนักเรียนตัวจริง (สามารถตั้งค่าการแจ้งเรื่องแบบไม่ประสงค์ออกนามได้ในระบบ)
           </p>
