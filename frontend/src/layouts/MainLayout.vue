@@ -185,9 +185,10 @@ const goHome = () => {
         <!-- Brand -->
         <div class="flex items-center gap-3 px-5 pb-4 pt-6">
           <RouterLink to="/app/home" class="flex items-center gap-2.5 group">
-            <div class="flex -space-x-2">
-              <img src="/logos/school-logo.png" alt="โลโก้โรงเรียน" class="h-9 w-9 rounded-xl border border-stone-200 object-cover" />
-              <img src="/logos/council-logo.png" alt="โลโก้สภานักเรียน" class="h-9 w-9 rounded-xl border border-stone-200 object-cover" />
+            <!-- ลบ border ออก และใช้ drop-shadow-sm คลุมกลุ่มแทน เพิ่มความสมูท -->
+            <div class="flex -space-x-2 drop-shadow-sm">
+              <img src="/logos/school-logo.png" alt="โลโก้โรงเรียน" class="h-9 w-9 rounded-xl object-contain" />
+              <img src="/logos/council-logo.png" alt="โลโก้สภานักเรียน" class="h-9 w-9 rounded-xl object-contain" />
             </div>
             <div class="leading-none">
               <span class="text-[15px] font-bold tracking-tight text-stone-900">
