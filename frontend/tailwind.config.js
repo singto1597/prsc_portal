@@ -12,6 +12,8 @@ export default {
         // ฟอนต์หลัก 'Noto Sans Thai' (รองรับภาษาไทย) — fallback เป็น sans-serif เสมอ
         // กัน Google Fonts โหลดไม่ทัน/โดน block แล้วหลุดไปเป็น serif
         sans: ['"Noto Sans Thai"', 'sans-serif'],
+        // พาดหัว/Display 'Anuphan' (จับคู่กับ Landing) — ใช้กับ headline/ตัวเลขใหญ่
+        display: ['"Anuphan"', '"Noto Sans Thai"', 'sans-serif'],
       },
     },
   },

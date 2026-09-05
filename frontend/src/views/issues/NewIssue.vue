@@ -130,12 +130,18 @@ async function handleSubmit() {
 
 <template>
   <div class="max-w-2xl mx-auto">
-    <h1 class="text-xl font-black tracking-tight text-slate-900 leading-tight mb-2 sm:text-2xl"><i class="bi bi-pencil-square mr-1 text-red-500"></i> แจ้งปัญหา / ความคิดเห็น</h1>
-    <p class="text-slate-500 text-sm mb-6">เรื่องจะถูกส่งต่อไปยังหัวหน้าห้อง + รองฝ่าย เพื่อดำเนินการ</p>
+    <!-- Editorial page header -->
+    <div class="mb-8">
+      <p class="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-[#B91C1C]">
+        <i class="bi bi-pencil-square text-[13px]"></i> Student Voice
+      </p>
+      <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-stone-900 leading-tight">แจ้งเรื่อง</h1>
+      <p class="mt-2 text-sm text-stone-500">เรื่องจะถูกส่งต่อไปยังหัวหน้าห้อง + รองฝ่าย เพื่อดำเนินการ</p>
+    </div>
 
     <!-- Step 1: หมวดหลัก -->
     <div class="mb-6">
-      <label class="block text-sm font-medium text-slate-700 mb-2">1. เลือกหมวดหลัก</label>
+      <label class="block text-sm font-medium text-stone-700 mb-2">1. เลือกหมวดหลัก</label>
       <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
         <button
           v-for="(info, key) in MAIN_CATEGORIES"
@@ -145,8 +151,8 @@ async function handleSubmit() {
           @click="mainCategory = key as MainCategory; category = ''"
           class="p-3 sm:p-4 min-h-[88px] sm:min-h-0 rounded-xl border-2 text-center transition flex flex-col items-center justify-center"
           :class="mainCategory === key
-            ? 'border-red-600 bg-red-50 text-red-700'
-            : 'border-slate-200 hover:border-red-300'"
+            ? 'border-[#B91C1C] bg-red-50 text-red-700'
+            : 'border-stone-200 hover:border-[#B91C1C]'"
         >
           <div class="text-xl sm:text-2xl mb-1">
             <i v-if="key === 'suggestion'" class="bi bi-lightbulb"></i>
@@ -160,7 +166,7 @@ async function handleSubmit() {
 
     <!-- Step 2: หมวดหมู่ย่อย -->
     <div v-if="mainCategory" class="mb-6">
-      <label class="block text-sm font-medium text-slate-700 mb-2">2. เลือกหมวดหมู่</label>
+      <label class="block text-sm font-medium text-stone-700 mb-2">2. เลือกหมวดหมู่</label>
       <div class="flex flex-wrap gap-2">
         <button
           v-for="c in availableCategories"
@@ -169,8 +175,8 @@ async function handleSubmit() {
           @click="category = c"
           class="px-4 py-2 rounded-full border text-sm transition"
           :class="category === c
-            ? 'bg-red-600 text-white border-red-600'
-            : 'border-slate-300 hover:border-red-400'"
+            ? 'bg-[#B91C1C] text-white border-[#B91C1C]'
+            : 'border-stone-300 hover:border-[#B91C1C]'"
         >
           {{ MAIN_CATEGORIES[mainCategory as MainCategory].subcategories[c] }}
         </button>
@@ -179,7 +185,7 @@ async function handleSubmit() {
 
     <!-- Step 3: รูปแบบที่ต้องการดำเนินการ (PIRI Boards) -->
     <div class="mb-6">
-      <label class="block text-sm font-medium text-slate-700 mb-2">3. รูปแบบที่ต้องการดำเนินการ</label>
+      <label class="block text-sm font-medium text-stone-700 mb-2">3. รูปแบบที่ต้องการดำเนินการ</label>
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
         <button
           v-for="opt in DESTINATION_OPTIONS"
@@ -189,17 +195,17 @@ async function handleSubmit() {
           @click="requestedDestination = opt.value"
           class="p-3 sm:p-4 rounded-xl border-2 text-left transition flex flex-col"
           :class="requestedDestination === opt.value
-            ? 'border-red-600 bg-red-50'
-            : 'border-slate-200 hover:border-red-300'"
+            ? 'border-[#B91C1C] bg-red-50'
+            : 'border-stone-200 hover:border-[#B91C1C]'"
         >
           <div class="flex items-center gap-2 mb-1">
-            <i :class="[opt.icon, 'text-lg', requestedDestination === opt.value ? 'text-red-600' : 'text-slate-400']"></i>
-            <span class="text-sm font-semibold" :class="requestedDestination === opt.value ? 'text-red-700' : 'text-slate-700'">{{ opt.label }}</span>
+            <i :class="[opt.icon, 'text-lg', requestedDestination === opt.value ? 'text-[#B91C1C]' : 'text-stone-400']"></i>
+            <span class="text-sm font-semibold" :class="requestedDestination === opt.value ? 'text-red-700' : 'text-stone-700'">{{ opt.label }}</span>
           </div>
-          <p class="text-xs text-slate-500 leading-snug">{{ opt.desc }}</p>
+          <p class="text-xs text-stone-500 leading-snug">{{ opt.desc }}</p>
         </button>
       </div>
-      <p v-if="wantsPublic" class="mt-2 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+      <p v-if="wantsPublic" class="mt-2 text-xs text-stone-600 bg-stone-50 border border-stone-200 rounded-lg px-3 py-2">
         <i class="bi bi-info-circle mr-1"></i> เรื่องที่ขอเผยแพร่จะถูกส่งตรงไปยัง<b>สภานักเรียน</b>เพื่อพิจารณาอนุมัติเป็นบอร์ดสาธารณะ — ถ้าไม่ได้รับอนุมัติเรื่องจะถูกปิด
       </p>
     </div>
@@ -207,29 +213,29 @@ async function handleSubmit() {
     <!-- Step 4: รายละเอียด -->
     <form @submit.prevent="handleSubmit" class="space-y-4">
       <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1">4. หัวข้อ</label>
+        <label class="block text-sm font-medium text-stone-700 mb-1">4. หัวข้อ</label>
         <input
           v-model="title"
           type="text"
           data-testid="issue-title"
-          class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500"
+          class="w-full px-3 py-2 border border-stone-300 rounded-lg"
           placeholder="สรุปสั้นๆ ว่าเรื่องอะไร"
           maxlength="200"
         />
       </div>
       <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1">5. รายละเอียด</label>
+        <label class="block text-sm font-medium text-stone-700 mb-1">5. รายละเอียด</label>
         <textarea
           v-model="description"
           rows="5"
           data-testid="issue-desc"
-          class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500"
+          class="w-full px-3 py-2 border border-stone-300 rounded-lg"
           placeholder="อธิบายปัญหาหรือความคิดเห็นให้ละเอียด..."
         ></textarea>
       </div>
       <!-- ระดับเริ่มต้น (เฉพาะผู้มีระดับสูง — หัวหน้าห้อง/ประธานระดับ/สภา) -->
-      <div v-if="selectableLevels.length > 1" class="bg-slate-50 rounded-lg p-3">
-        <label class="block text-sm font-medium text-slate-700 mb-2">ระดับเริ่มต้นของเรื่อง</label>
+      <div v-if="selectableLevels.length > 1" class="bg-stone-50 rounded-lg p-3">
+        <label class="block text-sm font-medium text-stone-700 mb-2">ระดับเริ่มต้นของเรื่อง</label>
         <div class="flex flex-wrap gap-2">
           <button
             v-for="lv in selectableLevels"
@@ -238,25 +244,25 @@ async function handleSubmit() {
             @click="startLevel = lv"
             class="px-3 py-1.5 rounded-full border text-sm transition"
             :class="startLevel === lv
-              ? 'bg-red-600 text-white border-red-600'
-              : 'border-slate-300 hover:border-red-400'"
+              ? 'bg-[#B91C1C] text-white border-[#B91C1C]'
+              : 'border-stone-300 hover:border-[#B91C1C]'"
           >
             {{ LEVEL_LABELS[lv as keyof typeof LEVEL_LABELS] }}
           </button>
         </div>
-        <p class="text-xs text-slate-400 mt-1.5">เลือกเริ่มที่ระดับสูงขึ้นได้เลย ไม่ต้องแจ้งแล้วส่งต่อทีหลัง</p>
+        <p class="text-xs text-stone-500 mt-1.5">เลือกเริ่มที่ระดับสูงขึ้นได้เลย ไม่ต้องแจ้งแล้วส่งต่อทีหลัง</p>
       </div>
 
-      <label class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none">
+      <label class="flex items-center gap-2 text-sm text-stone-700 cursor-pointer select-none">
         <input v-model="isAnonymous" type="checkbox"
-          class="w-4 h-4 rounded bg-white border-slate-300 text-red-600 focus:ring-red-500 accent-red-600" />
+          class="w-4 h-4 rounded bg-white border-stone-300 accent-[#B91C1C]" />
         <span>ซ่อนชื่อฉัน (แจ้งแบบไม่ระบุชื่อ)</span>
       </label>
       <button
         type="submit"
         :disabled="isLoading"
         data-testid="issue-submit"
-        class="w-full py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 font-medium"
+        class="w-full py-3 bg-[#B91C1C] text-white rounded-xl hover:bg-[#991B1B] disabled:opacity-50 disabled:pointer-events-none font-semibold"
       >
         {{ isLoading ? 'กำลังส่ง...' : 'ส่งเรื่อง' }}
       </button>

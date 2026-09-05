@@ -15,8 +15,8 @@ const route = useRoute();
 <style>
 /* Global Styles can go here */
 body {
-  /* #FAFAFC = โทนพรีเมียมเดียวกับ Landing/Login (แทน gray-50 เก่า) */
-  @apply bg-[#FAFAFC] text-slate-900;
+  /* #FAFAF9 = stone-50 โทนกระดาษเดียวกับ Landing (แทน #FAFAFC แบบเดิม) */
+  @apply bg-[#FAFAF9] text-stone-900;
   margin: 0;
   /* ฟอนต์หลัก Noto Sans Thai (ไทย) — fallback sans-serif เสมอ (ตรงกับ tailwind.config + main.css) */
   font-family: 'Noto Sans Thai', Tahoma, Arial, system-ui, -apple-system, sans-serif;

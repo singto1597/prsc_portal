@@ -44,19 +44,19 @@ watch(sort, () => emit('change'))
   <div ref="rootEl" class="flex flex-wrap items-center gap-2">
     <!-- 🔍 ค้นหา -->
     <div class="relative flex-1 min-w-[200px] sm:flex-none sm:w-72">
-      <i class="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+      <i class="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 text-sm"></i>
       <input
         v-model="q"
         type="search"
         placeholder="ค้นหาเรื่อง / ห้อง / ชื่อคน..."
-        class="w-full pl-9 pr-8 py-2.5 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-red-500 focus:border-red-500"
+        class="w-full pl-9 pr-8 py-2.5 border border-stone-300 rounded-xl text-sm bg-white"
       />
       <button
         v-if="q"
         type="button"
         @click="q = ''"
         title="ล้างคำค้นหา"
-        class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-sm"
+        class="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 text-sm"
       >
         <i class="bi bi-x-circle-fill"></i>
       </button>
@@ -72,15 +72,15 @@ watch(sort, () => emit('change'))
         class="relative flex items-center gap-1.5 px-3 py-2.5 border rounded-xl text-sm transition"
         :class="
           open
-            ? 'border-red-500 bg-red-50 text-red-600'
-            : 'border-slate-300 bg-white text-slate-600 hover:border-red-300 hover:text-red-600'
+            ? 'border-[#B91C1C] bg-red-50 text-[#B91C1C]'
+            : 'border-stone-300 bg-white text-stone-600 hover:border-[#B91C1C] hover:text-[#B91C1C]'
         "
       >
         <i class="bi bi-sliders text-base"></i>
         <span class="hidden sm:inline">กรอง</span>
         <span
           v-if="activeFilters > 0"
-          class="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-bold flex items-center justify-center"
+          class="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#B91C1C] text-white text-[10px] font-bold flex items-center justify-center"
         >
           {{ activeFilters }}
         </span>
@@ -89,20 +89,20 @@ watch(sort, () => emit('change'))
       <Transition name="pop">
         <div
           v-if="open"
-          class="absolute right-0 top-full mt-2 w-72 sm:w-80 bg-white border border-slate-200 rounded-2xl shadow-lg z-30 p-4"
+          class="absolute right-0 top-full mt-2 w-72 sm:w-80 bg-white border border-stone-200 rounded-2xl z-30 p-4"
         >
           <slot name="filters" />
 
           <!-- เรียงลำดับ -->
-          <div class="mt-4 pt-3 border-t border-slate-100">
-            <p class="text-xs font-semibold text-slate-500 mb-2">
+          <div class="mt-4 pt-3 border-t border-stone-100">
+            <p class="text-xs font-semibold text-stone-500 mb-2">
               <i class="bi bi-arrow-down-up mr-1"></i> เรียงลำดับ
             </p>
-            <div class="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-xl">
+            <div class="grid grid-cols-2 gap-1 p-1 bg-stone-100 rounded-xl">
               <button
                 type="button"
                 @click="sort = 'desc'"
-                :class="sort === 'desc' ? 'bg-white shadow text-red-600' : 'text-slate-500 hover:text-slate-700'"
+                :class="sort === 'desc' ? 'bg-white border border-stone-200 text-[#B91C1C]' : 'border border-transparent text-stone-500 hover:text-stone-700'"
                 class="px-3 py-1.5 rounded-lg text-sm font-medium transition"
               >
                 ใหม่ไปเก่า
@@ -110,7 +110,7 @@ watch(sort, () => emit('change'))
               <button
                 type="button"
                 @click="sort = 'asc'"
-                :class="sort === 'asc' ? 'bg-white shadow text-red-600' : 'text-slate-500 hover:text-slate-700'"
+                :class="sort === 'asc' ? 'bg-white border border-stone-200 text-[#B91C1C]' : 'border border-transparent text-stone-500 hover:text-stone-700'"
                 class="px-3 py-1.5 rounded-lg text-sm font-medium transition"
               >
                 เก่าไปใหม่
@@ -122,7 +122,7 @@ watch(sort, () => emit('change'))
     </div>
 
     <!-- จำนวนเรื่อง -->
-    <span class="text-sm text-slate-400 ml-auto tabular-nums" :class="{ 'opacity-50': loading }">
+    <span class="text-sm text-stone-400 ml-auto tabular-nums" :class="{ 'opacity-50': loading }">
       {{ count.toLocaleString('en-US') }} / {{ total.toLocaleString('en-US') }} เรื่อง
     </span>
   </div>

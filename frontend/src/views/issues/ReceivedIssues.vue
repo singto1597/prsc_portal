@@ -9,10 +9,10 @@ import {
   STATUS_LABELS,
   LEVEL_LABELS,
   DESTINATION_LABELS,
-  destinationBadgeClass,
   type Issue,
   type MainCategory,
 } from '@/types/issue';
+import { STATUS_BADGE } from '@/constants/status';
 import { useAuthStore } from '@/stores/auth';
 import IssueListToolbar from '@/components/IssueListToolbar.vue';
 import PaginationBar from '@/components/PaginationBar.vue';
@@ -222,26 +222,17 @@ async function load() {
     isLoading.value = false;
   }
 }
-
-function statusColor(s: string) {
-  return {
-    pending: 'bg-yellow-100 text-yellow-700',
-    in_progress: 'bg-blue-100 text-blue-700',
-    resolved: 'bg-green-100 text-green-700',
-    escalated: 'bg-orange-100 text-orange-700',
-    cancelled: 'bg-slate-200 text-slate-500',
-    rejected: 'bg-rose-100 text-rose-700',
-  }[s] || 'bg-slate-100 text-slate-600';
-}
 </script>
 
 <template>
   <div>
-    <div class="flex items-center justify-between mb-5">
-      <div>
-        <h1 class="text-xl font-black tracking-tight text-slate-900 leading-tight sm:text-2xl"><i class="bi bi-inbox mr-1 text-red-500"></i> เรื่องที่รับ / ระดับฉัน</h1>
-        <p class="text-sm text-slate-500">เรื่องที่รอคุณและทีมรับผิดชอบดำเนินการ</p>
-      </div>
+    <!-- Editorial page header -->
+    <div class="mb-6">
+      <p class="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-[#B91C1C]">
+        <i class="bi bi-inbox text-[13px]"></i> Inbox &amp; My Level
+      </p>
+      <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-stone-900 leading-tight">เรื่องที่รับ / ระดับฉัน</h1>
+      <p class="mt-2 text-sm text-stone-500">เรื่องที่รอคุณและทีมรับผิดชอบดำเนินการ</p>
     </div>
 
     <!-- Toolbar: ค้นหา + ปุ่ม filter (dropdown: ตัวกรอง + เรียงลำดับ) + จำนวน -->
@@ -257,18 +248,18 @@ function statusColor(s: string) {
       <template #filters>
         <div class="space-y-3">
           <div>
-            <label class="block text-xs font-semibold text-slate-500 mb-1.5">หมวดหลัก</label>
+            <label class="block text-xs font-semibold text-stone-500 mb-1.5">หมวดหลัก</label>
             <select v-model="mainCategoryFilter" @change="onMainCategoryChange"
-              class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white">
+              class="w-full px-3 py-2 border border-stone-300 rounded-xl text-sm bg-white">
               <option value="">ทุกหมวดหลัก</option>
               <option v-for="mc in mainCategoryOptions" :key="mc.value" :value="mc.value">{{ mc.label }}</option>
             </select>
           </div>
           <div>
-            <label class="block text-xs font-semibold text-slate-500 mb-1.5">หมวดย่อย</label>
+            <label class="block text-xs font-semibold text-stone-500 mb-1.5">หมวดย่อย</label>
             <select v-model="subcategoryFilter" @change="onSubcategoryChange"
               :disabled="!mainCategoryFilter"
-              class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white disabled:bg-slate-50 disabled:text-slate-400">
+              class="w-full px-3 py-2 border border-stone-300 rounded-xl text-sm bg-white disabled:bg-stone-50 disabled:text-stone-400">
               <option value="">
                 {{ mainCategoryFilter ? 'ทุกหมวดย่อย' : 'เลือกหมวดหลักก่อน' }}
               </option>
@@ -276,9 +267,9 @@ function statusColor(s: string) {
             </select>
           </div>
           <div>
-            <label class="block text-xs font-semibold text-slate-500 mb-1.5">ระดับ</label>
+            <label class="block text-xs font-semibold text-stone-500 mb-1.5">ระดับ</label>
             <select v-model="levelFilter" @change="onFilterChange"
-              class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white">
+              class="w-full px-3 py-2 border border-stone-300 rounded-xl text-sm bg-white">
               <option value="">ทุกระดับที่ฉันมองเห็น</option>
               <option v-for="lv in visibleLevels" :key="lv" :value="lv">
                 ระดับ{{ lv === 'room' ? 'ห้อง (หัวหน้าห้อง / รอง)' : lv === 'level' ? 'ชั้น (ประธานระดับ)' : 'สภานักเรียน' }}
@@ -286,9 +277,9 @@ function statusColor(s: string) {
             </select>
           </div>
           <div>
-            <label class="block text-xs font-semibold text-slate-500 mb-1.5">สถานะ</label>
+            <label class="block text-xs font-semibold text-stone-500 mb-1.5">สถานะ</label>
             <select v-model="statusFilter" @change="onFilterChange"
-              class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white">
+              class="w-full px-3 py-2 border border-stone-300 rounded-xl text-sm bg-white">
               <option value="not_resolved">ยังไม่เสร็จ (รอรับ / กำลังทำ / ส่งต่อ)</option>
               <option value="">ทุกสถานะ (รวมเสร็จแล้ว)</option>
               <option value="pending">รอรับ</option>
@@ -303,61 +294,99 @@ function statusColor(s: string) {
       </template>
     </IssueListToolbar>
 
-    <div v-if="isLoading" class="flex justify-center py-16">
-      <div class="animate-spin w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full"></div>
+    <!-- โหลดข้อมูล: skeleton รายการ -->
+    <div v-if="isLoading" class="animate-pulse rounded-2xl border border-stone-200 bg-white p-5">
+      <div class="divide-y divide-stone-100">
+        <div v-for="n in 5" :key="n" class="flex items-start gap-3 py-4">
+          <div class="h-10 w-10 rounded-full bg-stone-100"></div>
+          <div class="flex-1 space-y-2 pt-1">
+            <div class="h-3 w-1/3 rounded bg-stone-100"></div>
+            <div class="h-3 w-2/3 rounded bg-stone-100"></div>
+          </div>
+          <div class="h-6 w-16 rounded-full bg-stone-100"></div>
+        </div>
+      </div>
     </div>
-    <div v-else-if="error" class="text-red-500 text-center py-10">{{ error }}</div>
 
-    <div v-else-if="!issues.length" class="bg-white rounded-2xl p-10 text-center text-slate-400">
-      <div class="text-4xl mb-2"><i class="bi bi-inbox"></i></div>
-      <p>ไม่พบเรื่องในเงื่อนไขที่เลือก</p>
+    <!-- โหลดไม่สำเร็จ: inline error + retry -->
+    <div
+      v-else-if="error"
+      class="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-stone-200 py-20 text-center"
+    >
+      <i class="bi bi-wifi-off text-3xl text-stone-400 mb-3"></i>
+      <p class="text-stone-600">{{ error }}</p>
+      <button
+        type="button"
+        class="mt-4 rounded-lg bg-[#B91C1C] px-5 py-2 text-[13px] font-bold text-white hover:bg-[#991B1B]"
+        @click="load"
+      >
+        ลองอีกครั้ง
+      </button>
     </div>
 
-    <TransitionGroup v-else name="list" tag="div" class="grid gap-3">
+    <!-- Empty state -->
+    <div
+      v-else-if="!issues.length"
+      class="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-stone-200 bg-white py-16 px-6 text-center"
+    >
+      <div class="text-4xl mb-2 text-stone-300"><i class="bi bi-inbox"></i></div>
+      <p class="text-stone-600">ไม่พบเรื่องในเงื่อนไขที่เลือก</p>
+    </div>
+
+    <!-- Ledger-style list -->
+    <TransitionGroup
+      v-else
+      name="list"
+      tag="div"
+      class="rounded-2xl border border-stone-200 overflow-hidden bg-white divide-y divide-stone-200"
+    >
       <RouterLink
         v-for="i in issues"
         :key="i.id"
         :to="{ name: 'issue-detail', params: { id: i.id } }"
-        class="bg-white rounded-2xl shadow-sm p-4 hover:shadow-md transition block"
+        class="flex items-start justify-between gap-3 px-5 py-4 hover:bg-stone-50 transition block"
       >
-        <div class="flex items-start justify-between gap-3">
-          <div class="flex-1 min-w-0">
-            <div class="flex flex-wrap gap-2 mb-1.5">
-              <span class="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">{{ MAIN_CATEGORY_LABELS[i.main_category] }}</span>
-              <span class="px-2 py-0.5 bg-rose-50 text-rose-600 ring-1 ring-rose-100 text-xs rounded-full">{{ subcategoryLabel(i.main_category, i.category) }}</span>
-              <span class="px-2 py-0.5 rounded-full text-xs"
-                :class="{
-                  'bg-emerald-100 text-emerald-700': i.current_level === 'room',
-                  'bg-amber-100 text-amber-700': i.current_level === 'level',
-                  'bg-rose-100 text-rose-700': i.current_level === 'council',
-                }">
-                {{ LEVEL_LABELS[i.current_level] }}
-              </span>
-              <span v-if="i.requested_destination && i.requested_destination !== 'normal'"
-                class="px-2 py-0.5 text-xs rounded-full" :class="destinationBadgeClass(i.requested_destination)">
-                {{ DESTINATION_LABELS[i.requested_destination] }}
-              </span>
-            </div>
-            <h3 class="font-semibold text-slate-900 truncate">{{ i.title }}</h3>
-            <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 mt-1">
-              <span><i class="bi bi-building mr-1"></i> {{ i.room_name }}</span>
-              <span v-if="i.reporter_name"><i class="bi bi-person mr-1"></i> {{ i.reporter_name }}</span>
-              <span v-else><i class="bi bi-eye-slash mr-1"></i> ไม่ระบุชื่อ</span>
-              <span v-if="i.current_assignee_name"><i class="bi bi-person-badge mr-1"></i> {{ i.current_assignee_name }}</span>
-            </div>
-          </div>
-          <div class="text-right shrink-0 flex flex-col items-end gap-2">
-            <span class="px-2.5 py-1 text-xs font-medium rounded-full whitespace-nowrap" :class="statusColor(i.status)">
-              {{ STATUS_LABELS[i.status] }}
-            </span>
-            <button
-              v-if="canApprove(i)"
-              @click.stop.prevent="openApprove(i)"
-              class="px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700 whitespace-nowrap"
+        <div class="flex-1 min-w-0">
+          <div class="flex flex-wrap gap-2 mb-1.5">
+            <span class="px-2 py-0.5 bg-stone-100 text-stone-600 text-xs rounded-full">{{ MAIN_CATEGORY_LABELS[i.main_category] }}</span>
+            <span class="px-2 py-0.5 bg-stone-100 text-stone-600 text-xs rounded-full">{{ subcategoryLabel(i.main_category, i.category) }}</span>
+            <span
+              class="px-2 py-0.5 rounded-full text-xs"
+              :class="{
+                'bg-stone-100 text-stone-700': i.current_level === 'room',
+                'bg-stone-200 text-stone-700': i.current_level === 'level',
+                'bg-stone-300 text-stone-800': i.current_level === 'council',
+              }"
             >
-              <i class="bi bi-people-fill mr-1"></i> อนุมัติเผยแพร่
-            </button>
+              {{ LEVEL_LABELS[i.current_level] }}
+            </span>
+            <span v-if="i.requested_destination && i.requested_destination !== 'normal'"
+              class="px-2 py-0.5 bg-stone-100 text-stone-600 text-xs rounded-full">
+              {{ DESTINATION_LABELS[i.requested_destination] }}
+            </span>
           </div>
+          <h3 class="font-semibold text-stone-900 truncate">{{ i.title }}</h3>
+          <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-500 mt-1">
+            <span><i class="bi bi-building mr-1"></i> {{ i.room_name }}</span>
+            <span v-if="i.reporter_name"><i class="bi bi-person mr-1"></i> {{ i.reporter_name }}</span>
+            <span v-else><i class="bi bi-eye-slash mr-1"></i> ไม่ระบุชื่อ</span>
+            <span v-if="i.current_assignee_name"><i class="bi bi-person-badge mr-1"></i> {{ i.current_assignee_name }}</span>
+          </div>
+        </div>
+        <div class="text-right shrink-0 flex flex-col items-end gap-2">
+          <span
+            class="px-2.5 py-1 text-xs font-medium rounded-full whitespace-nowrap"
+            :class="STATUS_BADGE[i.status] || 'bg-stone-100 text-stone-500'"
+          >
+            {{ STATUS_LABELS[i.status] }}
+          </span>
+          <button
+            v-if="canApprove(i)"
+            @click.stop.prevent="openApprove(i)"
+            class="px-3 py-1.5 bg-[#B91C1C] text-white text-xs font-medium rounded-lg hover:bg-[#991B1B] whitespace-nowrap"
+          >
+            <i class="bi bi-people-fill mr-1"></i> อนุมัติเผยแพร่
+          </button>
         </div>
       </RouterLink>
     </TransitionGroup>

@@ -49,9 +49,9 @@ function actionLabel(action: string): string {
 }
 
 const STATUS_BADGE: Record<string, string> = {
-  success: 'bg-green-100 text-green-700',
-  error: 'bg-red-100 text-red-700',
-  partial: 'bg-amber-100 text-amber-700',
+  success: 'bg-emerald-100 text-emerald-700',
+  error: 'bg-[#B91C1C]/10 text-[#B91C1C]',
+  partial: 'bg-stone-100 text-stone-600',
 };
 
 // ===== ข้อมูล + การโหลด =====
@@ -144,48 +144,51 @@ function fmtPayload(v: Record<string, unknown> | null): string {
 }
 
 function statusBadge(s: string): string {
-  return STATUS_BADGE[s] ?? 'bg-slate-100 text-slate-600';
+  return STATUS_BADGE[s] ?? 'bg-stone-100 text-stone-600';
 }
 
 const hasData = computed(() => items.value.length > 0);
+
+const filterCls = 'w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm transition';
 </script>
 
 <template>
   <div>
     <!-- Header -->
-    <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+    <div class="flex flex-wrap items-start justify-between gap-3 mb-5">
       <div>
-        <h1 class="text-xl font-black tracking-tight text-slate-900 leading-tight sm:text-2xl">
-          <i class="bi bi-clock-history mr-1 text-red-500"></i> บันทึกการใช้งาน
+        <p class="mb-1 text-[11px] font-bold uppercase tracking-widest text-stone-400">Audit Trail</p>
+        <h1 class="text-2xl font-bold tracking-tight text-stone-900 leading-tight sm:text-3xl">
+          <i class="bi bi-clock-history mr-1 text-[#B91C1C]"></i> บันทึกการใช้งาน
         </h1>
-        <p class="text-xs text-slate-400 mt-0.5">ประวัติทุกการกระทำในระบบ (เข้าสู่ระบบ / เพิ่ม / ดึงข้อมูล / แก้ไข / ลบ)</p>
+        <p class="mt-1 text-xs text-stone-500">ประวัติทุกการกระทำในระบบ (เข้าสู่ระบบ / เพิ่ม / ดึงข้อมูล / แก้ไข / ลบ)</p>
       </div>
       <button
         type="button"
         @click="load"
         :disabled="isLoading"
         title="รีเฟรช"
-        class="w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-red-600 hover:border-red-300 flex items-center justify-center transition disabled:opacity-50"
+        class="flex h-9 w-9 items-center justify-center rounded-xl border border-stone-200 bg-white text-stone-500 transition hover:border-[#B91C1C]/30 hover:bg-[#B91C1C]/5 hover:text-[#B91C1C] disabled:opacity-50"
       >
         <i class="bi bi-arrow-clockwise" :class="{ 'animate-spin': isLoading }"></i>
       </button>
     </div>
 
     <!-- ตัวกรอง -->
-    <div class="bg-white rounded-2xl shadow-sm p-4 mb-4">
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+    <div class="mb-4 rounded-2xl border border-stone-200 bg-white p-4">
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
         <div>
-          <label class="block text-xs text-slate-500 mb-1">Action</label>
+          <label class="mb-1 block text-xs font-semibold text-stone-500">Action</label>
           <input
             v-model="fAction"
             type="text"
             placeholder="เช่น login, CREATE_ISSUE"
-            class="w-full input input-bordered input-sm"
+            :class="filterCls"
           />
         </div>
         <div>
-          <label class="block text-xs text-slate-500 mb-1">สถานะ</label>
-          <select v-model="fStatus" class="w-full select select-bordered select-sm">
+          <label class="mb-1 block text-xs font-semibold text-stone-500">สถานะ</label>
+          <select v-model="fStatus" :class="filterCls">
             <option value="">ทั้งหมด</option>
             <option value="success">สำเร็จ</option>
             <option value="error">ผิดพลาด</option>
@@ -193,111 +196,111 @@ const hasData = computed(() => items.value.length > 0);
           </select>
         </div>
         <div>
-          <label class="block text-xs text-slate-500 mb-1">ชนิดข้อมูล</label>
+          <label class="mb-1 block text-xs font-semibold text-stone-500">ชนิดข้อมูล</label>
           <input
             v-model="fEntityType"
             type="text"
             placeholder="เช่น issue, user"
-            class="w-full input input-bordered input-sm"
+            :class="filterCls"
           />
         </div>
         <div>
-          <label class="block text-xs text-slate-500 mb-1">ค้นหา (ผู้ใช้/error)</label>
-          <input v-model="fQ" type="text" placeholder="ชื่อผู้ใช้ / ข้อความ" class="w-full input input-bordered input-sm" />
+          <label class="mb-1 block text-xs font-semibold text-stone-500">ค้นหา (ผู้ใช้/error)</label>
+          <input v-model="fQ" type="text" placeholder="ชื่อผู้ใช้ / ข้อความ" :class="filterCls" />
         </div>
         <div>
-          <label class="block text-xs text-slate-500 mb-1">จากวันที่</label>
-          <input v-model="fDateFrom" type="date" class="w-full input input-bordered input-sm" />
+          <label class="mb-1 block text-xs font-semibold text-stone-500">จากวันที่</label>
+          <input v-model="fDateFrom" type="date" :class="filterCls" />
         </div>
         <div>
-          <label class="block text-xs text-slate-500 mb-1">ถึงวันที่</label>
-          <input v-model="fDateTo" type="date" class="w-full input input-bordered input-sm" />
+          <label class="mb-1 block text-xs font-semibold text-stone-500">ถึงวันที่</label>
+          <input v-model="fDateTo" type="date" :class="filterCls" />
         </div>
       </div>
     </div>
 
     <!-- Loading skeleton -->
-    <div v-if="isLoading && !hasData" class="bg-white rounded-2xl shadow-sm overflow-hidden">
-      <div class="p-4 space-y-3">
-        <div v-for="i in 6" :key="i" class="flex gap-3 items-center">
-          <div class="h-8 w-8 bg-slate-200 animate-pulse rounded-lg"></div>
+    <div v-if="isLoading && !hasData" class="overflow-hidden rounded-2xl border border-stone-200 bg-white" aria-busy="true">
+      <div class="space-y-3 p-4">
+        <div v-for="i in 6" :key="i" class="flex items-center gap-3">
+          <div class="h-8 w-8 animate-pulse rounded-lg bg-stone-100"></div>
           <div class="flex-1 space-y-1.5">
-            <div class="h-3 w-1/3 bg-slate-200 animate-pulse rounded"></div>
-            <div class="h-3 w-1/2 bg-slate-100 animate-pulse rounded"></div>
+            <div class="h-3 w-1/3 animate-pulse rounded bg-stone-100"></div>
+            <div class="h-3 w-1/2 animate-pulse rounded bg-stone-100"></div>
           </div>
         </div>
       </div>
     </div>
 
     <!-- Error -->
-    <div v-else-if="error && !hasData" class="bg-white rounded-2xl shadow-sm p-12 text-center">
-      <div class="text-5xl mb-3 text-red-300"><i class="bi bi-exclamation-triangle"></i></div>
-      <h2 class="text-lg font-bold text-slate-800 mb-1">โหลดข้อมูลไม่สำเร็จ</h2>
-      <p class="text-sm text-slate-500 mb-5 max-w-md mx-auto">{{ error }}</p>
+    <div v-else-if="error && !hasData" class="rounded-2xl border-2 border-dashed border-stone-200 bg-white p-12 text-center">
+      <div class="mb-3 text-3xl text-stone-300"><i class="bi bi-exclamation-triangle"></i></div>
+      <h2 class="mb-1 text-lg font-bold text-stone-800">โหลดข้อมูลไม่สำเร็จ</h2>
+      <p class="mx-auto mb-5 max-w-md text-sm text-stone-500">{{ error }}</p>
       <button
         type="button"
         @click="load"
-        class="px-5 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-700 text-sm font-medium transition"
+        class="inline-flex items-center gap-1.5 rounded-xl bg-[#B91C1C] px-5 py-2.5 text-sm font-medium text-white transition hover:bg-[#991B1B]"
       >
         <i class="bi bi-arrow-clockwise mr-1"></i> ลองใหม่
       </button>
     </div>
 
     <!-- Empty -->
-    <div v-else-if="!isLoading && !hasData" class="bg-white rounded-2xl shadow-sm p-12 text-center">
-      <div class="text-5xl mb-3 text-slate-300"><i class="bi bi-inbox"></i></div>
-      <p class="text-sm text-slate-500">ยังไม่มีบันทึกการใช้งานตามเงื่อนไขนี้</p>
+    <div v-else-if="!isLoading && !hasData" class="rounded-2xl border-2 border-dashed border-stone-200 bg-white p-12 text-center">
+      <div class="mb-3 text-3xl text-stone-300"><i class="bi bi-inbox"></i></div>
+      <p class="text-sm text-stone-500">ยังไม่มีบันทึกการใช้งานตามเงื่อนไขนี้</p>
     </div>
 
     <!-- ตาราง -->
-    <div v-else class="bg-white rounded-2xl shadow-sm overflow-hidden">
+    <div v-else class="overflow-hidden rounded-2xl border border-stone-200 bg-white">
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
-          <thead>
-            <tr class="text-left text-xs text-slate-400 border-b border-slate-100">
-              <th class="px-4 py-3 font-medium">เวลา</th>
-              <th class="px-4 py-3 font-medium">ผู้ใช้</th>
-              <th class="px-4 py-3 font-medium">การกระทำ</th>
-              <th class="px-4 py-3 font-medium">ข้อมูล</th>
-              <th class="px-4 py-3 font-medium">สถานะ</th>
-              <th class="px-4 py-3 font-medium">IP</th>
-              <th class="px-4 py-3 font-medium"></th>
+          <thead class="bg-stone-50">
+            <tr class="text-left text-[11px] uppercase tracking-wider text-stone-500">
+              <th class="px-4 py-3 font-semibold">เวลา</th>
+              <th class="px-4 py-3 font-semibold">ผู้ใช้</th>
+              <th class="px-4 py-3 font-semibold">การกระทำ</th>
+              <th class="px-4 py-3 font-semibold">ข้อมูล</th>
+              <th class="px-4 py-3 font-semibold">สถานะ</th>
+              <th class="px-4 py-3 font-semibold">IP</th>
+              <th class="px-4 py-3 font-semibold"></th>
             </tr>
           </thead>
-          <tbody>
+          <tbody class="divide-y divide-stone-100">
             <template v-for="e in items" :key="e.id">
-              <tr class="border-b border-slate-50 hover:bg-slate-50/50">
-                <td class="px-4 py-2.5 text-slate-500 whitespace-nowrap tabular-nums">{{ fmtDateTime(e.created_at) }}</td>
+              <tr class="transition-colors hover:bg-stone-50">
+                <td class="whitespace-nowrap px-4 py-2.5 text-stone-500 tabular-nums">{{ fmtDateTime(e.created_at) }}</td>
                 <td class="px-4 py-2.5">
-                  <span class="font-medium text-slate-700">{{ e.actor_identifier }}</span>
-                  <span v-if="e.ip_address" class="block text-[11px] text-slate-400 tabular-nums">{{ e.ip_address }}</span>
+                  <span class="font-medium text-stone-700">{{ e.actor_identifier }}</span>
+                  <span v-if="e.ip_address" class="block text-[11px] text-stone-400 tabular-nums">{{ e.ip_address }}</span>
                 </td>
                 <td class="px-4 py-2.5">
                   <span class="inline-flex items-center gap-1.5">
-                    <span class="font-medium text-slate-800">{{ actionLabel(e.action) }}</span>
-                    <span class="text-[11px] text-slate-400 font-mono">{{ e.action }}</span>
+                    <span class="font-medium text-stone-800">{{ actionLabel(e.action) }}</span>
+                    <span class="font-mono text-[11px] text-stone-400">{{ e.action }}</span>
                   </span>
-                  <span v-if="e.endpoint_or_command" class="block text-[11px] text-slate-400 font-mono">{{ e.endpoint_or_command }}</span>
+                  <span v-if="e.endpoint_or_command" class="block font-mono text-[11px] text-stone-400">{{ e.endpoint_or_command }}</span>
                 </td>
-                <td class="px-4 py-2.5 text-slate-500">
+                <td class="px-4 py-2.5 text-stone-500">
                   <template v-if="e.entity_type">
-                    <span class="text-slate-400">{{ e.entity_type }}</span>
-                    <span v-if="e.entity_id" class="text-slate-600 font-mono">#{{ e.entity_id }}</span>
+                    <span class="text-stone-400">{{ e.entity_type }}</span>
+                    <span v-if="e.entity_id" class="font-mono text-stone-600">#{{ e.entity_id }}</span>
                   </template>
-                  <span v-else class="text-slate-300">-</span>
+                  <span v-else class="text-stone-300">-</span>
                 </td>
                 <td class="px-4 py-2.5">
-                  <span class="px-2 py-0.5 text-[11px] font-medium rounded-full" :class="statusBadge(e.status)">
+                  <span class="rounded-full px-2 py-0.5 text-[11px] font-medium" :class="statusBadge(e.status)">
                     {{ e.status }}
                   </span>
                 </td>
-                <td class="px-4 py-2.5 text-slate-500 font-mono text-xs">{{ e.ip_address || '-' }}</td>
+                <td class="px-4 py-2.5 font-mono text-xs text-stone-500">{{ e.ip_address || '-' }}</td>
                 <td class="px-4 py-2.5 text-right">
                   <button
                     v-if="hasPayload(e)"
                     type="button"
                     @click="toggleExpand(e.id)"
-                    class="w-8 h-8 inline-flex items-center justify-center rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
+                    class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-stone-400 transition hover:bg-[#B91C1C]/5 hover:text-[#B91C1C]"
                     :title="expanded.has(e.id) ? 'ย่อรายละเอียด' : 'ดูรายละเอียด'"
                   >
                     <i class="bi" :class="expanded.has(e.id) ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
@@ -305,20 +308,20 @@ const hasData = computed(() => items.value.length > 0);
                 </td>
               </tr>
               <!-- รายละเอียดเก่า/ใหม่ (expand) -->
-              <tr v-if="expanded.has(e.id)" class="bg-slate-50/60 border-b border-slate-100">
+              <tr v-if="expanded.has(e.id)" class="bg-stone-50/60">
                 <td colspan="7" class="px-4 py-3">
-                  <div class="grid lg:grid-cols-2 gap-3">
+                  <div class="grid gap-3 lg:grid-cols-2">
                     <div>
-                      <p class="text-xs font-semibold text-slate-500 mb-1">ค่าเดิม (old_values)</p>
-                      <pre class="text-[11px] text-slate-600 bg-white rounded-lg p-2.5 border border-slate-100 overflow-x-auto">{{ fmtPayload(e.old_values) }}</pre>
+                      <p class="mb-1 text-xs font-semibold text-stone-500">ค่าเดิม (old_values)</p>
+                      <pre class="overflow-x-auto rounded-lg border border-stone-200 bg-white p-2.5 text-[11px] text-stone-600">{{ fmtPayload(e.old_values) }}</pre>
                     </div>
                     <div>
-                      <p class="text-xs font-semibold text-slate-500 mb-1">ค่าใหม่ (new_values)</p>
-                      <pre class="text-[11px] text-slate-600 bg-white rounded-lg p-2.5 border border-slate-100 overflow-x-auto">{{ fmtPayload(e.new_values) }}</pre>
+                      <p class="mb-1 text-xs font-semibold text-stone-500">ค่าใหม่ (new_values)</p>
+                      <pre class="overflow-x-auto rounded-lg border border-stone-200 bg-white p-2.5 text-[11px] text-stone-600">{{ fmtPayload(e.new_values) }}</pre>
                     </div>
                     <div v-if="e.error_detail" class="lg:col-span-2">
-                      <p class="text-xs font-semibold text-red-500 mb-1">ข้อผิดพลาด</p>
-                      <pre class="text-[11px] text-red-600 bg-red-50 rounded-lg p-2.5 border border-red-100 overflow-x-auto">{{ e.error_detail }}</pre>
+                      <p class="mb-1 text-xs font-semibold text-[#B91C1C]">ข้อผิดพลาด</p>
+                      <pre class="overflow-x-auto rounded-lg border border-[#B91C1C]/15 bg-[#B91C1C]/5 p-2.5 text-[11px] text-[#B91C1C]">{{ e.error_detail }}</pre>
                     </div>
                   </div>
                 </td>
@@ -328,7 +331,7 @@ const hasData = computed(() => items.value.length > 0);
         </table>
       </div>
 
-      <div class="px-4 py-3 text-xs text-slate-400 flex items-center justify-between">
+      <div class="flex items-center justify-between px-4 py-3 text-xs text-stone-400">
         <span>แสดง {{ items.length }} จาก {{ total }} รายการ</span>
         <span v-if="pages > 1">หน้า {{ page }} / {{ pages }}</span>
       </div>

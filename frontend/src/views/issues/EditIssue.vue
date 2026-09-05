@@ -18,6 +18,7 @@ const description = ref('')
 const isAnonymous = ref(false)
 const isLoading = ref(true) // โหลดข้อมูลเรื่อง
 const isSaving = ref(false) // กำลังบันทึก
+const loadError = ref('') // โหลดข้อมูลไม่สำเร็จ → แสดง inline + retry
 
 function errMsg(e: unknown): string {
   return e instanceof Error ? e.message : String(e)
@@ -35,7 +36,9 @@ const availableCategories = computed<Category[]>(() => {
   return Object.keys(MAIN_CATEGORIES[mainCategory.value].subcategories) as Category[]
 })
 
-onMounted(async () => {
+async function loadIssue() {
+  isLoading.value = true
+  loadError.value = ''
   try {
     const issue = await getIssue(issueId)
 
@@ -68,16 +71,12 @@ onMounted(async () => {
     description.value = issue.description
     isAnonymous.value = issue.is_anonymous
   } catch (e) {
-    Swal.fire({
-      icon: 'error',
-      title: 'ไม่สามารถโหลดเรื่องได้',
-      text: errMsg(e) || 'เกิดข้อผิดพลาด',
-    })
-    router.replace({ name: 'issue-detail', params: { id: issueId } })
+    loadError.value = errMsg(e) || 'เกิดข้อผิดพลาด'
   } finally {
     isLoading.value = false
   }
-})
+}
+onMounted(loadIssue)
 
 async function handleSubmit() {
   if (!mainCategory.value) {
@@ -136,21 +135,47 @@ async function handleSubmit() {
 
 <template>
   <div class="max-w-2xl mx-auto">
-    <div v-if="isLoading" class="flex justify-center py-16">
-      <div
-        class="animate-spin w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full"
-      ></div>
+    <!-- โหลดข้อมูล: skeleton เนื้อหา -->
+    <div v-if="isLoading" class="animate-pulse">
+      <div class="rounded-2xl border border-stone-200 bg-white p-6 space-y-5">
+        <div class="h-6 w-48 rounded-lg bg-stone-100"></div>
+        <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
+          <div v-for="n in 6" :key="n" class="h-24 rounded-xl bg-stone-100"></div>
+        </div>
+        <div class="h-40 rounded-xl bg-stone-100"></div>
+        <div class="h-12 rounded-xl bg-stone-100"></div>
+      </div>
+    </div>
+
+    <!-- โหลดไม่สำเร็จ: inline error + retry -->
+    <div
+      v-else-if="loadError"
+      class="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-stone-200 py-20 text-center"
+    >
+      <i class="bi bi-exclamation-triangle text-3xl text-stone-400 mb-3"></i>
+      <p class="text-stone-600 px-6">{{ loadError }}</p>
+      <button
+        type="button"
+        class="mt-4 rounded-lg bg-[#B91C1C] px-5 py-2 text-[13px] font-bold text-white hover:bg-[#991B1B]"
+        @click="loadIssue"
+      >
+        ลองอีกครั้ง
+      </button>
     </div>
 
     <template v-else>
-      <h1 class="text-xl font-black tracking-tight text-slate-900 leading-tight mb-2 sm:text-2xl">
-        <i class="bi bi-pencil-square mr-1 text-red-500"></i> แก้ไขเรื่อง
-      </h1>
-      <p class="text-slate-500 text-sm mb-6">แก้ไขข้อมูลเรื่องที่แจ้งไปแล้ว (เฉพาะผู้แจ้ง)</p>
+      <!-- Editorial page header -->
+      <div class="mb-8">
+        <p class="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-[#B91C1C]">
+          <i class="bi bi-pencil-square text-[13px]"></i> Edit Issue
+        </p>
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-stone-900 leading-tight">แก้ไขเรื่อง</h1>
+        <p class="mt-2 text-sm text-stone-500">แก้ไขข้อมูลเรื่องที่แจ้งไปแล้ว (เฉพาะผู้แจ้ง)</p>
+      </div>
 
       <!-- Step 1: หมวดหลัก -->
       <div class="mb-6">
-        <label class="block text-sm font-medium text-slate-700 mb-2">1. เลือกหมวดหลัก</label>
+        <label class="block text-sm font-medium text-stone-700 mb-2">1. เลือกหมวดหลัก</label>
         <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
           <button
             v-for="(info, key) in MAIN_CATEGORIES"
@@ -160,8 +185,8 @@ async function handleSubmit() {
             class="p-3 sm:p-4 min-h-[88px] sm:min-h-0 rounded-xl border-2 text-center transition flex flex-col items-center justify-center"
             :class="
               mainCategory === key
-                ? 'border-red-600 bg-red-50 text-red-700'
-                : 'border-slate-200 hover:border-red-300'
+                ? 'border-[#B91C1C] bg-red-50 text-red-700'
+                : 'border-stone-200 hover:border-[#B91C1C]'
             "
           >
             <div class="text-xl sm:text-2xl mb-1">
@@ -178,7 +203,7 @@ async function handleSubmit() {
 
       <!-- Step 2: หมวดหมู่ย่อย -->
       <div v-if="mainCategory" class="mb-6">
-        <label class="block text-sm font-medium text-slate-700 mb-2">2. เลือกหมวดหมู่</label>
+        <label class="block text-sm font-medium text-stone-700 mb-2">2. เลือกหมวดหมู่</label>
         <div class="flex flex-wrap gap-2">
           <button
             v-for="c in availableCategories"
@@ -188,8 +213,8 @@ async function handleSubmit() {
             class="px-4 py-2 rounded-full border text-sm transition"
             :class="
               category === c
-                ? 'bg-red-600 text-white border-red-600'
-                : 'border-slate-300 hover:border-red-400'
+                ? 'bg-[#B91C1C] text-white border-[#B91C1C]'
+                : 'border-stone-300 hover:border-[#B91C1C]'
             "
           >
             {{ MAIN_CATEGORIES[mainCategory as MainCategory].subcategories[c] }}
@@ -200,30 +225,30 @@ async function handleSubmit() {
       <!-- Step 3: รายละเอียด -->
       <form @submit.prevent="handleSubmit" class="space-y-4">
         <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">3. หัวข้อ</label>
+          <label class="block text-sm font-medium text-stone-700 mb-1">3. หัวข้อ</label>
           <input
             v-model="title"
             type="text"
-            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500"
+            class="w-full px-3 py-2 border border-stone-300 rounded-lg"
             placeholder="สรุปสั้นๆ ว่าเรื่องอะไร"
             maxlength="200"
           />
         </div>
         <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">4. รายละเอียด</label>
+          <label class="block text-sm font-medium text-stone-700 mb-1">4. รายละเอียด</label>
           <textarea
             v-model="description"
             rows="5"
-            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500"
+            class="w-full px-3 py-2 border border-stone-300 rounded-lg"
             placeholder="อธิบายปัญหาหรือความคิดเห็นให้ละเอียด..."
           ></textarea>
         </div>
 
-        <label class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none">
+        <label class="flex items-center gap-2 text-sm text-stone-700 cursor-pointer select-none">
           <input
             v-model="isAnonymous"
             type="checkbox"
-            class="w-4 h-4 rounded bg-white border-slate-300 text-red-600 focus:ring-red-500 accent-red-600"
+            class="w-4 h-4 rounded bg-white border-stone-300 accent-[#B91C1C]"
           />
           <span>ซ่อนชื่อฉัน (แจ้งแบบไม่ระบุชื่อ)</span>
         </label>
@@ -232,14 +257,14 @@ async function handleSubmit() {
           <button
             type="button"
             @click="router.push({ name: 'issue-detail', params: { id: issueId } })"
-            class="px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-medium"
+            class="px-4 py-3 border border-stone-200 text-stone-700 rounded-xl hover:bg-stone-50 font-medium"
           >
             ยกเลิก
           </button>
           <button
             type="submit"
             :disabled="isSaving"
-            class="flex-1 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 font-medium"
+            class="flex-1 py-3 bg-[#B91C1C] text-white rounded-xl hover:bg-[#991B1B] disabled:opacity-50 disabled:pointer-events-none font-semibold"
           >
             {{ isSaving ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข' }}
           </button>

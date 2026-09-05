@@ -1,31 +1,37 @@
 // สีสถานะ (semantic) — ใช้ร่วมกันทั้งหน้า อย่าให้สีหมวดหลักมาทับ
-// pending=เหลือง, in_progress=น้ำเงิน, escalated=ส้ม, resolved=เขียว, cancelled=เทา, rejected=กุหลาบ
+// แผนภาพสีแบบจำกัด (Editorial & Civic):
+//   resolved    → emerald (ปิดเรื่อง/สำเร็จ)
+//   in_progress → cardinal tint (กำลังดำเนินการ)
+//   escalated   → cardinal ทึบ (ถูกส่งต่อ/เด่นสุด)
+//   pending     → stone (รอรับ — muted)
+//   cancelled / rejected → stone อ่อน
+// ตัวอย่างเดิมเป็นรุ้ง (yellow/blue/orange/green/rose) — ยกเลิกแล้ว กันสีหลักทับ
 
 export const STATUS_DOT: Record<string, string> = {
-  pending: 'bg-yellow-500',
-  in_progress: 'bg-blue-500',
-  escalated: 'bg-orange-500',
-  resolved: 'bg-green-500',
-  cancelled: 'bg-slate-400',
-  rejected: 'bg-rose-500',
+  pending: 'bg-stone-400',
+  in_progress: 'bg-[#B91C1C]',
+  escalated: 'bg-[#991B1B]',
+  resolved: 'bg-emerald-500',
+  cancelled: 'bg-stone-300',
+  rejected: 'bg-stone-500',
 };
 
 export const STATUS_BAR: Record<string, string> = {
-  pending: 'bg-yellow-400',
-  in_progress: 'bg-blue-500',
-  escalated: 'bg-orange-500',
-  resolved: 'bg-green-500',
-  cancelled: 'bg-slate-300',
-  rejected: 'bg-rose-400',
+  pending: 'bg-stone-300',
+  in_progress: 'bg-[#B91C1C]',
+  escalated: 'bg-[#991B1B]',
+  resolved: 'bg-emerald-500',
+  cancelled: 'bg-stone-200',
+  rejected: 'bg-stone-300',
 };
 
 export const STATUS_BADGE: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-700',
-  in_progress: 'bg-blue-100 text-blue-700',
-  escalated: 'bg-orange-100 text-orange-700',
-  resolved: 'bg-green-100 text-green-700',
-  cancelled: 'bg-slate-200 text-slate-500',
-  rejected: 'bg-rose-100 text-rose-700',
+  pending: 'bg-stone-100 text-stone-600',
+  in_progress: 'bg-[#B91C1C]/10 text-[#B91C1C]',
+  escalated: 'bg-[#B91C1C] text-white',
+  resolved: 'bg-emerald-100 text-emerald-700',
+  cancelled: 'bg-stone-200 text-stone-500',
+  rejected: 'bg-stone-100 text-stone-500',
 };
 
 // ป้ายสั้น (สำหรับแถวรายการ/ชิป) — แยกจาก STATUS_LABELS ยาวที่ใช้ใน dropdown/filter

@@ -11,6 +11,7 @@ const authStore = useAuthStore();
 
 const profile = ref<MyProfile | null>(null);
 const isLoading = ref(true);
+const hasError = ref(false);
 const menuOpen = ref(false);
 
 const ROLE_LABELS: Record<string, string> = {
@@ -46,9 +47,11 @@ const roleLabel = computed(() => {
 
 async function load() {
   isLoading.value = true;
+  hasError.value = false;
   try {
     profile.value = await getMyProfile();
   } catch (e: unknown) {
+    hasError.value = true;
     Swal.fire({ icon: 'error', title: 'โหลดโปรไฟล์ไม่สำเร็จ', text: e instanceof Error ? e.message : 'เกิดข้อผิดพลาด' });
   } finally {
     isLoading.value = false;
@@ -97,47 +100,75 @@ const infoRows = computed(() => {
 
 <template>
   <div class="max-w-3xl mx-auto">
-    <div v-if="isLoading" class="flex justify-center py-20">
-      <div class="animate-spin w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full"></div>
+    <!-- Loading skeleton -->
+    <div v-if="isLoading" class="space-y-4" aria-busy="true">
+      <div class="overflow-hidden rounded-2xl border border-stone-200 bg-white">
+        <div class="h-28 sm:h-36 animate-pulse bg-stone-100"></div>
+        <div class="px-5 py-6 sm:px-8">
+          <div class="flex items-center gap-4">
+            <div class="h-16 w-16 rounded-2xl animate-pulse bg-stone-100 sm:h-20 sm:w-20"></div>
+            <div class="flex-1 space-y-2.5">
+              <div class="h-5 w-52 animate-pulse rounded bg-stone-100"></div>
+              <div class="h-4 w-32 animate-pulse rounded bg-stone-100"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="rounded-2xl border border-stone-200 bg-white p-6 sm:p-8">
+        <div class="mb-6 h-5 w-28 animate-pulse rounded bg-stone-100"></div>
+        <div class="grid gap-x-8 gap-y-5 sm:grid-cols-2">
+          <div v-for="i in 6" :key="i" class="flex items-center gap-3">
+            <div class="h-9 w-9 animate-pulse rounded-xl bg-stone-100"></div>
+            <div class="flex-1 space-y-2">
+              <div class="h-3 w-20 animate-pulse rounded bg-stone-100"></div>
+              <div class="h-4 w-32 animate-pulse rounded bg-stone-100"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Error + retry -->
+    <div v-else-if="hasError" class="rounded-2xl border-2 border-dashed border-stone-200 bg-white py-16 text-center">
+      <i class="bi bi-person-exclamation mb-3 block text-3xl text-stone-400"></i>
+      <p class="text-[15px] font-semibold text-stone-700">ไม่สามารถโหลดโปรไฟล์ได้ในขณะนี้</p>
+      <p class="mt-1 text-sm text-stone-500">ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง</p>
+      <button
+        type="button"
+        @click="load"
+        class="mt-5 inline-flex items-center gap-2 rounded-lg bg-[#B91C1C] px-5 py-2.5 text-[13px] font-bold text-white transition-colors hover:bg-[#991B1B]"
+      >
+        <i class="bi bi-arrow-clockwise"></i> ลองใหม่
+      </button>
     </div>
 
     <div v-else-if="profile" class="space-y-4">
       <!-- ===== การ์ดหลัก: cover + ตัวตน (avatar ทับ cover เฉพาะตัว, ชื่ออยู่บนพื้นขาวเสมอ) ===== -->
       <div class="relative">
-        <div class="bg-white rounded-3xl shadow-sm overflow-hidden">
-          <!-- Cover banner -->
-          <div class="relative h-28 sm:h-36 bg-gradient-to-br from-red-600 via-rose-600 to-red-700">
-            <!-- ลวดลายวงกลม (ดูมีมิติ ไม่ทึบ) -->
-            <div class="absolute -right-10 -top-14 w-48 h-48 rounded-full bg-white/10"></div>
-            <div class="absolute right-1/4 -bottom-16 w-32 h-32 rounded-full bg-white/10"></div>
-            <div class="absolute left-1/3 -top-10 w-24 h-24 rounded-full bg-white/5"></div>
-            <!-- ไล่เงาด้านล่างเบา ๆ ให้ avatar กลืนกับ cover -->
-            <div class="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/10 to-transparent"></div>
-          </div>
+        <div class="overflow-hidden rounded-2xl border border-stone-200 bg-white">
+          <!-- Cover banner (พื้นหินเรียบ + hairline) -->
+          <div class="h-28 border-b border-stone-200 bg-stone-100 sm:h-36"></div>
 
-          <!-- ตัวตน: relative z-10 → avatar/ชื่อวาดอยู่บนสุด เหนือลวดลายวงกลมและแถบไล่เงา cover
-               (มิฉะนั้น absolute z-auto จะทับ avatar → ขอบคล้ำ/ด่างแบบ bug) -->
-          <div class="relative z-10 px-4 sm:px-6 pb-5 sm:pb-6">
+          <!-- ตัวตน: relative z-10 → avatar/ชื่อวาดอยู่บนสุด เหนือ cover -->
+          <div class="relative z-10 px-4 pb-5 sm:px-6 sm:pb-6">
             <div class="flex items-start gap-3 sm:gap-4">
               <!-- avatar: มี -mt เท่านั้น เพื่อให้ทับ cover มุมซ้าย (ไม่ดึงชื่อขึ้นด้วย) -->
-              <div class="-mt-10 sm:-mt-14 shrink-0">
-                <div class="w-16 h-16 sm:w-24 sm:h-24 rounded-2xl sm:rounded-3xl bg-white p-1 shadow-xl ring-4 ring-white">
-                  <div class="w-full h-full rounded-xl sm:rounded-2xl bg-gradient-to-br from-red-500 to-rose-500 text-white flex items-center justify-center text-2xl sm:text-4xl font-bold">
-                    {{ avatarChar }}
-                  </div>
+              <div class="-mt-10 shrink-0 sm:-mt-14">
+                <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#B91C1C] text-2xl font-bold text-white ring-2 ring-stone-200 sm:h-24 sm:w-24 sm:rounded-3xl sm:text-4xl">
+                  {{ avatarChar }}
                 </div>
               </div>
               <!-- ชื่อ + ตำแหน่ง: pt ชัดเจน → อยู่ใต้ cover บนพื้นขาว อ่านง่ายเสมอ -->
               <div class="min-w-0 flex-1 pt-3 sm:pt-5">
-                <h1 class="text-lg sm:text-2xl font-bold text-slate-900 leading-snug break-words">{{ fullName }}</h1>
-                <div class="flex flex-wrap gap-1.5 mt-2">
-                  <span class="px-2.5 py-1 bg-red-100 text-red-700 text-xs font-semibold rounded-full">
+                <h1 class="text-2xl font-bold tracking-tight text-stone-900 break-words leading-snug sm:text-3xl">{{ fullName }}</h1>
+                <div class="flex flex-wrap gap-1.5 mt-2.5">
+                  <span class="px-2.5 py-1 bg-[#B91C1C]/10 text-[#B91C1C] text-xs font-semibold rounded-full">
                     <i class="bi bi-mortarboard mr-1"></i>{{ roleLabel }}
                   </span>
-                  <span v-if="profile.staff_level" class="px-2.5 py-1 bg-amber-100 text-amber-700 text-xs font-semibold rounded-full">
+                  <span v-if="profile.staff_level" class="px-2.5 py-1 bg-stone-100 text-stone-600 text-xs font-semibold rounded-full">
                     <i class="bi bi-clipboard-check mr-1"></i>ระดับ {{ profile.staff_level }}
                   </span>
-                  <span v-if="profile.room_code" class="px-2.5 py-1 bg-slate-100 text-slate-600 text-xs font-medium rounded-full">
+                  <span v-if="profile.room_code" class="px-2.5 py-1 bg-stone-100 text-stone-600 text-xs font-medium rounded-full">
                     <i class="bi bi-door-closed mr-1"></i>{{ profile.room_code }}
                   </span>
                 </div>
@@ -147,29 +178,29 @@ const infoRows = computed(() => {
         </div>
 
         <!-- เมนู ⋮ (อยู่ข้างนอก overflow-hidden → dropdown ไม่ถูกตัด) -->
-        <div class="absolute top-3 right-3 z-50">
+        <div class="absolute right-3 top-3 z-50">
           <button
             @click="menuOpen = !menuOpen"
             aria-label="เมนูโปรไฟล์"
-            class="w-9 h-9 rounded-full bg-black/20 text-white hover:bg-black/30 flex items-center justify-center backdrop-blur-sm transition"
-            :class="{ 'bg-black/30': menuOpen }"
+            class="flex h-9 w-9 items-center justify-center rounded-full bg-stone-200/90 text-stone-700 transition hover:bg-stone-300"
+            :class="{ 'bg-stone-300': menuOpen }"
           >
             <i class="bi bi-three-dots-vertical text-lg"></i>
           </button>
 
           <transition name="fade-up">
-            <div v-if="menuOpen" class="absolute right-0 top-11 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50">
-              <div class="px-4 py-1.5 mb-1 border-b border-slate-50">
-                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">การจัดการบัญชี</p>
+            <div v-if="menuOpen" class="absolute right-0 top-11 z-50 w-56 rounded-2xl border border-stone-200 bg-white py-2 shadow-lg shadow-stone-900/5">
+              <div class="mb-1 border-b border-stone-100 px-4 py-1.5">
+                <p class="text-[10px] font-bold text-stone-400 uppercase tracking-widest">การจัดการบัญชี</p>
               </div>
-              <button @click="goEdit" class="w-full text-left px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-red-50 hover:text-red-600 transition-colors flex items-center gap-3">
+              <button @click="goEdit" class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-semibold text-stone-700 transition-colors hover:bg-stone-100 hover:text-[#B91C1C]">
                 <i class="bi bi-pencil-square text-lg"></i> แก้ไขโปรไฟล์
               </button>
-              <button @click="goPassword" class="w-full text-left px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-red-50 hover:text-red-600 transition-colors flex items-center gap-3">
+              <button @click="goPassword" class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-semibold text-stone-700 transition-colors hover:bg-stone-100 hover:text-[#B91C1C]">
                 <i class="bi bi-shield-lock text-lg"></i> เปลี่ยนรหัสผ่าน
               </button>
-              <div class="h-px bg-slate-100 my-1"></div>
-              <button @click="logout" class="w-full text-left px-4 py-2.5 text-sm font-bold text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors flex items-center gap-3">
+              <div class="my-1 h-px bg-stone-200"></div>
+              <button @click="logout" class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-bold text-[#B91C1C] transition-colors hover:bg-[#B91C1C]/5 hover:text-[#991B1B]">
                 <i class="bi bi-box-arrow-right text-lg"></i> ออกจากระบบ
               </button>
             </div>
@@ -181,29 +212,34 @@ const infoRows = computed(() => {
       </div>
 
       <!-- ===== ข้อมูลส่วนตัว ===== -->
-      <div class="bg-white rounded-3xl shadow-sm p-5 sm:p-6">
-        <h2 class="text-base font-bold text-slate-800 mb-1 flex items-center gap-2">
-          <i class="bi bi-person-lines-fill text-red-500"></i> ข้อมูลส่วนตัว
-        </h2>
-        <p class="text-xs text-slate-400 mb-4">ข้อมูลและช่องทางการติดต่อของคุณ</p>
-        <div class="grid sm:grid-cols-2 gap-x-6 gap-y-3">
+      <div class="rounded-2xl border border-stone-200 bg-white p-6 sm:p-8">
+        <div class="mb-5 flex items-center gap-3">
+          <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-stone-100 text-stone-500">
+            <i class="bi bi-person-lines-fill"></i>
+          </span>
+          <div>
+            <h2 class="text-lg font-bold text-stone-900">ข้อมูลส่วนตัว</h2>
+            <p class="text-xs text-stone-500 mt-0.5">ข้อมูลและช่องทางการติดต่อของคุณ</p>
+          </div>
+        </div>
+        <div class="grid gap-x-6 gap-y-3 sm:grid-cols-2">
           <div
             v-for="row in infoRows"
             :key="row.label"
             class="flex items-center gap-3 py-1.5 min-w-0"
           >
-            <span class="w-9 h-9 rounded-xl bg-red-50 text-red-500 flex items-center justify-center shrink-0">
+            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-stone-100 text-stone-500">
               <i :class="['bi', row.icon]"></i>
             </span>
             <div class="min-w-0">
-              <p class="text-[11px] text-slate-400 font-medium leading-tight">{{ row.label }}</p>
-              <p class="text-sm text-slate-800 font-medium break-words leading-snug">{{ row.value }}</p>
+              <p class="text-[11px] text-stone-500 font-medium leading-tight">{{ row.label }}</p>
+              <p class="text-sm text-stone-800 font-semibold break-words leading-snug">{{ row.value }}</p>
             </div>
           </div>
         </div>
       </div>
 
-      <p class="text-center text-[11px] text-slate-300 pb-4">
+      <p class="text-center text-[11px] text-stone-400 pb-4">
         แก้ไขโปรไฟล์หรือเปลี่ยนรหัสผ่านได้จากเมนู <i class="bi bi-three-dots-vertical"></i> มุมขวาบน
       </p>
     </div>

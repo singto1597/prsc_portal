@@ -125,11 +125,3 @@ export const REPORT_STATUS_LABELS: Record<ReportStatus, string> = {
   resolved: 'ซ่อนแล้ว',
   dismissed: 'ปัดตก',
 }
-
-export function reportStatusBadge(s: ReportStatus): string {
-  return {
-    open: 'bg-amber-100 text-amber-700',
-    resolved: 'bg-emerald-100 text-emerald-700',
-    dismissed: 'bg-gray-100 text-gray-600',
-  }[s]
-}

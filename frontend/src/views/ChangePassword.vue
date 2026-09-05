@@ -62,44 +62,45 @@ async function submit() {
 
 const goBack = () => router.push({ name: 'profile' });
 
-const inputCls = 'w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm mt-1 focus:ring-2 focus:ring-red-500 focus:border-red-500 transition';
+const inputCls = 'w-full px-3.5 py-2.5 border border-stone-300 rounded-xl text-sm mt-1 bg-white transition focus:ring-2 focus:ring-[#B91C1C]/25 focus:border-[#B91C1C]';
 </script>
 
 <template>
   <div class="max-w-2xl mx-auto">
     <form @submit.prevent="submit" class="space-y-4">
       <!-- Header -->
-      <div class="flex items-center gap-3">
-        <button type="button" @click="goBack" class="w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-red-600 hover:border-red-300 flex items-center justify-center transition shrink-0">
+      <div class="flex items-start gap-3">
+        <button type="button" @click="goBack" aria-label="กลับไปหน้าโปรไฟล์" class="w-9 h-9 rounded-xl bg-white border border-stone-200 text-stone-500 hover:text-[#B91C1C] hover:border-[#B91C1C]/30 hover:bg-[#B91C1C]/5 flex items-center justify-center transition shrink-0 mt-1">
           <i class="bi bi-arrow-left text-lg"></i>
         </button>
         <div>
-          <h1 class="text-xl font-black tracking-tight text-slate-900 leading-tight sm:text-2xl"><i class="bi bi-shield-lock mr-1 text-red-500"></i> เปลี่ยนรหัสผ่าน</h1>
-          <p class="text-sm text-slate-500">ตั้งรหัสผ่านใหม่เพื่อความปลอดภัย</p>
+          <p class="text-[11px] font-bold uppercase tracking-widest text-stone-400 mb-1">การจัดการบัญชี</p>
+          <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-stone-900 leading-tight"><i class="bi bi-shield-lock mr-1 text-[#B91C1C]"></i> เปลี่ยนรหัสผ่าน</h1>
+          <p class="text-sm text-stone-500 mt-1">ตั้งรหัสผ่านใหม่เพื่อความปลอดภัย</p>
         </div>
       </div>
 
       <!-- บังคับเปลี่ยนครั้งแรก -->
-      <div v-if="isForced" class="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-800 flex gap-3">
+      <div v-if="isForced" class="flex gap-3 rounded-2xl border border-[#B91C1C]/20 bg-[#B91C1C]/10 p-4 text-sm text-[#B91C1C]">
         <i class="bi bi-shield-exclamation text-xl shrink-0"></i>
         <div>
           <p class="font-bold">บัญชีนี้เป็นบัญชีเริ่มต้นของระบบ</p>
-          <p class="text-amber-700 mt-0.5">กรุณาเปลี่ยนรหัสผ่านก่อนใช้งาน เพื่อป้องกันผู้อื่นเข้าถึง</p>
+          <p class="text-[#B91C1C]/70 mt-0.5">กรุณาเปลี่ยนรหัสผ่านก่อนใช้งาน เพื่อป้องกันผู้อื่นเข้าถึง</p>
         </div>
       </div>
 
-      <div class="bg-white rounded-2xl shadow-sm p-5 space-y-4">
+      <div class="space-y-5 rounded-2xl border border-stone-200 bg-white p-6 sm:p-8">
         <div>
-          <label class="text-xs font-medium text-slate-500">รหัสผ่านเดิม</label>
+          <label class="block text-xs font-semibold text-stone-700">รหัสผ่านเดิม</label>
           <input v-model="oldPass" type="password" :class="inputCls" placeholder="••••••" autocomplete="current-password" />
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label class="text-xs font-medium text-slate-500">รหัสผ่านใหม่</label>
+            <label class="block text-xs font-semibold text-stone-700">รหัสผ่านใหม่</label>
             <input v-model="newPass" type="password" :class="inputCls" placeholder="อย่างน้อย 4 ตัว" autocomplete="new-password" />
           </div>
           <div>
-            <label class="text-xs font-medium text-slate-500">ยืนยันรหัสผ่านใหม่</label>
+            <label class="block text-xs font-semibold text-stone-700">ยืนยันรหัสผ่านใหม่</label>
             <input v-model="confirmPass" type="password" :class="inputCls" placeholder="พิมพ์ซ้ำอีกครั้ง" autocomplete="new-password" />
           </div>
         </div>
@@ -108,7 +109,7 @@ const inputCls = 'w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-s
       <button
         type="submit"
         :disabled="isSaving"
-        class="w-full py-3 bg-gradient-to-r from-red-600 to-rose-600 text-white rounded-xl hover:from-red-700 hover:to-rose-700 disabled:opacity-50 font-semibold shadow-md shadow-red-200 transition-all"
+        class="w-full py-3 bg-[#B91C1C] text-white rounded-xl hover:bg-[#991B1B] disabled:opacity-50 font-semibold transition-colors"
       >
         <i class="bi bi-key mr-1"></i> {{ isSaving ? 'กำลังเปลี่ยน...' : 'เปลี่ยนรหัสผ่าน' }}
       </button>

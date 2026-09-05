@@ -105,7 +105,7 @@ async function handleHide() {
     inputAttributes: { maxlength: '200' },
     showCancelButton: true,
     confirmButtonText: 'ซ่อนคอมเมนต์',
-    confirmButtonColor: '#ef4444',
+    confirmButtonColor: '#b91c1c',
     cancelButtonText: 'ยกเลิก',
   })
   if (!value || !String(value).trim()) {
@@ -126,28 +126,28 @@ async function handleHide() {
 </script>
 
 <template>
-  <div data-testid="comment-node" class="pl-4 border-l-2 border-slate-100">
+  <div data-testid="comment-node" class="pl-4 border-l-2 border-stone-100">
     <!-- ตัวคอมเมนต์ -->
     <div class="flex gap-2.5">
       <div
-        class="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center font-bold text-sm shrink-0"
+        class="w-8 h-8 rounded-full bg-[#B91C1C]/10 text-[#B91C1C] flex items-center justify-center font-bold text-sm shrink-0"
       >
         {{ (comment.commenter_name || '?').charAt(0) }}
       </div>
       <div class="min-w-0 flex-1">
         <div class="flex items-center gap-2 flex-wrap">
-          <span class="text-sm font-semibold text-slate-800">{{ comment.commenter_name || 'ไม่ระบุชื่อ' }}</span>
-          <span class="text-xs text-slate-400">{{ fmtTime(comment.created_at) }}</span>
-          <span v-if="comment.is_edited" class="text-[11px] text-slate-400">· แก้ไขแล้ว</span>
+          <span class="text-sm font-semibold text-stone-800">{{ comment.commenter_name || 'ไม่ระบุชื่อ' }}</span>
+          <span class="text-xs text-stone-400">{{ fmtTime(comment.created_at) }}</span>
+          <span v-if="comment.is_edited" class="text-[11px] text-stone-400">· แก้ไขแล้ว</span>
         </div>
-        <p class="text-sm text-slate-700 mt-0.5 whitespace-pre-wrap break-words">{{ comment.body }}</p>
+        <p class="text-sm text-stone-700 mt-0.5 whitespace-pre-wrap break-words">{{ comment.body }}</p>
         <!-- action: ตอบกลับ / แจ้ง (ทุกคน ยกเว้นตัวเอง) / ซ่อน (สภา/แอดมิน) -->
         <div class="mt-1 flex items-center gap-3 text-xs">
           <button
             type="button"
             data-testid="reply-btn"
             @click="replying = !replying"
-            class="text-slate-400 hover:text-red-600 font-medium flex items-center gap-1"
+            class="text-stone-400 hover:text-[#B91C1C] font-medium flex items-center gap-1"
           >
             <i class="bi bi-reply"></i> ตอบกลับ
           </button>
@@ -157,7 +157,7 @@ async function handleHide() {
             data-testid="report-btn"
             @click="handleReport"
             :disabled="acting"
-            class="text-slate-400 hover:text-amber-600 font-medium flex items-center gap-1 disabled:opacity-40"
+            class="text-stone-400 hover:text-[#B91C1C] font-medium flex items-center gap-1 disabled:opacity-40"
           >
             <i class="bi bi-flag"></i> แจ้ง
           </button>
@@ -167,7 +167,7 @@ async function handleHide() {
             data-testid="hide-btn"
             @click="handleHide"
             :disabled="acting"
-            class="text-slate-400 hover:text-red-600 font-medium flex items-center gap-1 disabled:opacity-40"
+            class="text-stone-400 hover:text-[#B91C1C] font-medium flex items-center gap-1 disabled:opacity-40"
           >
             <i class="bi bi-eye-slash"></i> ซ่อน
           </button>
@@ -180,14 +180,14 @@ async function handleHide() {
             type="text"
             placeholder="พิมพ์คำตอบ..."
             maxlength="1000"
-            class="flex-1 px-3 py-2 border border-slate-300 rounded-xl text-sm"
+            class="flex-1 px-3 py-2 border border-stone-300 rounded-xl text-sm"
             @keyup.enter="submitReply"
           />
           <button
             type="button"
             :disabled="posting || !replyBody.trim()"
             @click="submitReply"
-            class="px-3.5 py-2 bg-red-600 text-white rounded-xl text-sm hover:bg-red-700 disabled:opacity-50"
+            class="px-3.5 py-2 bg-[#B91C1C] text-white rounded-xl text-sm hover:bg-[#991B1B] disabled:opacity-50"
           >
             {{ posting ? '...' : 'ตอบ' }}
           </button>

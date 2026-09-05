@@ -58,75 +58,49 @@ async function handleLogin() {
 </script>
 
 <template>
-  <div class="relative flex min-h-screen flex-col overflow-x-clip bg-[#FAFAFC] font-sans text-slate-900 selection:bg-rose-500/30 selection:text-rose-900">
-    <!-- 🎨 พื้นหลังตกแต่ง: Premium Animated Glow -->
-    <div class="pointer-events-none absolute inset-0 overflow-hidden">
-      <div class="animate-blob absolute -right-[5%] -top-[10%] h-[800px] w-[800px] rounded-full bg-gradient-to-b from-red-100/70 to-rose-50/20 opacity-70 blur-[100px]"></div>
-      <div class="animate-blob animation-delay-2000 absolute -left-[10%] top-[35%] h-[600px] w-[600px] rounded-full bg-gradient-to-tr from-rose-200/40 to-transparent opacity-60 blur-[80px]"></div>
-      <div
-        class="absolute inset-0 opacity-50 [mask-image:linear-gradient(to_bottom,white,transparent)] [background-image:url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8vMjAwMC9zdmciPjxjaXJjbGUgY3g9IjEiIGN5PSIxIiByPSIxIiBmaWxsPSJyZ2JhKDAsIDAsIDAsIDAuMDQpIi8+PC9zdmc+')]"
-      ></div>
-    </div>
+  <div class="relative flex min-h-screen flex-col overflow-x-clip bg-[#FAFAF9] font-sans text-stone-900 selection:bg-[#B91C1C]/15 selection:text-[#B91C1C]">
+    <!-- เส้นกริดจุด "กระดาษ" (เดียวกับ Landing hero) -->
+    <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(#e7e5e4_1px,transparent_1px)] [background-size:16px_16px] opacity-50"></div>
 
     <!-- ⚡ Navbar: Minimalist -->
-    <header class="relative z-20 mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-6 lg:px-8 animate-fade-in">
-      <div class="flex items-center gap-3">
-        <div class="flex items-center gap-2">
-          <div class="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200/60 bg-white p-1 shadow-sm transition-transform duration-300 hover:scale-105">
-            <img src="/logos/school-logo.png" alt="โลโก้โรงเรียน" class="h-full w-full object-contain" />
-          </div>
-          <div class="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200/60 bg-white p-1 shadow-sm transition-transform duration-300 hover:scale-105">
-            <img src="/logos/council-logo.png" alt="โลโก้สภานักเรียน" class="h-full w-full object-contain" />
-          </div>
+    <header class="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-6 lg:px-8 animate-fade-in">
+      <div class="flex items-center gap-4">
+        <div class="flex items-center gap-3">
+          <img src="/logos/school-logo.png" alt="ตราโรงเรียนพิริยาลัยจังหวัดแพร่" class="h-10 w-auto object-contain" />
+          <span class="h-6 w-px bg-stone-300"></span>
+          <img src="/logos/council-logo.png" alt="ตราสภานักเรียน" class="h-10 w-auto object-contain" />
         </div>
-        <div class="mx-2 hidden h-6 border-l border-slate-300 sm:block"></div>
-        <router-link to="/" class="group flex items-center gap-1">
-          <span class="text-xl font-black tracking-tight text-slate-800">
-            PIRI<span class="bg-gradient-to-r from-red-600 to-rose-600 bg-clip-text text-transparent">voice</span>
-          </span>
+        <router-link to="/" class="flex flex-col items-start leading-none">
+          <span class="text-lg font-bold tracking-tight text-stone-900">PIRI<span class="text-[#B91C1C]">voice</span></span>
+          <span class="mt-1 hidden text-[10px] font-semibold uppercase tracking-[0.18em] text-stone-400 sm:block">Student Council</span>
         </router-link>
       </div>
-      <div class="hidden md:flex relative group">
-        <div class="absolute inset-0 rounded-full bg-red-400/20 opacity-0 blur-md transition-opacity duration-500 group-hover:opacity-100"></div>
-        <span class="relative rounded-full border border-slate-200/80 bg-white/70 px-4 py-1.5 text-xs font-semibold text-slate-600 shadow-sm backdrop-blur-md">
-          🏫 เสียงจากชาวพิริยาลัย
-        </span>
+      <div class="hidden md:block">
+        <span class="rounded-full border border-stone-200 bg-white px-4 py-1.5 text-xs font-semibold text-stone-500">🏫 เสียงจากชาวพิริยาลัย</span>
       </div>
     </header>
 
     <!-- 🔐 ส่วนกลาง: เฉพาะการเข้าสู่ระบบ -->
     <main class="relative z-10 flex flex-1 items-center justify-center px-6 py-10">
       <div class="w-full max-w-[420px] animate-slide-up-fade">
-        <!-- การ์ดซ้อนด้านหลัง -->
-        <div class="absolute inset-0 -z-10 -translate-y-4 scale-[0.94] rounded-[2.5rem] border border-red-100/50 bg-gradient-to-br from-rose-100/80 to-white shadow-2xl shadow-rose-200/50"></div>
-
-        <div class="relative rounded-[2rem] border border-white bg-white/90 p-8 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] backdrop-blur-xl sm:p-10">
+        <div class="rounded-3xl border border-stone-200 bg-white p-8 sm:p-10">
           <div class="mb-8 text-center">
-            <!-- โลโก้ทั้ง 2 -->
-            <div class="mb-5 flex items-center justify-center gap-4">
-              <div class="relative flex h-16 w-16 items-center justify-center rounded-full bg-white p-1.5 shadow-lg ring-2 ring-red-100 ring-offset-2">
-                <img src="/logos/school-logo.png" alt="โลโก้โรงเรียน" class="relative h-full w-full object-contain" />
-              </div>
-              <div class="relative flex h-16 w-16 items-center justify-center rounded-full bg-white p-1.5 shadow-lg ring-2 ring-rose-100 ring-offset-2">
-                <img src="/logos/council-logo.png" alt="โลโก้สภานักเรียน" class="relative h-full w-full object-contain" />
-              </div>
-            </div>
-
-            <h2 class="text-2xl font-black tracking-tight text-slate-900">เข้าสู่ระบบ</h2>
-            <p class="mt-2 text-sm font-medium text-slate-500">กรุณากรอกข้อมูลเพื่อเข้าใช้งานระบบ</p>
+            <p class="mb-3 text-[11px] font-bold uppercase tracking-widest text-[#B91C1C]">Student Council · PRSC</p>
+            <h2 class="text-3xl font-bold tracking-tight text-stone-900">เข้าสู่ระบบ</h2>
+            <p class="mt-2 text-sm text-stone-500">ลงชื่อเข้าใช้ด้วยรหัสนักเรียน / บุคลากร</p>
           </div>
 
           <form @submit.prevent="handleLogin" class="space-y-5">
             <!-- กลุ่มรหัสนักเรียน -->
             <div class="group">
-              <label class="mb-1.5 block text-sm font-semibold text-slate-700 transition-colors group-focus-within:text-red-600">รหัสนักเรียน</label>
+              <label class="mb-1.5 block text-sm font-semibold text-stone-700 transition-colors group-focus-within:text-[#B91C1C]">รหัสนักเรียน</label>
               <div class="relative">
-                <i class="bi bi-person absolute left-4 top-1/2 -translate-y-1/2 text-lg text-slate-400 transition-colors group-focus-within:text-red-500"></i>
+                <i class="bi bi-person absolute left-4 top-1/2 -translate-y-1/2 text-lg text-stone-400 transition-colors group-focus-within:text-[#B91C1C]"></i>
                 <input
                   v-model="username"
                   type="text"
                   autocomplete="username"
-                  class="w-full rounded-xl border border-slate-200 bg-slate-50 py-3.5 pl-11 pr-4 text-sm shadow-sm outline-none transition-all focus:border-red-500 focus:bg-white focus:ring-[3px] focus:ring-red-500/20 sm:text-base"
+                  class="w-full rounded-xl border border-stone-200 bg-white py-3.5 pl-11 pr-4 text-sm outline-none transition-colors focus:border-[#B91C1C] focus:ring-[3px] focus:ring-[#B91C1C]/20 sm:text-base"
                   placeholder="เช่น 41001"
                   :disabled="isLoading"
                 />
@@ -135,21 +109,21 @@ async function handleLogin() {
 
             <!-- กลุ่มรหัสผ่าน -->
             <div class="group">
-              <label class="mb-1.5 block text-sm font-semibold text-slate-700 transition-colors group-focus-within:text-red-600">รหัสผ่าน</label>
+              <label class="mb-1.5 block text-sm font-semibold text-stone-700 transition-colors group-focus-within:text-[#B91C1C]">รหัสผ่าน</label>
               <div class="relative">
-                <i class="bi bi-lock absolute left-4 top-1/2 -translate-y-1/2 text-lg text-slate-400 transition-colors group-focus-within:text-red-500"></i>
+                <i class="bi bi-lock absolute left-4 top-1/2 -translate-y-1/2 text-lg text-stone-400 transition-colors group-focus-within:text-[#B91C1C]"></i>
                 <input
                   v-model="password"
                   :type="showPassword ? 'text' : 'password'"
                   autocomplete="current-password"
-                  class="w-full rounded-xl border border-slate-200 bg-slate-50 py-3.5 pl-11 pr-12 text-sm shadow-sm outline-none transition-all focus:border-red-500 focus:bg-white focus:ring-[3px] focus:ring-red-500/20 sm:text-base"
+                  class="w-full rounded-xl border border-stone-200 bg-white py-3.5 pl-11 pr-12 text-sm outline-none transition-colors focus:border-[#B91C1C] focus:ring-[3px] focus:ring-[#B91C1C]/20 sm:text-base"
                   placeholder="••••••••"
                   :disabled="isLoading"
                 />
                 <button
                   type="button"
                   @click="showPassword = !showPassword"
-                  class="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                  class="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600"
                   :aria-label="showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'"
                 >
                   <i :class="showPassword ? 'bi bi-eye-slash' : 'bi bi-eye'"></i>
@@ -157,11 +131,11 @@ async function handleLogin() {
               </div>
             </div>
 
-            <!-- ปุ่ม Submit แบบ Animated Gradient -->
+            <!-- ปุ่ม Submit (flat cardinal) -->
             <button
               type="submit"
               :disabled="isLoading"
-              class="relative mt-4 flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-red-600 via-rose-500 to-red-600 bg-[length:200%_auto] py-3.5 text-base font-bold text-white shadow-lg shadow-red-500/30 transition-all hover:bg-right hover:shadow-red-500/50 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:ring-offset-2 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
+              class="mt-4 flex w-full items-center justify-center rounded-xl bg-[#B91C1C] py-3.5 text-base font-bold text-white transition-colors hover:bg-[#991B1B] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B91C1C] focus-visible:ring-offset-2 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
             >
               <i v-if="!isLoading" class="bi bi-arrow-right-circle mr-2 text-lg"></i>
               <i v-else class="bi bi-arrow-repeat mr-2 animate-spin text-lg"></i>
@@ -170,13 +144,13 @@ async function handleLogin() {
           </form>
 
           <!-- Note box: รหัสผ่านเริ่มต้น -->
-          <div class="mt-6 rounded-xl border-y border-r border-slate-100/80 border-l-4 border-l-red-500 bg-gradient-to-r from-rose-50 to-slate-50 p-4 shadow-sm">
+          <div class="mt-6 border-l-2 border-l-[#B91C1C] border border-stone-200 bg-stone-50 p-4">
             <div class="flex items-start gap-3">
-              <i class="bi bi-info-circle-fill mt-0.5 text-red-500"></i>
-              <p class="text-[12px] leading-relaxed text-slate-600">
-                <strong class="mb-0.5 block font-bold text-slate-800">รหัสผ่านเริ่มต้น</strong>
+              <i class="bi bi-info-circle-fill mt-0.5 text-[#B91C1C]"></i>
+              <p class="text-[12px] leading-relaxed text-stone-600">
+                <strong class="mb-0.5 block font-bold text-stone-800">รหัสผ่านเริ่มต้น</strong>
                 สำหรับนักเรียนและบุคลากร รหัสผ่านตั้งต้นคือ
-                <code class="rounded border border-red-200 bg-white px-1.5 py-0.5 font-mono text-red-600 shadow-sm">รหัสนักเรียน/บุคลากร</code>
+                <code class="rounded border border-stone-200 bg-white px-1.5 py-0.5 font-mono text-[#B91C1C]">รหัสนักเรียน/บุคลากร</code>
                 ของท่าน
               </p>
             </div>
@@ -186,21 +160,21 @@ async function handleLogin() {
     </main>
 
     <!-- Footer -->
-    <footer class="relative z-10 border-t border-slate-200/60 bg-white py-8 text-center">
+    <footer class="relative z-10 border-t border-stone-200 bg-white py-8 text-center">
       <div class="flex flex-col items-center justify-center gap-2">
-        <p class="text-sm font-medium text-slate-500">
-          คณะกรรมการสภานักเรียน · <span class="font-bold text-slate-700">โรงเรียนพิริยาลัยจังหวัดแพร่</span>
+        <p class="text-sm font-medium text-stone-500">
+          คณะกรรมการสภานักเรียน · <span class="font-bold text-stone-700">โรงเรียนพิริยาลัยจังหวัดแพร่</span>
         </p>
-        <div class="flex flex-col items-center gap-2 text-xs font-medium text-slate-400 sm:flex-row">
+        <div class="flex flex-col items-center gap-2 text-xs font-medium text-stone-400 sm:flex-row">
           <span>© 2026 PIRIvoice. สงวนลิขสิทธิ์</span>
-          <span class="hidden text-slate-300 sm:inline-block">•</span>
+          <span class="hidden text-stone-300 sm:inline-block">•</span>
           <div class="flex items-center gap-1.5">
             <span>พัฒนาโดย</span>
             <a
               href="https://www.singto1597.xyz/"
               target="_blank"
               rel="noopener noreferrer"
-              class="rounded-md border border-slate-200/60 bg-slate-100 px-2.5 py-1 font-semibold text-slate-600 transition-all duration-200 hover:border-red-200 hover:bg-red-50 hover:text-red-600 hover:shadow-sm"
+              class="rounded-md border border-stone-200 bg-stone-100 px-2.5 py-1 font-semibold text-stone-600 transition-colors hover:border-[#B91C1C]/40 hover:bg-[#B91C1C]/5 hover:text-[#B91C1C]"
             >
               นายพัฒนพล สุธรรม
             </a>
@@ -212,7 +186,7 @@ async function handleLogin() {
 </template>
 
 <style scoped>
-/* Animations ที่ดูเป็นธรรมชาติแบบงาน Premium */
+/* Animations — เรียบ สั้น ไม่มีลูกบอลเรืองแสง */
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -221,20 +195,12 @@ async function handleLogin() {
 @keyframes slideUpFade {
   from {
     opacity: 0;
-    transform: translateY(20px) scale(0.98);
+    transform: translateY(20px);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
-}
-
-/* อนิเมชันทำให้พื้นหลังขยับสไลด์ไปมาเบาๆ */
-@keyframes blob {
-  0% { transform: translate(0px, 0px) scale(1); }
-  33% { transform: translate(30px, -50px) scale(1.05); }
-  66% { transform: translate(-20px, 20px) scale(0.95); }
-  100% { transform: translate(0px, 0px) scale(1); }
 }
 
 .animate-fade-in {
@@ -244,14 +210,6 @@ async function handleLogin() {
 .animate-slide-up-fade {
   opacity: 0;
   animation: slideUpFade 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-.animate-blob {
-  animation: blob 15s infinite alternate ease-in-out;
-}
-
-.animation-delay-2000 {
-  animation-delay: 2s;
 }
 
 /* ลบลูกศรใน input type number */
@@ -265,13 +223,12 @@ input[type="number"]::-webkit-outer-spin-button {
 input:focus-visible,
 button:focus-visible,
 a:focus-visible {
-  outline: 2px solid rgba(225, 29, 72, 0.65);
+  outline: 2px solid rgba(185, 28, 28, 0.55);
   outline-offset: 2px;
 }
 
 /* ♿ เคารพผู้ที่ปิดแอนิเมชัน */
 @media (prefers-reduced-motion: reduce) {
-  .animate-blob,
   .animate-slide-up-fade,
   .animate-fade-in {
     animation: none !important;
