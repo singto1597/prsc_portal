@@ -103,42 +103,42 @@ const quickActions = computed<QuickAction[]>(() => {
   if (authStore.hasPermission('VIEW_DASHBOARD')) {
     acts.push({
       key: 'dashboard', label: 'แดชบอร์ด', desc: 'สถิติภาพรวม', icon: 'bi-grid-1x2',
-      to: '/app/dashboard', badge: 0, accent: 'from-red-500/15 to-rose-400/15 text-red-600',
+      to: '/app/dashboard', badge: 0, accent: 'bg-stone-100 text-stone-700',
     });
   }
   if (authStore.hasPermission('RECEIVE_ISSUES')) {
     acts.push({
       key: 'received', label: 'เรื่องที่รับ', desc: 'คิวรอจัดการ', icon: 'bi-inbox',
       to: '/app/issues/received', badge: notificationsStore.counts.issue_received || 0,
-      accent: 'from-rose-500/15 to-pink-400/15 text-rose-600',
+      accent: 'bg-stone-100 text-stone-700',
     });
   }
   acts.push({
     key: 'boards', label: 'PIRI Boards', desc: 'โหวต + พูดคุย', icon: 'bi-columns-gap',
     to: '/app/boards', badge: notificationsStore.counts.board || 0,
-    accent: 'from-red-500/15 to-rose-400/15 text-red-600',
+    accent: 'bg-stone-100 text-stone-700',
   });
   acts.push({
     key: 'playbooks', label: 'P.R. Playbooks', desc: 'คู่มือสภานักเรียน', icon: 'bi-journal-bookmark-fill',
-    to: '/app/playbooks', badge: 0, accent: 'from-rose-500/15 to-orange-300/15 text-rose-600',
+    to: '/app/playbooks', badge: 0, accent: 'bg-stone-100 text-stone-700',
   });
   if (authStore.isCouncilAuthority) {
     acts.push({
       key: 'moderation', label: 'จัดการรายงาน', desc: 'คิวรีวิวคอมเมนต์', icon: 'bi-flag-fill',
       to: '/app/boards/reports', badge: notificationsStore.counts.report || 0,
-      accent: 'from-red-500/15 to-rose-400/15 text-red-600',
+      accent: 'bg-stone-100 text-stone-700',
     });
   }
   if (authStore.hasPermission('MANAGE_STUDENTS')) {
     acts.push({
       key: 'students', label: 'นักเรียน', desc: 'รายชื่อ + ระดับชั้น', icon: 'bi-people',
-      to: '/app/students', badge: 0, accent: 'from-rose-500/15 to-purple-200/15 text-rose-600',
+      to: '/app/students', badge: 0, accent: 'bg-stone-100 text-stone-700',
     });
   }
   if (authStore.hasPermission('VIEW_AUDIT_LOG')) {
     acts.push({
       key: 'audit', label: 'บันทึกการใช้งาน', desc: 'Audit log', icon: 'bi-clock-history',
-      to: '/app/audit-logs', badge: 0, accent: 'from-red-500/15 to-amber-200/15 text-red-600',
+      to: '/app/audit-logs', badge: 0, accent: 'bg-stone-100 text-stone-700',
     });
   }
   return acts;
@@ -243,9 +243,9 @@ const loadingAnnounce = ref(true);
 const announceError = ref(false);
 
 const annIconColor: Record<string, string> = {
-  urgent: 'bg-red-500 shadow-red-500/50',
-  high: 'bg-amber-400 shadow-amber-400/50',
-  normal: 'bg-slate-300',
+  urgent: 'bg-[#B91C1C]',
+  high: 'bg-[#991B1B]',
+  normal: 'bg-stone-300',
 };
 
 async function loadAnnouncements() {
@@ -300,30 +300,29 @@ const hasActiveIssues = computed(() => {
 <template>
   <div ref="rootEl" class="space-y-5 pb-2 sm:space-y-6">
     <!-- ============ Hero greeting ============ -->
-    <section class="relative overflow-hidden rounded-[2rem] border border-white/70 bg-white/75 p-6 shadow-[0_25px_70px_-40px_rgba(190,18,60,0.5)] backdrop-blur-2xl sm:p-8">
-      <!-- กลิ่นอายแสงแดง -->
-      <div class="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-gradient-to-br from-red-200/60 to-rose-100/40 blur-3xl"></div>
-      <div class="pointer-events-none absolute -bottom-24 -left-10 h-56 w-56 rounded-full bg-gradient-to-tr from-rose-200/40 to-transparent blur-3xl"></div>
+    <section class="relative overflow-hidden rounded-2xl border border-stone-200 bg-white p-6 sm:p-8">
+      <!-- ลายจุดพื้น (Editorial dot-grid) -->
+      <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(#e7e5e4_1px,transparent_1px)] [background-size:16px_16px] opacity-40"></div>
 
       <div class="relative flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
         <!-- ทักทาย -->
         <div class="min-w-0">
-          <div class="flex items-center gap-3">
-            <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.1rem] bg-gradient-to-br from-red-500 to-rose-600 text-lg font-black text-white shadow-lg shadow-red-500/35 ring-2 ring-white sm:h-16 sm:w-16">
+          <div class="flex items-center gap-4">
+            <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#B91C1C] text-lg font-bold text-white sm:h-16 sm:w-16">
               {{ avatarChar }}
             </span>
             <div>
-              <p class="text-xs font-bold uppercase tracking-[0.14em] text-rose-500">{{ greeting }} 👋</p>
-              <h1 class="mt-0.5 truncate text-xl font-black tracking-tight text-slate-900 sm:text-2xl">
+              <p class="text-[11px] font-bold uppercase tracking-widest text-[#B91C1C]">{{ greeting }} 👋</p>
+              <h1 class="mt-1 truncate text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
                 {{ displayName }}
               </h1>
-              <p class="mt-0.5 text-[11px] font-semibold text-slate-400 sm:text-xs">
+              <p class="mt-0.5 text-xs font-semibold text-stone-500">
                 {{ roleLine }}
               </p>
             </div>
           </div>
-          <p class="mt-4 flex items-center gap-1.5 text-xs font-medium text-slate-500 sm:text-sm">
-            <i class="bi bi-calendar3 text-red-400"></i>
+          <p class="mt-4 flex items-center gap-1.5 text-xs font-medium text-stone-500 sm:text-sm">
+            <i class="bi bi-calendar3 text-[#B91C1C]"></i>
             {{ dateLabel }}
           </p>
         </div>
@@ -332,14 +331,14 @@ const hasActiveIssues = computed(() => {
         <div class="flex flex-col gap-2.5">
           <RouterLink
             to="/app/issues/new"
-            class="group relative flex items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-r from-red-600 via-rose-500 to-red-600 bg-[length:200%_auto] px-6 py-3.5 text-sm font-bold text-white shadow-xl shadow-rose-500/30 transition-all duration-300 hover:bg-right hover:shadow-rose-500/50 active:scale-[0.97] sm:text-base"
+            class="inline-flex items-center justify-center gap-2 rounded-xl bg-[#B91C1C] px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#991B1B] active:scale-[0.97] sm:text-base"
           >
             <i class="bi bi-plus-lg text-lg"></i>
             แจ้งเรื่อง / ความคิดเห็น
           </RouterLink>
           <RouterLink
             to="/app/issues/mine"
-            class="flex items-center justify-center gap-2 rounded-2xl border border-slate-200/80 bg-white/80 px-6 py-3 text-sm font-bold text-slate-600 backdrop-blur transition-all duration-300 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 active:scale-[0.97]"
+            class="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-200 bg-white px-6 py-3 text-sm font-semibold text-stone-700 transition-colors hover:bg-stone-50 active:scale-[0.97]"
           >
             <i class="bi bi-file-earmark-text"></i>
             ดูเรื่องของฉัน
@@ -349,21 +348,21 @@ const hasActiveIssues = computed(() => {
     </section>
 
     <!-- ============ My-issue summary (ทุกคน) ============ -->
-    <section class="overflow-hidden rounded-[2rem] border border-white/70 bg-white/75 shadow-[0_20px_60px_-40px_rgba(190,18,60,0.45)] backdrop-blur-2xl">
+    <section class="overflow-hidden rounded-2xl border border-stone-200 bg-white">
       <!-- Header -->
       <div class="flex items-center justify-between gap-3 px-6 pb-1 pt-6">
         <div class="flex items-center gap-3">
-          <span class="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-red-500/15 to-rose-400/15 text-red-600">
+          <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-stone-100 text-stone-600">
             <i class="bi bi-stack text-lg"></i>
           </span>
           <div>
-            <h2 class="text-base font-black tracking-tight text-slate-900 sm:text-lg">สรุปเรื่องของฉัน</h2>
-            <p class="text-[11px] font-medium text-slate-400 sm:text-xs">ติดตามสถานะเรื่องที่คุณแจ้งไว้</p>
+            <h2 class="text-base font-bold tracking-tight text-stone-900 sm:text-lg">สรุปเรื่องของฉัน</h2>
+            <p class="text-[11px] font-medium text-stone-400 sm:text-xs">ติดตามสถานะเรื่องที่คุณแจ้งไว้</p>
           </div>
         </div>
         <RouterLink
           to="/app/issues/mine"
-          class="hidden shrink-0 items-center gap-1 rounded-xl px-3 py-2 text-xs font-bold text-rose-600 transition-colors hover:bg-rose-50 sm:flex"
+          class="hidden shrink-0 items-center gap-1 rounded-xl px-3 py-2 text-xs font-bold text-[#B91C1C] transition-colors hover:bg-stone-100 sm:flex"
         >
           ดูทั้งหมด <i class="bi bi-arrow-right"></i>
         </RouterLink>
@@ -371,52 +370,52 @@ const hasActiveIssues = computed(() => {
 
       <!-- Skeleton -->
       <div v-if="loadingSummary" class="px-6 pb-6 pt-3">
-        <div class="skeleton-shimmer rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-          <div class="flex flex-wrap items-center gap-3">
-            <div class="h-14 w-14 rounded-2xl bg-slate-200"></div>
-            <div class="space-y-2">
-              <div class="h-4 w-40 rounded-lg bg-slate-200"></div>
-              <div class="h-3 w-24 rounded-lg bg-slate-100"></div>
-            </div>
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="h-14 w-14 animate-pulse rounded-2xl bg-stone-100"></div>
+          <div class="space-y-2">
+            <div class="h-4 w-40 animate-pulse rounded-lg bg-stone-100"></div>
+            <div class="h-3 w-24 animate-pulse rounded-lg bg-stone-100"></div>
           </div>
-          <div class="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div v-for="n in 4" :key="n" class="h-16 rounded-xl bg-slate-100"></div>
+        </div>
+        <div class="mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-stone-200 bg-stone-200 sm:grid-cols-4">
+          <div v-for="n in 4" :key="n" class="bg-white p-5">
+            <div class="h-9 animate-pulse rounded-xl bg-stone-100"></div>
           </div>
         </div>
       </div>
 
       <!-- Error -->
       <div v-else-if="summaryError" class="px-6 pb-6 pt-3">
-        <div class="flex flex-col items-center justify-center gap-3 rounded-2xl border border-rose-100 bg-rose-50/60 px-6 py-8 text-center">
-          <span class="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-rose-500 shadow-sm">
+        <div class="flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-stone-200 bg-white px-6 py-12 text-center">
+          <span class="flex h-11 w-11 items-center justify-center rounded-2xl bg-stone-100 text-stone-400">
             <i class="bi bi-wifi-off text-lg"></i>
           </span>
-          <p class="text-sm font-semibold text-slate-600">โหลดข้อมูลไม่สำเร็จ</p>
+          <p class="text-sm font-semibold text-stone-700">โหลดข้อมูลไม่สำเร็จ</p>
           <button
             type="button"
             @click="loadSummary"
-            class="rounded-xl bg-white px-4 py-2 text-xs font-bold text-rose-600 shadow-sm transition-colors hover:bg-rose-50"
+            class="inline-flex items-center gap-1.5 rounded-xl bg-stone-900 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-stone-800"
           >
-            <i class="bi bi-arrow-clockwise mr-1"></i> ลองใหม่
+            <i class="bi bi-arrow-clockwise"></i> ลองใหม่
           </button>
         </div>
       </div>
 
       <!-- Empty: ยังไม่เคยแจ้ง -->
       <div v-else-if="summary && summary.total_issues === 0" class="px-6 pb-7 pt-2">
-        <div class="flex flex-col items-center gap-4 rounded-3xl border border-dashed border-rose-200/80 bg-gradient-to-br from-rose-50/70 to-white px-6 py-9 text-center">
-          <span class="flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-red-500 to-rose-600 text-2xl text-white shadow-lg shadow-red-500/30">
+        <div class="flex flex-col items-center gap-4 rounded-2xl border-2 border-dashed border-stone-200 bg-white px-6 py-12 text-center">
+          <span class="flex h-14 w-14 items-center justify-center rounded-2xl bg-stone-100 text-2xl text-stone-400">
             <i class="bi bi-megaphone"></i>
           </span>
           <div>
-            <p class="text-base font-black text-slate-800">ยังไม่เคยแจ้งเรื่องเลย</p>
-            <p class="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-slate-500 sm:text-sm">
+            <p class="text-base font-bold text-stone-800">ยังไม่เคยแจ้งเรื่องเลย</p>
+            <p class="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-stone-500 sm:text-sm">
               เจอปัญหาหรือมีข้อเสนอแนะ? แจ้งเข้ามาได้เลย หัวหน้าห้องและสภานักเรียนจะช่วยติดตามให้
             </p>
           </div>
           <RouterLink
             to="/app/issues/new"
-            class="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-red-600 via-rose-500 to-red-600 bg-[length:200%_auto] px-6 py-3 text-sm font-bold text-white shadow-lg shadow-rose-500/30 transition-all duration-300 hover:bg-right hover:shadow-rose-500/50 active:scale-[0.97]"
+            class="inline-flex items-center gap-2 rounded-xl bg-[#B91C1C] px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#991B1B] active:scale-[0.97]"
           >
             <i class="bi bi-plus-lg"></i> แจ้งเรื่องแรกเลย
           </RouterLink>
@@ -424,35 +423,33 @@ const hasActiveIssues = computed(() => {
       </div>
 
       <!-- Loaded with data -->
-      <div v-else-if="summary" class="px-6 pb-6 pt-2">
-        <!-- ตัวเลขหลัก -->
-        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
-          <div class="rounded-2xl bg-gradient-to-br from-red-600 to-rose-600 p-[1.5px] shadow-lg shadow-red-500/20">
-            <div class="flex h-full flex-col justify-center rounded-[calc(1rem-1.5px)] bg-white/95 px-4 py-3.5">
-              <p class="text-[10px] font-bold uppercase tracking-wider text-rose-500">แจ้งไปทั้งหมด</p>
-              <p class="mt-0.5 text-2xl font-black leading-none text-slate-900 sm:text-3xl" :data-count="summary.total_issues">0</p>
-            </div>
+      <div v-else-if="summary" class="px-6 pb-6 pt-3">
+        <!-- ตัวเลขหลัก (ledger) -->
+        <div class="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-stone-200 bg-stone-200 sm:grid-cols-4">
+          <div class="bg-white p-4 sm:p-5">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-stone-500">แจ้งไปทั้งหมด</p>
+            <p class="mt-1 font-display text-2xl font-bold leading-none text-stone-900 sm:text-3xl" :data-count="summary.total_issues">0</p>
           </div>
 
-          <div class="rounded-2xl border border-amber-100 bg-amber-50/70 px-4 py-3.5">
-            <p class="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-amber-600">
-              <span class="h-1.5 w-1.5 rounded-full bg-amber-400"></span> รอรับเรื่อง
+          <div class="bg-white p-4 sm:p-5">
+            <p class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-stone-500">
+              <span class="h-1.5 w-1.5 rounded-full bg-stone-400"></span> รอรับเรื่อง
             </p>
-            <p class="mt-0.5 text-2xl font-black leading-none text-slate-900 sm:text-3xl" :data-count="statusMap['pending'] ?? 0">0</p>
+            <p class="mt-1 font-display text-2xl font-bold leading-none text-stone-900 sm:text-3xl" :data-count="statusMap['pending'] ?? 0">0</p>
           </div>
 
-          <div class="rounded-2xl border border-blue-100 bg-blue-50/70 px-4 py-3.5">
-            <p class="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-blue-600">
-              <span class="h-1.5 w-1.5 rounded-full bg-blue-500"></span> กำลังดำเนินการ
+          <div class="bg-white p-4 sm:p-5">
+            <p class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-stone-500">
+              <span class="h-1.5 w-1.5 rounded-full bg-[#B91C1C]"></span> กำลังดำเนินการ
             </p>
-            <p class="mt-0.5 text-2xl font-black leading-none text-slate-900 sm:text-3xl" :data-count="statusMap['in_progress'] ?? 0">0</p>
+            <p class="mt-1 font-display text-2xl font-bold leading-none text-stone-900 sm:text-3xl" :data-count="statusMap['in_progress'] ?? 0">0</p>
           </div>
 
-          <div class="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3.5">
-            <p class="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-emerald-600">
+          <div class="bg-white p-4 sm:p-5">
+            <p class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-stone-500">
               <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span> เสร็จแล้ว
             </p>
-            <p class="mt-0.5 text-2xl font-black leading-none text-slate-900 sm:text-3xl" :data-count="statusMap['resolved'] ?? 0">0</p>
+            <p class="mt-1 font-display text-2xl font-bold leading-none text-stone-900 sm:text-3xl" :data-count="statusMap['resolved'] ?? 0">0</p>
           </div>
         </div>
 
@@ -461,61 +458,61 @@ const hasActiveIssues = computed(() => {
           <RouterLink
             v-if="(statusMap['escalated'] ?? 0) > 0"
             :to="{ name: 'my-issues', query: { status: 'escalated' } }"
-            class="inline-flex items-center gap-1.5 rounded-full bg-orange-50 px-3 py-1.5 text-[11px] font-bold text-orange-700 ring-1 ring-orange-100 transition-colors hover:bg-orange-100"
+            class="inline-flex items-center gap-1.5 rounded-full bg-[#B91C1C]/10 px-3 py-1.5 text-[11px] font-bold text-[#B91C1C] ring-1 ring-[#B91C1C]/20 transition-colors hover:bg-[#B91C1C]/15"
           >
             <i class="bi bi-arrow-up-circle text-xs"></i> ส่งต่อระดับบน {{ statusMap['escalated'] }}
           </RouterLink>
           <RouterLink
             v-if="hasActiveIssues > 0"
             :to="{ name: 'my-issues', query: { status: 'pending,in_progress,escalated' } }"
-            class="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-[11px] font-bold text-slate-600 ring-1 ring-slate-200 transition-colors hover:bg-slate-200"
+            class="inline-flex items-center gap-1.5 rounded-full bg-stone-100 px-3 py-1.5 text-[11px] font-bold text-stone-600 ring-1 ring-stone-200 transition-colors hover:bg-stone-200"
           >
-            <i class="bi bi-lightning-charge text-xs text-amber-500"></i> กำลังดำเนินการ/ส่งต่อรวม {{ hasActiveIssues }}
+            <i class="bi bi-lightning-charge text-xs text-stone-500"></i> กำลังดำเนินการ/ส่งต่อรวม {{ hasActiveIssues }}
           </RouterLink>
           <RouterLink
             v-if="(statusMap['rejected'] ?? 0) > 0"
             :to="{ name: 'my-issues', query: { status: 'rejected' } }"
-            class="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-3 py-1.5 text-[11px] font-bold text-rose-600 ring-1 ring-rose-100 transition-colors hover:bg-rose-100"
+            class="inline-flex items-center gap-1.5 rounded-full bg-stone-100 px-3 py-1.5 text-[11px] font-bold text-stone-600 ring-1 ring-stone-200 transition-colors hover:bg-stone-200"
           >
             <i class="bi bi-x-circle text-xs"></i> ปัดตก {{ statusMap['rejected'] }}
           </RouterLink>
           <RouterLink
             v-if="(statusMap['cancelled'] ?? 0) > 0"
             :to="{ name: 'my-issues', query: { status: 'cancelled' } }"
-            class="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-[11px] font-bold text-slate-500 ring-1 ring-slate-200 transition-colors hover:bg-slate-200"
+            class="inline-flex items-center gap-1.5 rounded-full bg-stone-100 px-3 py-1.5 text-[11px] font-bold text-stone-500 ring-1 ring-stone-200 transition-colors hover:bg-stone-200"
           >
             <i class="bi bi-x-octagon text-xs"></i> ยกเลิก {{ statusMap['cancelled'] }}
           </RouterLink>
           <RouterLink
             to="/app/issues/mine"
-            class="ml-auto inline-flex items-center gap-1 rounded-xl px-3 py-2 text-xs font-bold text-rose-600 transition-colors hover:bg-rose-50 sm:hidden"
+            class="ml-auto inline-flex items-center gap-1 rounded-xl px-3 py-2 text-xs font-bold text-[#B91C1C] transition-colors hover:bg-stone-100 sm:hidden"
           >
             ดูทั้งหมด <i class="bi bi-arrow-right"></i>
           </RouterLink>
         </div>
 
         <!-- ล่าสุด 2 เรื่อง -->
-        <div v-if="summary.recent.length > 0" class="mt-4 border-t border-slate-100/80 pt-3">
-          <p class="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+        <div v-if="summary.recent.length > 0" class="mt-4 border-t border-stone-200 pt-4">
+          <p class="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-stone-500">
             <i class="bi bi-clock-history"></i> เรื่องล่าสุด
           </p>
-          <div class="space-y-2">
+          <div class="space-y-1">
             <RouterLink
               v-for="it in summary.recent.slice(0, 2)"
               :key="it.id"
               :to="{ name: 'issue-detail', params: { id: it.id } }"
-              class="group flex items-center gap-3 rounded-2xl border border-transparent bg-white px-3.5 py-3 shadow-sm transition-all hover:border-rose-100 hover:shadow-md"
+              class="group flex items-center gap-3 rounded-xl px-3.5 py-3 transition-colors hover:bg-stone-50"
             >
-              <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-red-50 to-rose-50 text-red-500">
+              <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-stone-100 text-stone-600">
                 <i :class="['bi', it.requested_destination === 'vote' ? 'bi-bar-chart' : it.requested_destination === 'talk' ? 'bi-chat-dots' : 'bi-file-earmark-text']"></i>
               </span>
               <span class="min-w-0 flex-1">
-                <span class="block truncate text-sm font-semibold text-slate-800 group-hover:text-red-600">{{ it.title }}</span>
-                <span class="text-[11px] font-medium text-slate-400">{{ formatDate(it.created_at) }}</span>
+                <span class="block truncate text-sm font-semibold text-stone-800 group-hover:text-[#B91C1C]">{{ it.title }}</span>
+                <span class="text-[11px] font-medium text-stone-400">{{ formatDate(it.created_at) }}</span>
               </span>
               <span
                 class="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold"
-                :class="STATUS_BADGE[it.status] || 'bg-slate-100 text-slate-500'"
+                :class="STATUS_BADGE[it.status] || 'bg-stone-100 text-stone-500'"
               >
                 {{ statusShort(it.status) }}
               </span>
@@ -532,19 +529,18 @@ const hasActiveIssues = computed(() => {
           v-for="a in quickActions"
           :key="a.key"
           :to="a.to"
-          class="group relative flex flex-col items-start gap-3 overflow-hidden rounded-[1.5rem] border border-white/70 bg-white/80 p-4 shadow-[0_18px_50px_-40px_rgba(190,18,60,0.5)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-0.5 hover:border-rose-100 hover:shadow-xl hover:shadow-rose-100/40 active:scale-[0.98] sm:p-5"
+          class="group relative flex flex-col items-start gap-3 rounded-2xl border border-stone-200 bg-white p-4 transition-colors hover:border-stone-300 hover:bg-stone-50 active:scale-[0.98] sm:p-5"
         >
-          <div class="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-rose-50 opacity-0 blur-2xl transition-opacity duration-300 group-hover:opacity-100"></div>
-          <span class="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br text-xl shadow-inner" :class="a.accent">
+          <span class="flex h-12 w-12 items-center justify-center rounded-xl text-xl" :class="a.accent">
             <i :class="['bi', a.icon]"></i>
           </span>
-          <div class="relative min-w-0">
-            <p class="truncate text-sm font-bold text-slate-800 sm:text-[15px]">{{ a.label }}</p>
-            <p class="mt-0.5 truncate text-[11px] font-medium text-slate-400">{{ a.desc }}</p>
+          <div class="min-w-0">
+            <p class="truncate text-sm font-bold text-stone-800 sm:text-[15px]">{{ a.label }}</p>
+            <p class="mt-0.5 truncate text-[11px] font-medium text-stone-400">{{ a.desc }}</p>
           </div>
           <span
             v-if="a.badge > 0"
-            class="absolute right-3 top-3 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold text-white shadow-md shadow-red-500/30"
+            class="absolute right-3 top-3 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#B91C1C] px-1.5 text-[10px] font-bold text-white"
           >
             {{ a.badge > 99 ? '99+' : a.badge }}
           </span>
@@ -553,26 +549,26 @@ const hasActiveIssues = computed(() => {
     </section>
 
     <!-- ============ เรื่องที่รอจัดการ (คนรับเรื่อง) ============ -->
-    <section v-if="canReceive" class="overflow-hidden rounded-[2rem] border border-white/70 bg-white/80 shadow-[0_20px_60px_-40px_rgba(190,18,60,0.45)] backdrop-blur-2xl">
+    <section v-if="canReceive" class="overflow-hidden rounded-2xl border border-stone-200 bg-white">
       <div class="flex items-center justify-between gap-3 px-6 pb-1 pt-6">
         <div class="flex items-center gap-3">
-          <span class="relative flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-lg shadow-red-500/25">
+          <span class="relative flex h-10 w-10 items-center justify-center rounded-xl bg-[#B91C1C] text-white">
             <i class="bi bi-inbox text-lg"></i>
             <span
               v-if="unreadCount('issue_received') > 0"
-              class="absolute -right-1.5 -top-1.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold text-red-600 shadow ring-1 ring-red-100"
+              class="absolute -right-1.5 -top-1.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold text-[#B91C1C] ring-1 ring-stone-200"
             >
               {{ unreadCount('issue_received') > 99 ? '99+' : unreadCount('issue_received') }}
             </span>
           </span>
           <div>
-            <h2 class="text-base font-black tracking-tight text-slate-900 sm:text-lg">เรื่องที่รอจัดการ</h2>
-            <p class="text-[11px] font-medium text-slate-400 sm:text-xs">ในระดับความรับผิดชอบของคุณ</p>
+            <h2 class="text-base font-bold tracking-tight text-stone-900 sm:text-lg">เรื่องที่รอจัดการ</h2>
+            <p class="text-[11px] font-medium text-stone-400 sm:text-xs">ในระดับความรับผิดชอบของคุณ</p>
           </div>
         </div>
         <RouterLink
           to="/app/issues/received"
-          class="flex shrink-0 items-center gap-1 rounded-xl px-3 py-2 text-xs font-bold text-rose-600 transition-colors hover:bg-rose-50"
+          class="flex shrink-0 items-center gap-1 rounded-xl px-3 py-2 text-xs font-bold text-[#B91C1C] transition-colors hover:bg-stone-100"
         >
           ทั้งหมด {{ receivedTotal > 0 ? `(${receivedTotal})` : '' }} <i class="bi bi-arrow-right"></i>
         </RouterLink>
@@ -581,68 +577,68 @@ const hasActiveIssues = computed(() => {
       <div class="px-6 pb-6 pt-3">
         <!-- Skeleton -->
         <div v-if="loadingReceived" class="space-y-2">
-          <div v-for="n in 3" :key="n" class="h-14 rounded-2xl bg-slate-100"></div>
+          <div v-for="n in 3" :key="n" class="h-14 animate-pulse rounded-2xl bg-stone-100"></div>
         </div>
         <!-- Error -->
-        <div v-else-if="receivedError" class="rounded-2xl border border-rose-100 bg-rose-50/60 px-5 py-6 text-center">
-          <p class="text-sm font-semibold text-slate-600">โหลดคิวไม่สำเร็จ</p>
-          <button type="button" @click="loadReceived" class="mt-2 rounded-xl bg-white px-4 py-2 text-xs font-bold text-rose-600 shadow-sm hover:bg-rose-50">
-            ลองใหม่
+        <div v-else-if="receivedError" class="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-stone-200 bg-white px-5 py-10 text-center">
+          <p class="text-sm font-semibold text-stone-700">โหลดคิวไม่สำเร็จ</p>
+          <button type="button" @click="loadReceived" class="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-stone-900 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-stone-800">
+            <i class="bi bi-arrow-clockwise"></i> ลองใหม่
           </button>
         </div>
         <!-- Empty -->
-        <div v-else-if="receivedIssues.length === 0" class="rounded-3xl border border-dashed border-slate-200 px-5 py-8 text-center">
-          <p class="text-sm font-bold text-slate-500">🎉 ไม่มีเรื่องค้างรอคุณอยู่</p>
-          <p class="mt-1 text-xs text-slate-400">เมื่อมีเรื่องถูกส่งมาถึงระดับคุณ จะขึ้นที่นี่</p>
+        <div v-else-if="receivedIssues.length === 0" class="rounded-2xl border border-dashed border-stone-200 px-5 py-8 text-center">
+          <p class="text-sm font-bold text-stone-500">🎉 ไม่มีเรื่องค้างรอคุณอยู่</p>
+          <p class="mt-1 text-xs text-stone-400">เมื่อมีเรื่องถูกส่งมาถึงระดับคุณ จะขึ้นที่นี่</p>
         </div>
         <!-- List -->
-        <div v-else class="space-y-2">
+        <div v-else class="space-y-1">
           <RouterLink
             v-for="it in receivedIssues"
             :key="it.id"
             :to="{ name: 'issue-detail', params: { id: it.id } }"
-            class="group flex items-center gap-3 rounded-2xl border border-slate-100 bg-white px-3.5 py-3 shadow-sm transition-all hover:border-rose-100 hover:shadow-md"
+            class="group flex items-center gap-3 rounded-xl px-3.5 py-3 transition-colors hover:bg-stone-50"
           >
             <span
-              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-black"
-              :class="it.priority === 'high' ? 'bg-red-50 text-red-600' : it.priority === 'urgent' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'"
+              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-bold"
+              :class="it.priority === 'high' ? 'bg-[#B91C1C]/10 text-[#B91C1C]' : it.priority === 'urgent' ? 'bg-[#991B1B] text-white' : 'bg-stone-100 text-stone-500'"
             >
               <i class="bi bi-exclamation-lg"></i>
             </span>
             <span class="min-w-0 flex-1">
-              <span class="block truncate text-sm font-semibold text-slate-800 group-hover:text-red-600">{{ it.title }}</span>
-              <span class="flex items-center gap-1.5 text-[11px] font-medium text-slate-400">
+              <span class="block truncate text-sm font-semibold text-stone-800 group-hover:text-[#B91C1C]">{{ it.title }}</span>
+              <span class="flex items-center gap-1.5 text-[11px] font-medium text-stone-400">
                 <i class="bi bi-geo-alt"></i> {{ it.room_name || '—' }}
-                <span class="text-slate-200">•</span> {{ formatDate(it.created_at) }}
+                <span class="text-stone-300">•</span> {{ formatDate(it.created_at) }}
               </span>
             </span>
             <span
               class="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold"
-              :class="STATUS_BADGE[it.status] || 'bg-slate-100 text-slate-500'"
+              :class="STATUS_BADGE[it.status] || 'bg-stone-100 text-stone-500'"
             >
               {{ statusShort(it.status) }}
             </span>
-            <i class="bi bi-chevron-right text-xs text-slate-300 transition-transform group-hover:translate-x-0.5"></i>
+            <i class="bi bi-chevron-right text-xs text-stone-300 transition-transform group-hover:translate-x-0.5"></i>
           </RouterLink>
         </div>
       </div>
     </section>
 
     <!-- ============ คิวรายงาน (สภา/แอดมิน) ============ -->
-    <section v-if="isCouncil" class="overflow-hidden rounded-[2rem] border border-white/70 bg-white/80 shadow-[0_20px_60px_-40px_rgba(190,18,60,0.45)] backdrop-blur-2xl">
+    <section v-if="isCouncil" class="overflow-hidden rounded-2xl border border-stone-200 bg-white">
       <div class="flex items-center justify-between gap-3 px-6 pb-1 pt-6">
         <div class="flex items-center gap-3">
-          <span class="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-red-500/15 to-rose-400/15 text-red-600">
+          <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-stone-100 text-stone-600">
             <i class="bi bi-flag-fill text-lg"></i>
           </span>
           <div>
-            <h2 class="text-base font-black tracking-tight text-slate-900 sm:text-lg">คิวจัดการรายงาน</h2>
-            <p class="text-[11px] font-medium text-slate-400 sm:text-xs">คอมเมนต์ที่ถูกรายงานว่าน่าไม่เหมาะสม</p>
+            <h2 class="text-base font-bold tracking-tight text-stone-900 sm:text-lg">คิวจัดการรายงาน</h2>
+            <p class="text-[11px] font-medium text-stone-400 sm:text-xs">คอมเมนต์ที่ถูกรายงานว่าน่าไม่เหมาะสม</p>
           </div>
         </div>
         <RouterLink
           to="/app/boards/reports"
-          class="flex shrink-0 items-center gap-1 rounded-xl px-3 py-2 text-xs font-bold text-rose-600 transition-colors hover:bg-rose-50"
+          class="flex shrink-0 items-center gap-1 rounded-xl px-3 py-2 text-xs font-bold text-[#B91C1C] transition-colors hover:bg-stone-100"
         >
           ไปจัดการ <i class="bi bi-arrow-right"></i>
         </RouterLink>
@@ -650,94 +646,108 @@ const hasActiveIssues = computed(() => {
 
       <div class="px-6 pb-6 pt-3">
         <div v-if="loadingReports" class="space-y-2">
-          <div v-for="n in 3" :key="n" class="h-12 rounded-2xl bg-slate-100"></div>
+          <div v-for="n in 3" :key="n" class="h-12 animate-pulse rounded-2xl bg-stone-100"></div>
         </div>
-        <div v-else-if="reportsError" class="rounded-2xl border border-rose-100 bg-rose-50/60 px-5 py-6 text-center">
-          <p class="text-sm font-semibold text-slate-600">โหลดคิวรายงานไม่สำเร็จ</p>
-          <button type="button" @click="loadReports" class="mt-2 rounded-xl bg-white px-4 py-2 text-xs font-bold text-rose-600 shadow-sm hover:bg-rose-50">
-            ลองใหม่
+        <div v-else-if="reportsError" class="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-stone-200 bg-white px-5 py-10 text-center">
+          <p class="text-sm font-semibold text-stone-700">โหลดคิวรายงานไม่สำเร็จ</p>
+          <button type="button" @click="loadReports" class="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-stone-900 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-stone-800">
+            <i class="bi bi-arrow-clockwise"></i> ลองใหม่
           </button>
         </div>
-        <div v-else-if="reports.length === 0" class="rounded-3xl border border-dashed border-slate-200 px-5 py-8 text-center">
-          <p class="text-sm font-bold text-slate-500">✅ คิวรายงานว่าง</p>
-          <p class="mt-1 text-xs text-slate-400">ไม่มีคอมเมนต์ที่รอรีวิว</p>
+        <div v-else-if="reports.length === 0" class="rounded-2xl border border-dashed border-stone-200 px-5 py-8 text-center">
+          <p class="text-sm font-bold text-stone-500">✅ คิวรายงานว่าง</p>
+          <p class="mt-1 text-xs text-stone-400">ไม่มีคอมเมนต์ที่รอรีวิว</p>
         </div>
-        <div v-else class="space-y-2">
+        <div v-else class="space-y-1">
           <RouterLink
             v-for="r in reports.slice(0, 3)"
             :key="r.id"
             :to="{ name: 'board-reports' }"
-            class="group flex items-start gap-3 rounded-2xl border border-slate-100 bg-white px-3.5 py-3 shadow-sm transition-all hover:border-rose-100 hover:shadow-md"
+            class="group flex items-start gap-3 rounded-xl px-3.5 py-3 transition-colors hover:bg-stone-50"
           >
-            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-stone-100 text-stone-600">
               <i class="bi bi-flag text-sm"></i>
             </span>
             <span class="min-w-0 flex-1">
-              <span class="block truncate text-sm font-semibold text-slate-800 group-hover:text-red-600">{{ r.board_title }}</span>
-              <span class="mt-0.5 block truncate text-[11px] text-slate-400">“{{ r.comment_body }}”</span>
+              <span class="block truncate text-sm font-semibold text-stone-800 group-hover:text-[#B91C1C]">{{ r.board_title }}</span>
+              <span class="mt-0.5 block truncate text-[11px] text-stone-400">“{{ r.comment_body }}”</span>
             </span>
-            <span v-if="reportsTotal > 3" class="shrink-0 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-bold text-white">+{{ reportsTotal - 3 }}</span>
+            <span v-if="reportsTotal > 3" class="shrink-0 rounded-full bg-[#B91C1C] px-2 py-0.5 text-[10px] font-bold text-white">+{{ reportsTotal - 3 }}</span>
           </RouterLink>
         </div>
       </div>
     </section>
 
     <!-- ============ สถิติ (VIEW_DASHBOARD) ============ -->
-    <section v-if="canDashboard" class="overflow-hidden rounded-[2rem] bg-gradient-to-br from-red-600 via-rose-600 to-red-700 p-[1.5px] shadow-[0_20px_60px_-30px_rgba(225,29,72,0.6)]">
-      <div class="relative overflow-hidden rounded-[calc(2rem-1.5px)] bg-white/95 px-6 py-5 backdrop-blur-xl">
-        <div class="pointer-events-none absolute -right-14 -top-14 h-40 w-40 rounded-full bg-rose-100/50 blur-3xl"></div>
-        <div class="relative flex items-center justify-between gap-3">
+    <section v-if="canDashboard" class="overflow-hidden rounded-2xl border border-stone-200 bg-white">
+      <div class="px-6 py-5">
+        <div class="flex items-center justify-between gap-3">
           <div class="flex items-center gap-3">
-            <span class="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-rose-600 text-white shadow-lg shadow-red-500/30">
+            <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#B91C1C] text-white">
               <i class="bi bi-graph-up text-lg"></i>
             </span>
             <div>
-              <h2 class="text-sm font-black tracking-tight text-slate-900 sm:text-base">ภาพรวม {{
+              <h2 class="text-sm font-bold tracking-tight text-stone-900 sm:text-base">ภาพรวม {{
                 dash?.scope_label ? `ระดับ ${dash.scope_label}` : 'ทั้งโรงเรียน'
               }}</h2>
-              <p class="text-[11px] font-medium text-slate-400">จากแดชบอร์ด — ข้อมูลอัปเดตเรียลไทม์</p>
+              <p class="text-[11px] font-medium text-stone-400">จากแดชบอร์ด — ข้อมูลอัปเดตเรียลไทม์</p>
             </div>
           </div>
-          <RouterLink to="/app/dashboard" class="hidden shrink-0 items-center gap-1 rounded-xl px-3 py-2 text-xs font-bold text-rose-600 transition-colors hover:bg-rose-50 sm:flex">
+          <RouterLink to="/app/dashboard" class="hidden shrink-0 items-center gap-1 rounded-xl px-3 py-2 text-xs font-bold text-[#B91C1C] transition-colors hover:bg-stone-100 sm:flex">
             เปิดแดชบอร์ด <i class="bi bi-arrow-right"></i>
           </RouterLink>
         </div>
 
-        <div v-if="loadingDash" class="relative mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div v-for="n in 4" :key="n" class="h-16 rounded-2xl bg-slate-100"></div>
+        <div v-if="loadingDash" class="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-stone-200 bg-stone-200 sm:grid-cols-4">
+          <div v-for="n in 4" :key="n" class="bg-white p-5">
+            <div class="h-10 animate-pulse rounded-xl bg-stone-100"></div>
+          </div>
         </div>
-        <div v-else-if="dash" class="relative mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div class="rounded-2xl border border-red-100 bg-red-50/50 px-4 py-3">
-            <p class="text-[10px] font-bold uppercase tracking-wider text-red-500">เรื่องทั้งหมด</p>
-            <p class="mt-0.5 text-2xl font-black leading-none text-slate-900">{{ dash.total_issues }}</p>
+        <div v-else-if="dashError" class="mt-4 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-stone-200 bg-white px-5 py-10 text-center">
+          <p class="text-sm font-semibold text-stone-700">โหลดสถิติภาพรวมไม่สำเร็จ</p>
+          <button type="button" @click="loadDash" class="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-stone-900 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-stone-800">
+            <i class="bi bi-arrow-clockwise"></i> ลองใหม่
+          </button>
+        </div>
+        <div v-else-if="dash" class="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-stone-200 bg-stone-200 sm:grid-cols-4">
+          <div class="bg-white p-4 sm:p-5">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-stone-500">เรื่องทั้งหมด</p>
+            <p class="mt-1 font-display text-2xl font-bold leading-none text-stone-900">{{ dash.total_issues }}</p>
           </div>
-          <div class="rounded-2xl border border-amber-100 bg-amber-50/50 px-4 py-3">
-            <p class="text-[10px] font-bold uppercase tracking-wider text-amber-600">ค้าง/เลยกำหนด</p>
-            <p class="mt-0.5 text-2xl font-black leading-none text-slate-900">{{ dash.overdue }}</p>
+          <div class="bg-[#B91C1C]/5 p-4 sm:p-5">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-[#B91C1C]">ค้าง/เลยกำหนด</p>
+            <p class="mt-1 font-display text-2xl font-bold leading-none text-[#991B1B]">{{ dash.overdue }}</p>
           </div>
-          <div class="rounded-2xl border border-blue-100 bg-blue-50/50 px-4 py-3">
-            <p class="text-[10px] font-bold uppercase tracking-wider text-blue-600">กำลังดำเนินการ</p>
-            <p class="mt-0.5 text-2xl font-black leading-none text-slate-900">{{ dash.in_progress }}</p>
+          <div class="bg-white p-4 sm:p-5">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-stone-500">กำลังดำเนินการ</p>
+            <p class="mt-1 font-display text-2xl font-bold leading-none text-stone-900">{{ dash.in_progress }}</p>
           </div>
-          <div class="rounded-2xl border border-emerald-100 bg-emerald-50/50 px-4 py-3">
-            <p class="text-[10px] font-bold uppercase tracking-wider text-emerald-600">เสร็จแล้ว</p>
-            <p class="mt-0.5 text-2xl font-black leading-none text-slate-900">{{ dash.resolved }}</p>
+          <div class="bg-white p-4 sm:p-5">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-stone-500">เสร็จแล้ว</p>
+            <p class="mt-1 font-display text-2xl font-bold leading-none text-stone-900">{{ dash.resolved }}</p>
           </div>
         </div>
       </div>
     </section>
 
     <!-- ============ ประกาศโรงเรียน ============ -->
-    <section v-if="!loadingAnnounce && !announceError && announcements.length > 0" class="rounded-[1.5rem] border border-white/60 bg-white/70 px-5 py-4 shadow-[0_16px_45px_-40px_rgba(190,18,60,0.45)] backdrop-blur-2xl">
+    <section v-if="announceError" class="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-stone-200 bg-white px-5 py-10 text-center">
+      <p class="text-sm font-semibold text-stone-700"><i class="bi bi-wifi-off mr-2"></i>โหลดประกาศไม่สำเร็จ</p>
+      <button type="button" @click="loadAnnouncements" class="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-stone-900 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-stone-800">
+        <i class="bi bi-arrow-clockwise"></i> ลองใหม่
+      </button>
+    </section>
+
+    <section v-else-if="!loadingAnnounce && announcements.length > 0" class="rounded-2xl border border-stone-200 bg-white px-5 py-4">
       <div class="flex items-start gap-3">
-        <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-red-500/15 to-rose-400/15 text-red-600">
+        <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-stone-100 text-stone-600">
           <i class="bi bi-megaphone"></i>
         </span>
         <div class="min-w-0 space-y-2">
-          <p class="text-xs font-bold uppercase tracking-wider text-slate-500">ประกาศโรงเรียน</p>
+          <p class="text-xs font-bold uppercase tracking-wider text-stone-500">ประกาศโรงเรียน</p>
           <div v-for="a in announcements.slice(0, 3)" :key="a.id" class="flex items-start gap-2.5">
-            <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full" :class="annIconColor[a.priority] || 'bg-slate-300'"></span>
-            <p class="text-sm font-medium leading-relaxed text-slate-700">{{ a.message }}</p>
+            <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full" :class="annIconColor[a.priority] || 'bg-stone-300'"></span>
+            <p class="text-sm font-medium leading-relaxed text-stone-700">{{ a.message }}</p>
           </div>
         </div>
       </div>
@@ -749,7 +759,7 @@ const hasActiveIssues = computed(() => {
 /* ♿ Keyboard focus ตามธีม */
 a:focus-visible,
 button:focus-visible {
-  outline: 2px solid rgba(225, 29, 72, 0.65);
+  outline: 2px solid rgba(185, 28, 28, 0.65);
   outline-offset: 2px;
 }
 

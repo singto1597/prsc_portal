@@ -91,45 +91,45 @@ interface CategoryTheme {
 const CATEGORY_THEMES: Record<string, CategoryTheme> = {
   suggestion: {
     icon: 'bi-lightbulb',
-    iconBg: 'bg-blue-500',
-    countColor: 'text-blue-600',
-    barColor: 'bg-blue-500',
-    headerBg: 'bg-blue-50/60 border-b border-blue-100',
-    rowHover: 'hover:bg-blue-50/40',
-    leaderHighlight: 'bg-blue-50/50 ring-1 ring-blue-200',
-    chevron: 'group-hover:text-blue-600',
+    iconBg: 'bg-stone-900',
+    countColor: 'text-stone-900',
+    barColor: 'bg-stone-700',
+    headerBg: 'bg-stone-50 border-b border-stone-200',
+    rowHover: 'hover:bg-stone-50',
+    leaderHighlight: 'bg-stone-100 ring-1 ring-stone-200',
+    chevron: 'group-hover:text-stone-700',
   },
   wellbeing: {
     icon: 'bi-heart-pulse',
-    iconBg: 'bg-emerald-500',
-    countColor: 'text-emerald-600',
-    barColor: 'bg-emerald-500',
-    headerBg: 'bg-emerald-50/60 border-b border-emerald-100',
-    rowHover: 'hover:bg-emerald-50/40',
-    leaderHighlight: 'bg-emerald-50/50 ring-1 ring-emerald-200',
-    chevron: 'group-hover:text-emerald-600',
+    iconBg: 'bg-stone-500',
+    countColor: 'text-stone-600',
+    barColor: 'bg-stone-400',
+    headerBg: 'bg-stone-50 border-b border-stone-200',
+    rowHover: 'hover:bg-stone-50',
+    leaderHighlight: 'bg-stone-100 ring-1 ring-stone-200',
+    chevron: 'group-hover:text-stone-600',
   },
   report: {
     icon: 'bi-megaphone',
-    iconBg: 'bg-red-500',
-    countColor: 'text-red-600',
-    barColor: 'bg-red-500',
-    headerBg: 'bg-red-50/60 border-b border-red-100',
-    rowHover: 'hover:bg-red-50/40',
-    leaderHighlight: 'bg-red-50/60 ring-1 ring-red-200',
-    chevron: 'group-hover:text-red-600',
+    iconBg: 'bg-[#B91C1C]',
+    countColor: 'text-[#B91C1C]',
+    barColor: 'bg-[#B91C1C]',
+    headerBg: 'bg-[#B91C1C]/5 border-b border-[#B91C1C]/10',
+    rowHover: 'hover:bg-[#B91C1C]/5',
+    leaderHighlight: 'bg-[#B91C1C]/10 ring-1 ring-[#B91C1C]/20',
+    chevron: 'group-hover:text-[#B91C1C]',
   },
 };
 
 const DEFAULT_THEME: CategoryTheme = {
   icon: 'bi-collection',
-  iconBg: 'bg-slate-500',
-  countColor: 'text-slate-700',
-  barColor: 'bg-slate-500',
-  headerBg: 'bg-slate-50 border-b border-slate-200',
-  rowHover: 'hover:bg-slate-50',
-  leaderHighlight: 'bg-slate-50 ring-1 ring-slate-200',
-  chevron: 'group-hover:text-slate-600',
+  iconBg: 'bg-stone-700',
+  countColor: 'text-stone-700',
+  barColor: 'bg-stone-600',
+  headerBg: 'bg-stone-50 border-b border-stone-200',
+  rowHover: 'hover:bg-stone-50',
+  leaderHighlight: 'bg-stone-100 ring-1 ring-stone-200',
+  chevron: 'group-hover:text-stone-700',
 };
 
 function themeFor(code: string): CategoryTheme {
@@ -138,12 +138,12 @@ function themeFor(code: string): CategoryTheme {
 
 // ===== 🎛️ KPI (6 ตัว เน้น "อะไรเยอะที่สุด/อะไรค้าง") =====
 const statCards = computed(() => [
-  { label: 'เรื่องทั้งหมด', value: data.value?.total_issues ?? 0, dot: 'bg-red-500' },
-  { label: 'รอรับเรื่อง', value: data.value?.pending ?? 0, dot: 'bg-yellow-500' },
-  { label: 'กำลังดำเนินการ', value: data.value?.in_progress ?? 0, dot: 'bg-blue-500' },
-  { label: 'ส่งต่อระดับบน', value: data.value?.escalated ?? 0, dot: 'bg-orange-500' },
-  { label: 'แก้ไขเสร็จ', value: data.value?.resolved ?? 0, dot: 'bg-green-500' },
-  { label: 'งานเกินเวลา', value: data.value?.overdue ?? 0, dot: 'bg-red-600', alert: true },
+  { label: 'เรื่องทั้งหมด', value: data.value?.total_issues ?? 0, dot: 'bg-stone-500' },
+  { label: 'รอรับเรื่อง', value: data.value?.pending ?? 0, dot: 'bg-stone-400' },
+  { label: 'กำลังดำเนินการ', value: data.value?.in_progress ?? 0, dot: 'bg-[#B91C1C]' },
+  { label: 'ส่งต่อระดับบน', value: data.value?.escalated ?? 0, dot: 'bg-[#991B1B]' },
+  { label: 'แก้ไขเสร็จ', value: data.value?.resolved ?? 0, dot: 'bg-emerald-500' },
+  { label: 'งานเกินเวลา', value: data.value?.overdue ?? 0, dot: 'bg-[#B91C1C]', alert: true },
 ]);
 
 // ===== 🧮 ตัวช่วยตัวเลข/เปอร์เซ็นต์ =====
@@ -179,9 +179,9 @@ function rankEmoji(n: number): string {
 }
 
 function rankCircle(idx: number): string {
-  if (idx === 0) return 'bg-amber-100';
-  if (idx === 1) return 'bg-slate-100';
-  if (idx === 2) return 'bg-orange-50';
+  if (idx === 0) return 'bg-stone-200';
+  if (idx === 1) return 'bg-stone-100';
+  if (idx === 2) return 'bg-stone-50';
   return 'bg-transparent';
 }
 
@@ -215,11 +215,11 @@ const trendChart = computed(() => ({
     {
       label: 'จำนวนเรื่อง/วัน',
       data: (data.value?.trend || []).map((t) => t.count),
-      borderColor: '#dc2626',
-      backgroundColor: 'rgba(220,38,38,0.08)',
+      borderColor: '#B91C1C',
+      backgroundColor: 'rgba(185,28,28,0.10)',
       fill: true,
       tension: 0.3,
-      pointBackgroundColor: '#dc2626',
+      pointBackgroundColor: '#B91C1C',
     },
   ],
 }));
@@ -233,11 +233,11 @@ const trafficLoginsChart = computed(() => ({
     {
       label: 'ผู้เข้าใช้/วัน',
       data: (traffic.value?.daily_logins || []).map((t) => t.count),
-      borderColor: '#2563eb',
-      backgroundColor: 'rgba(37,99,235,0.10)',
+      borderColor: '#57534E',
+      backgroundColor: 'rgba(87,83,78,0.10)',
       fill: true,
       tension: 0.3,
-      pointBackgroundColor: '#2563eb',
+      pointBackgroundColor: '#57534E',
     },
   ],
 }));
@@ -248,7 +248,7 @@ const trafficActionsChart = computed(() => ({
     {
       label: 'กิจกรรม/วัน',
       data: (traffic.value?.daily_actions || []).map((t) => t.count),
-      backgroundColor: 'rgba(220,38,38,0.75)',
+      backgroundColor: 'rgba(185,28,28,0.75)',
       borderRadius: 4,
     },
   ],
@@ -261,8 +261,8 @@ const trafficBreakdownChart = computed(() => ({
       label: 'การใช้งาน',
       data: (traffic.value?.action_breakdown || []).map((a) => a.count),
       backgroundColor: [
-        '#dc2626', '#2563eb', '#059669', '#d97706', '#7c3aed',
-        '#db2777', '#0891b2', '#65a30d', '#ea580c', '#475569',
+        '#1C1917', '#57534E', '#D6D3D1', '#B91C1C', '#991B1B',
+        '#44403C', '#A8A29E',
       ],
       borderWidth: 1,
     },
@@ -284,23 +284,24 @@ const hasTrafficData = computed(
     <!-- ===== Header ===== -->
     <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
       <div>
-        <h1 class="text-xl font-black tracking-tight text-slate-900 leading-tight sm:text-2xl"><i class="bi bi-bar-chart mr-1 text-red-500"></i> แดชบอร์ด</h1>
-        <p v-if="lastUpdated" class="text-xs text-slate-400 mt-0.5">
-          อัปเดตล่าสุด <span class="font-medium text-slate-500">{{ fmtDateTime(lastUpdated) }}</span>
+        <p class="text-[11px] font-bold uppercase tracking-widest text-[#B91C1C]"><i class="bi bi-bar-chart mr-1"></i> ระบบสถิติ</p>
+        <h1 class="mt-0.5 text-2xl font-bold tracking-tight text-stone-900 leading-tight sm:text-3xl">แดชบอร์ด</h1>
+        <p v-if="lastUpdated" class="text-xs text-stone-400 mt-1.5">
+          อัปเดตล่าสุด <span class="font-medium text-stone-500">{{ fmtDateTime(lastUpdated) }}</span>
         </p>
       </div>
       <div class="flex items-center gap-2">
         <div v-if="data && data.scope === 'level'"
-          class="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+          class="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-stone-100 border border-stone-200 text-stone-700 text-sm">
           <i class="bi bi-funnel"></i>
           กำลังแสดงสถิติเฉพาะระดับชั้น <b class="ml-0.5">{{ data.scope_label }}</b>
         </div>
         <div v-else-if="data && data.scope === 'none'"
-          class="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm">
+          class="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-[#B91C1C]/5 border border-[#B91C1C]/20 text-[#991B1B] text-sm">
           <i class="bi bi-exclamation-triangle"></i>
           ยังไม่ได้กำหนดระดับชั้นที่รับผิดชอบ
         </div>
-        <div v-else-if="data" class="px-3.5 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-sm">
+        <div v-else-if="data" class="px-3.5 py-1.5 rounded-xl bg-stone-100 text-stone-600 text-sm">
           <i class="bi bi-globe2 mr-1"></i> ภาพรวมทั้งโรงเรียน
         </div>
         <button
@@ -308,7 +309,7 @@ const hasTrafficData = computed(
           @click="loadDashboard"
           :disabled="isLoading"
           title="รีเฟรชข้อมูล"
-          class="w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-red-600 hover:border-red-300 flex items-center justify-center transition disabled:opacity-50"
+          class="w-9 h-9 rounded-xl bg-white border border-stone-200 text-stone-500 hover:text-[#B91C1C] hover:border-[#B91C1C]/40 flex items-center justify-center transition disabled:opacity-50"
         >
           <i class="bi bi-arrow-clockwise" :class="{ 'animate-spin': isLoading }"></i>
         </button>
@@ -317,57 +318,57 @@ const hasTrafficData = computed(
 
     <!-- ===== Loading: skeleton จำลองโครงสร้างจริง (กัน layout shift) ===== -->
     <div v-if="isLoading && !data" class="space-y-6">
-      <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
-        <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-px bg-slate-100">
+      <div class="overflow-hidden rounded-2xl border border-stone-200 bg-white">
+        <div class="grid grid-cols-2 gap-px bg-stone-200 sm:grid-cols-3 xl:grid-cols-6">
           <div v-for="i in 6" :key="i" class="bg-white p-5">
-            <div class="w-2 h-2 rounded-full bg-slate-200 animate-pulse mb-2"></div>
-            <div class="h-7 w-16 bg-slate-200 animate-pulse rounded mb-1"></div>
-            <div class="h-3 w-20 bg-slate-200 animate-pulse rounded"></div>
+            <div class="mb-2 h-2 w-2 animate-pulse rounded-full bg-stone-200"></div>
+            <div class="mb-1 h-7 w-16 animate-pulse rounded bg-stone-200"></div>
+            <div class="h-3 w-20 animate-pulse rounded bg-stone-200"></div>
           </div>
         </div>
         <div class="px-5 pb-5">
-          <div class="h-2 bg-slate-200 animate-pulse rounded-full mb-2"></div>
-          <div class="h-3 w-64 bg-slate-200 animate-pulse rounded"></div>
+          <div class="mb-2 h-2 animate-pulse rounded-full bg-stone-200"></div>
+          <div class="h-3 w-64 animate-pulse rounded bg-stone-200"></div>
         </div>
       </div>
-      <div v-for="i in 3" :key="i" class="bg-white rounded-2xl shadow-sm p-5">
-        <div class="flex items-center gap-3 mb-4">
-          <div class="w-11 h-11 rounded-xl bg-slate-200 animate-pulse"></div>
+      <div v-for="i in 3" :key="i" class="rounded-2xl border border-stone-200 bg-white p-5">
+        <div class="mb-4 flex items-center gap-3">
+          <div class="h-11 w-11 animate-pulse rounded-xl bg-stone-200"></div>
           <div class="flex-1 space-y-1.5">
-            <div class="h-4 w-40 bg-slate-200 animate-pulse rounded"></div>
-            <div class="h-3 w-64 bg-slate-200 animate-pulse rounded"></div>
+            <div class="h-4 w-40 animate-pulse rounded bg-stone-200"></div>
+            <div class="h-3 w-64 animate-pulse rounded bg-stone-200"></div>
           </div>
         </div>
-        <div class="grid lg:grid-cols-3 gap-4">
-          <div class="lg:col-span-2 space-y-2.5">
-            <div v-for="j in 3" :key="j" class="h-16 bg-slate-100 animate-pulse rounded-xl"></div>
+        <div class="grid gap-4 lg:grid-cols-3">
+          <div class="space-y-2.5 lg:col-span-2">
+            <div v-for="j in 3" :key="j" class="h-16 animate-pulse rounded-xl bg-stone-100"></div>
           </div>
           <div class="space-y-2.5">
-            <div v-for="j in 3" :key="j" class="h-9 bg-slate-100 animate-pulse rounded-xl"></div>
+            <div v-for="j in 3" :key="j" class="h-9 animate-pulse rounded-xl bg-stone-100"></div>
           </div>
         </div>
       </div>
     </div>
 
     <!-- ===== Error ครั้งแรก (ไม่มีข้อมูล) ===== -->
-    <div v-else-if="error && !data" class="bg-white rounded-2xl shadow-sm p-12 text-center">
-      <div class="text-5xl mb-3 text-red-300"><i class="bi bi-exclamation-triangle"></i></div>
-      <h2 class="text-lg font-bold text-slate-800 mb-1">ไม่สามารถโหลดข้อมูล Dashboard</h2>
-      <p class="text-sm text-slate-500 mb-5 max-w-md mx-auto">{{ error }}</p>
+    <div v-else-if="error && !data" class="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-stone-200 bg-white px-6 py-16 text-center">
+      <div class="mb-3 text-4xl text-stone-300"><i class="bi bi-exclamation-triangle"></i></div>
+      <h2 class="mb-1 text-lg font-bold text-stone-700">ไม่สามารถโหลดข้อมูล Dashboard</h2>
+      <p class="mb-5 max-w-md text-sm text-stone-500 mx-auto">{{ error }}</p>
       <button
         type="button"
         @click="loadDashboard"
-        class="px-5 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-700 text-sm font-medium transition"
+        class="inline-flex items-center gap-1.5 rounded-xl bg-stone-900 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-stone-800"
       >
-        <i class="bi bi-arrow-clockwise mr-1"></i> ลองใหม่
+        <i class="bi bi-arrow-clockwise"></i> ลองใหม่
       </button>
     </div>
 
     <!-- ===== scope 'none': ครูยังไม่ตั้งระดับชั้น → แนะนำแทนเลข 0 ===== -->
-    <div v-else-if="data && data.scope === 'none'" class="bg-white rounded-2xl shadow-sm p-12 text-center">
-      <div class="text-5xl mb-3 text-slate-300"><i class="bi bi-person-gear"></i></div>
-      <h2 class="text-lg font-bold text-slate-800 mb-2">ยังไม่ได้กำหนดระดับชั้นที่รับผิดชอบ</h2>
-      <p class="text-sm text-slate-500 max-w-md mx-auto">
+    <div v-else-if="data && data.scope === 'none'" class="rounded-2xl border border-stone-200 bg-white p-12 text-center">
+      <div class="mb-3 text-5xl text-stone-300"><i class="bi bi-person-gear"></i></div>
+      <h2 class="mb-2 text-lg font-bold text-stone-800">ยังไม่ได้กำหนดระดับชั้นที่รับผิดชอบ</h2>
+      <p class="mx-auto max-w-md text-sm text-stone-500">
         ครูยังไม่ระบุระดับชั้น (เช่น ม.4 / ม.5) จึงยังไม่เห็นข้อมูลสถิติ
         <br />กรุณาติดต่อผู้ดูแลระบบเพื่อตั้งค่าระดับชั้นในบัญชีของคุณ
       </p>
@@ -375,30 +376,30 @@ const hasTrafficData = computed(
 
     <div v-else-if="data" class="space-y-6">
       <!-- ===== KPI band: 6 ตัว + แถบสัดส่วนสถานะรวมทั้งระบบ ===== -->
-      <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
-        <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-px bg-slate-100">
+      <div class="overflow-hidden rounded-2xl border border-stone-200 bg-white">
+        <div class="grid grid-cols-2 gap-px bg-stone-200 sm:grid-cols-3 xl:grid-cols-6">
           <div
             v-for="s in statCards"
             :key="s.label"
             class="bg-white p-4 sm:p-5"
-            :class="s.alert ? 'bg-red-50' : ''"
+            :class="s.alert ? 'bg-[#B91C1C]/5' : ''"
           >
-            <div class="flex items-center gap-1.5 mb-1">
-              <span class="w-2 h-2 rounded-full shrink-0" :class="s.dot"></span>
-              <span class="text-xs text-slate-500 truncate">{{ s.label }}</span>
+            <div class="mb-1 flex items-center gap-1.5">
+              <span class="h-2 w-2 shrink-0 rounded-full" :class="s.dot"></span>
+              <span class="truncate text-xs text-stone-500">{{ s.label }}</span>
             </div>
-            <p class="text-2xl font-black text-slate-900 tabular-nums" :class="s.alert ? 'text-red-700' : ''">
+            <p class="font-display text-2xl font-bold text-stone-900 tabular-nums" :class="s.alert ? 'text-[#991B1B]' : ''">
               {{ fmtNum(s.value) }}
             </p>
           </div>
         </div>
-        <div class="px-4 sm:px-5 py-4">
+        <div class="px-4 py-4 sm:px-5">
           <StatusStackedBar :stats="data.by_status" :total="data.total_issues" heightClass="h-2" />
-          <div class="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-slate-500">
+          <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-500">
             <span v-for="s in data.by_status" :key="s.status" class="inline-flex items-center gap-1.5">
-              <span class="w-2.5 h-2.5 rounded-full" :class="STATUS_DOT[s.status] ?? 'bg-slate-300'"></span>
+              <span class="h-2.5 w-2.5 rounded-full" :class="STATUS_DOT[s.status] ?? 'bg-stone-300'"></span>
               {{ s.label }}
-              <b class="text-slate-700 tabular-nums">{{ fmtNum(s.count) }}</b>
+              <b class="text-stone-700 tabular-nums">{{ fmtNum(s.count) }}</b>
             </span>
           </div>
         </div>
@@ -408,7 +409,7 @@ const hasTrafficData = computed(
       <section
         v-for="cat in data.main_categories"
         :key="cat.code"
-        class="bg-white rounded-2xl shadow-sm overflow-hidden"
+        class="rounded-2xl border border-stone-200 bg-white overflow-hidden"
       >
         <!-- Header band (ทั้งแถวคลิก → ดูทั้งหมดในหมวด) -->
         <RouterLink
@@ -418,32 +419,32 @@ const hasTrafficData = computed(
         >
           <div class="flex items-center gap-3 min-w-0">
             <div
-              class="w-11 h-11 rounded-xl flex items-center justify-center text-xl text-white shadow-sm shrink-0"
+              class="w-11 h-11 rounded-xl flex items-center justify-center text-xl text-white shrink-0"
               :class="themeFor(cat.code).iconBg"
             >
               <i class="bi" :class="themeFor(cat.code).icon"></i>
             </div>
             <div class="min-w-0">
-              <h2 class="text-lg font-bold text-slate-900 flex flex-wrap items-center gap-2">
+              <h2 class="text-lg font-bold text-stone-900 flex flex-wrap items-center gap-2">
                 {{ cat.label }}
                 <span
                   v-if="cat.overdue > 0"
-                  class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold rounded-full bg-red-100 text-red-700"
+                  class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold rounded-full bg-[#B91C1C]/10 text-[#B91C1C]"
                   title="งานที่เกินกำหนดเวลาในหมวดนี้"
                 >
                   <i class="bi bi-alarm"></i> เกินเวลา {{ fmtNum(cat.overdue) }}
                 </span>
               </h2>
-              <p class="text-xs text-slate-500 truncate mt-0.5">{{ cat.description }}</p>
+              <p class="text-xs text-stone-500 truncate mt-0.5">{{ cat.description }}</p>
             </div>
           </div>
           <div class="text-right shrink-0">
-            <p class="text-3xl font-black leading-none tabular-nums" :class="themeFor(cat.code).countColor">
+            <p class="font-display text-3xl font-bold leading-none tabular-nums" :class="themeFor(cat.code).countColor">
               {{ fmtNum(cat.total) }}
             </p>
-            <p class="text-[11px] text-slate-500 mt-1 inline-flex items-center gap-1">
+            <p class="text-[11px] text-stone-500 mt-1 inline-flex items-center gap-1">
               เรื่อง · เสร็จ {{ resolvedRate(cat) }}%
-              <span class="text-red-600 font-medium group-hover:underline inline-flex items-center gap-0.5">
+              <span class="text-[#B91C1C] font-medium group-hover:underline inline-flex items-center gap-0.5">
                 ดูทั้งหมด <i class="bi bi-arrow-right"></i>
               </span>
             </p>
@@ -453,10 +454,10 @@ const hasTrafficData = computed(
         <!-- แถบสถานะภายในหมวด (progress รวม) -->
         <div class="px-5 pt-3">
           <StatusStackedBar :stats="cat.by_status" :total="cat.total" heightClass="h-1.5" />
-          <div class="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 text-[11px] text-slate-500">
+          <div class="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 text-[11px] text-stone-500">
             <span v-for="s in cat.by_status" :key="s.status" class="inline-flex items-center gap-1">
-              <span class="w-2 h-2 rounded-full" :class="STATUS_DOT[s.status] ?? 'bg-slate-300'"></span>
-              {{ statusShort(s.status) }} <b class="text-slate-700 tabular-nums">{{ fmtNum(s.count) }}</b>
+              <span class="w-2 h-2 rounded-full" :class="STATUS_DOT[s.status] ?? 'bg-stone-300'"></span>
+              {{ statusShort(s.status) }} <b class="text-stone-700 tabular-nums">{{ fmtNum(s.count) }}</b>
             </span>
           </div>
         </div>
@@ -464,7 +465,7 @@ const hasTrafficData = computed(
         <!-- Body: leaderboard หมวดย่อย (2/3) + เรื่องล่าสุด (1/3) -->
         <div class="p-5 grid lg:grid-cols-3 gap-6">
           <div class="lg:col-span-2 min-w-0">
-            <h3 class="text-sm font-semibold text-slate-700 mb-2.5">
+            <h3 class="text-sm font-semibold text-stone-700 mb-2.5">
               <i class="bi bi-trophy mr-1" :class="themeFor(cat.code).countColor"></i>
               หมวดย่อยที่แจ้งมากที่สุด
             </h3>
@@ -474,7 +475,7 @@ const hasTrafficData = computed(
                 <RouterLink
                   v-if="sc.category !== '_other'"
                   :to="{ name: 'received-issues', query: { main_category: cat.code, category: sc.category } }"
-                  class="group flex flex-wrap items-center gap-3 rounded-xl p-3 transition focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-none"
+                  class="group flex flex-wrap items-center gap-3 rounded-xl p-3 transition focus-visible:ring-2 focus-visible:ring-[#B91C1C] focus-visible:outline-none"
                   :class="idx === 0 ? themeFor(cat.code).leaderHighlight : themeFor(cat.code).rowHover"
                 >
                   <span
@@ -484,26 +485,26 @@ const hasTrafficData = computed(
                     <span v-if="idx < 3" class="text-base" role="img" :aria-label="`อันดับ ${idx + 1}`">
                       {{ rankEmoji(idx + 1) }}
                     </span>
-                    <span v-else class="text-sm font-black text-slate-400" :aria-label="`อันดับ ${idx + 1}`">
+                    <span v-else class="text-sm font-bold text-stone-400" :aria-label="`อันดับ ${idx + 1}`">
                       {{ idx + 1 }}
                     </span>
                   </span>
 
                   <div class="flex-1 min-w-0">
                     <div class="flex items-center justify-between gap-2">
-                      <p class="font-semibold text-slate-800 truncate">{{ sc.label }}</p>
-                      <span class="text-lg font-black text-slate-900 shrink-0 tabular-nums">{{ fmtNum(sc.count) }}</span>
+                      <p class="font-semibold text-stone-800 truncate">{{ sc.label }}</p>
+                      <span class="text-lg font-bold text-stone-900 shrink-0 tabular-nums">{{ fmtNum(sc.count) }}</span>
                     </div>
-                    <p class="text-[11px] text-slate-400 truncate">{{ sc.description }}</p>
+                    <p class="text-[11px] text-stone-400 truncate">{{ sc.description }}</p>
                     <div class="mt-1.5 flex items-center gap-2">
-                      <div class="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div class="flex-1 h-1.5 bg-stone-100 rounded-full overflow-hidden">
                         <div
                           class="h-full rounded-full transition-all"
                           :class="themeFor(cat.code).barColor"
                           :style="{ width: shareWidth(sc.count, maxSubCount(cat)) + '%' }"
                         ></div>
                       </div>
-                      <span class="text-[11px] text-slate-400 shrink-0 tabular-nums">
+                      <span class="text-[11px] text-stone-400 shrink-0 tabular-nums">
                         {{ percent(sc.count, cat.total) }}%
                       </span>
                     </div>
@@ -511,36 +512,36 @@ const hasTrafficData = computed(
                       <span
                         v-for="s in sc.by_status.filter((x) => x.count > 0)"
                         :key="s.status"
-                        class="inline-flex items-center gap-1 text-[11px] text-slate-500"
+                        class="inline-flex items-center gap-1 text-[11px] text-stone-500"
                         :title="`${s.label}: ${s.count} เรื่อง`"
                       >
-                        <span class="w-2 h-2 rounded-full" :class="STATUS_DOT[s.status] ?? 'bg-slate-300'"></span>
-                        {{ statusShort(s.status) }} <b class="text-slate-600 tabular-nums">{{ fmtNum(s.count) }}</b>
+                        <span class="w-2 h-2 rounded-full" :class="STATUS_DOT[s.status] ?? 'bg-stone-300'"></span>
+                        {{ statusShort(s.status) }} <b class="text-stone-600 tabular-nums">{{ fmtNum(s.count) }}</b>
                       </span>
-                      <span v-if="!sc.by_status.some((x) => x.count > 0)" class="text-[11px] text-slate-400">
+                      <span v-if="!sc.by_status.some((x) => x.count > 0)" class="text-[11px] text-stone-400">
                         ยังไม่มีเรื่อง
                       </span>
                     </div>
                   </div>
 
-                  <i class="bi bi-chevron-right text-slate-300 shrink-0 transition" :class="themeFor(cat.code).chevron"></i>
+                  <i class="bi bi-chevron-right text-stone-300 shrink-0 transition" :class="themeFor(cat.code).chevron"></i>
                 </RouterLink>
 
                 <!-- หมวดย่อยนอกระบบ (อื่นๆ) → ไม่คลิก เน้นๆ ให้เห็นว่าไม่ใช่หมวดใน config -->
                 <div v-else class="flex flex-wrap items-center gap-3 rounded-xl p-3 opacity-80">
-                  <span class="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-sm font-black text-slate-400"
+                  <span class="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-sm font-bold text-stone-400"
                     :aria-label="`อันดับ ${idx + 1}`">{{ idx + 1 }}</span>
                   <div class="flex-1 min-w-0">
                     <div class="flex items-center justify-between gap-2">
-                      <p class="font-semibold text-slate-500 truncate">{{ sc.label }}</p>
-                      <span class="text-lg font-black text-slate-500 shrink-0 tabular-nums">{{ fmtNum(sc.count) }}</span>
+                      <p class="font-semibold text-stone-500 truncate">{{ sc.label }}</p>
+                      <span class="text-lg font-bold text-stone-500 shrink-0 tabular-nums">{{ fmtNum(sc.count) }}</span>
                     </div>
-                    <p class="text-[11px] text-slate-400 truncate">{{ sc.description }}</p>
+                    <p class="text-[11px] text-stone-400 truncate">{{ sc.description }}</p>
                   </div>
                 </div>
               </template>
             </div>
-            <p v-else class="text-sm text-slate-400 py-8 text-center">
+            <p v-else class="text-sm text-stone-400 py-8 text-center">
               <i class="bi bi-inbox mr-1"></i> ยังไม่มีเรื่องในหมวดนี้
             </p>
           </div>
@@ -548,7 +549,7 @@ const hasTrafficData = computed(
           <!-- เรื่องล่าสุด → คลิกเข้าไปดูผลลัพธ์/ติดตามงาน -->
           <div class="lg:col-span-1 min-w-0">
             <div class="flex items-center justify-between mb-2">
-              <h3 class="text-sm font-semibold text-slate-700">
+              <h3 class="text-sm font-semibold text-stone-700">
                 <i class="bi bi-clock-history mr-1"></i> เรื่องล่าสุด
               </h3>
             </div>
@@ -557,40 +558,40 @@ const hasTrafficData = computed(
                 v-for="r in cat.recent_issues"
                 :key="r.id"
                 :to="{ name: 'issue-detail', params: { id: r.id } }"
-                class="flex items-center gap-2.5 p-2 rounded-xl hover:bg-slate-50 transition group focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-none"
+                class="flex items-center gap-2.5 p-2 rounded-xl hover:bg-stone-50 transition group focus-visible:ring-2 focus-visible:ring-[#B91C1C] focus-visible:outline-none"
               >
-                <span class="w-2 h-2 rounded-full shrink-0" :class="STATUS_DOT[r.status] ?? 'bg-slate-300'"></span>
+                <span class="w-2 h-2 rounded-full shrink-0" :class="STATUS_DOT[r.status] ?? 'bg-stone-300'"></span>
                 <div class="flex-1 min-w-0">
-                  <p class="text-sm text-slate-800 truncate group-hover:text-slate-900">{{ r.title }}</p>
-                  <p class="text-[11px] text-slate-400 truncate">
+                  <p class="text-sm text-stone-800 truncate group-hover:text-stone-900">{{ r.title }}</p>
+                  <p class="text-[11px] text-stone-400 truncate">
                     {{ r.category_label }} · {{ r.room_name || 'ไม่ระบุห้อง' }} · {{ fmtDate(r.created_at) }}
                   </p>
                 </div>
                 <span
                   class="px-2 py-0.5 text-[11px] font-medium rounded-full shrink-0"
-                  :class="STATUS_BADGE[r.status] ?? 'bg-slate-100 text-slate-600'"
+                  :class="STATUS_BADGE[r.status] ?? 'bg-stone-100 text-stone-600'"
                 >
                   {{ statusShort(r.status) }}
                 </span>
               </RouterLink>
             </div>
-            <p v-else class="text-sm text-slate-400 py-4 text-center">ยังไม่มีเรื่องล่าสุด</p>
+            <p v-else class="text-sm text-stone-400 py-4 text-center">ยังไม่มีเรื่องล่าสุด</p>
           </div>
         </div>
       </section>
 
       <!-- ===== การเข้าใช้งาน (30 วัน) — เฉพาะบทบาทระดับโรงเรียน (scope 'all') ===== -->
-      <section v-if="data.scope === 'all'" class="bg-white rounded-2xl shadow-sm overflow-hidden">
-        <div class="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-100">
-          <h3 class="font-semibold text-slate-800">
-            <i class="bi bi-activity mr-1 text-red-500"></i> การเข้าใช้งาน (30 วัน)
+      <section v-if="data.scope === 'all'" class="rounded-2xl border border-stone-200 bg-white overflow-hidden">
+        <div class="flex items-center justify-between gap-3 px-5 py-4 border-b border-stone-100">
+          <h3 class="font-semibold text-stone-800">
+            <i class="bi bi-activity mr-1 text-[#B91C1C]"></i> การเข้าใช้งาน (30 วัน)
           </h3>
           <button
             type="button"
             @click="loadTraffic"
             :disabled="isLoadingTraffic"
             title="รีเฟรชสถิติการใช้งาน"
-            class="w-8 h-8 rounded-lg bg-slate-100 text-slate-500 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition disabled:opacity-50"
+            class="w-8 h-8 rounded-lg bg-stone-100 text-stone-500 hover:text-[#B91C1C] hover:bg-[#B91C1C]/5 flex items-center justify-center transition disabled:opacity-50"
           >
             <i class="bi bi-arrow-clockwise" :class="{ 'animate-spin': isLoadingTraffic }"></i>
           </button>
@@ -599,52 +600,62 @@ const hasTrafficData = computed(
         <!-- Traffic loading skeleton -->
         <div v-if="isLoadingTraffic && !traffic" class="p-5 space-y-4">
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div v-for="i in 3" :key="i" class="h-16 bg-slate-100 animate-pulse rounded-xl"></div>
+            <div v-for="i in 3" :key="i" class="h-16 bg-stone-100 animate-pulse rounded-xl"></div>
           </div>
           <div class="grid lg:grid-cols-3 gap-4">
-            <div v-for="i in 3" :key="'c' + i" class="h-56 bg-slate-100 animate-pulse rounded-xl"></div>
+            <div v-for="i in 3" :key="'c' + i" class="h-56 bg-stone-100 animate-pulse rounded-xl"></div>
           </div>
         </div>
 
-        <!-- Traffic error (ยังไม่มีข้อมูลเดิม) -->
-        <div v-else-if="trafficError && !traffic" class="p-5 text-center text-sm text-slate-500">
-          <i class="bi bi-exclamation-triangle mr-1 text-rose-500"></i> {{ trafficError }}
+        <!-- Traffic error -->
+        <div v-else-if="trafficError" class="p-5">
+          <div class="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-stone-200 bg-white px-6 py-12 text-center">
+            <p class="text-sm font-semibold text-stone-700"><i class="bi bi-exclamation-triangle mr-1"></i> โหลดสถิติการใช้งานไม่สำเร็จ</p>
+            <p class="mt-1 max-w-sm text-xs text-stone-500">{{ trafficError }}</p>
+            <button
+              type="button"
+              @click="loadTraffic"
+              class="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-stone-900 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-stone-800"
+            >
+              <i class="bi bi-arrow-clockwise"></i> ลองใหม่
+            </button>
+          </div>
         </div>
 
         <!-- Traffic ไม่มีข้อมูล -->
         <div v-else-if="traffic && !hasTrafficData" class="p-5 text-center">
-          <i class="bi bi-person-check text-3xl text-slate-300"></i>
-          <p class="text-sm text-slate-500 mt-2">ยังไม่มีข้อมูลการใช้งาน — ระบบจะเริ่มเก็บสถิติตั้งแต่วันนี้</p>
+          <i class="bi bi-person-check text-3xl text-stone-300"></i>
+          <p class="text-sm text-stone-500 mt-2">ยังไม่มีข้อมูลการใช้งาน — ระบบจะเริ่มเก็บสถิติตั้งแต่วันนี้</p>
         </div>
 
         <!-- Traffic charts -->
         <div v-else-if="traffic" class="p-5 space-y-4">
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div class="bg-slate-50 rounded-xl p-4">
-              <p class="text-2xl font-black text-slate-900 tabular-nums">{{ fmtNum(traffic.total_logins) }}</p>
-              <p class="text-xs text-slate-500"><i class="bi bi-box-arrow-in-right mr-1"></i> เข้าสู่ระบบสะสม</p>
+            <div class="bg-stone-50 rounded-xl p-4">
+              <p class="font-display text-2xl font-bold text-stone-900 tabular-nums">{{ fmtNum(traffic.total_logins) }}</p>
+              <p class="text-xs text-stone-500"><i class="bi bi-box-arrow-in-right mr-1"></i> เข้าสู่ระบบสะสม</p>
             </div>
-            <div class="bg-slate-50 rounded-xl p-4">
-              <p class="text-2xl font-black text-slate-900 tabular-nums">{{ fmtNum(traffic.unique_users) }}</p>
-              <p class="text-xs text-slate-500"><i class="bi bi-people mr-1"></i> ผู้ใช้ที่ใช้งาน</p>
+            <div class="bg-stone-50 rounded-xl p-4">
+              <p class="font-display text-2xl font-bold text-stone-900 tabular-nums">{{ fmtNum(traffic.unique_users) }}</p>
+              <p class="text-xs text-stone-500"><i class="bi bi-people mr-1"></i> ผู้ใช้ที่ใช้งาน</p>
             </div>
-            <div class="bg-slate-50 rounded-xl p-4">
-              <p class="text-2xl font-black text-slate-900 tabular-nums">{{ fmtNum(traffic.failed_logins) }}</p>
-              <p class="text-xs text-slate-500"><i class="bi bi-x-circle mr-1"></i> ล็อกอินล้มเหลว</p>
+            <div class="bg-stone-50 rounded-xl p-4">
+              <p class="font-display text-2xl font-bold text-stone-900 tabular-nums">{{ fmtNum(traffic.failed_logins) }}</p>
+              <p class="text-xs text-stone-500"><i class="bi bi-x-circle mr-1"></i> ล็อกอินล้มเหลว</p>
             </div>
           </div>
 
           <div class="grid lg:grid-cols-3 gap-4">
             <div>
-              <h4 class="text-sm font-semibold text-slate-700 mb-2"><i class="bi bi-box-arrow-in-right mr-1 text-blue-600"></i> ผู้เข้าใช้ต่อวัน</h4>
+              <h4 class="text-sm font-semibold text-stone-700 mb-2"><i class="bi bi-box-arrow-in-right mr-1 text-stone-600"></i> ผู้เข้าใช้ต่อวัน</h4>
               <div class="h-56"><Line :data="trafficLoginsChart" :options="chartOptions" /></div>
             </div>
             <div>
-              <h4 class="text-sm font-semibold text-slate-700 mb-2"><i class="bi bi-lightning-charge mr-1 text-red-600"></i> กิจกรรมทั้งระบบต่อวัน</h4>
+              <h4 class="text-sm font-semibold text-stone-700 mb-2"><i class="bi bi-lightning-charge mr-1 text-[#B91C1C]"></i> กิจกรรมทั้งระบบต่อวัน</h4>
               <div class="h-56"><Bar :data="trafficActionsChart" :options="chartOptions" /></div>
             </div>
             <div>
-              <h4 class="text-sm font-semibold text-slate-700 mb-2"><i class="bi bi-pie-chart mr-1 text-emerald-600"></i> สัดส่วนการใช้งาน</h4>
+              <h4 class="text-sm font-semibold text-stone-700 mb-2"><i class="bi bi-pie-chart mr-1 text-stone-600"></i> สัดส่วนการใช้งาน</h4>
               <div class="h-56"><Doughnut :data="trafficBreakdownChart" :options="chartOptions" /></div>
             </div>
           </div>
@@ -653,40 +664,40 @@ const hasTrafficData = computed(
 
       <!-- ===== ภาพรวมเสริม: แนวโน้ม + สถิติระบบ ===== -->
       <div class="grid lg:grid-cols-3 gap-4">
-        <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm p-4 sm:p-5">
-          <h3 class="font-semibold text-slate-800 mb-3"><i class="bi bi-graph-up mr-1"></i> แนวโน้มเรื่องที่แจ้ง (7 วัน)</h3>
+        <div class="lg:col-span-2 rounded-2xl border border-stone-200 bg-white p-4 sm:p-5">
+          <h3 class="font-semibold text-stone-800 mb-3"><i class="bi bi-graph-up mr-1"></i> แนวโน้มเรื่องที่แจ้ง (7 วัน)</h3>
           <div class="h-64"><Line :data="trendChart" :options="chartOptions" /></div>
         </div>
 
-        <div class="bg-white rounded-2xl shadow-sm p-4 sm:p-5">
-          <h3 class="font-semibold text-slate-800 mb-3"><i class="bi bi-building mr-1"></i> สถิติระบบ</h3>
+        <div class="rounded-2xl border border-stone-200 bg-white p-4 sm:p-5">
+          <h3 class="font-semibold text-stone-800 mb-3"><i class="bi bi-building mr-1"></i> สถิติระบบ</h3>
           <div class="grid grid-cols-2 gap-3">
-            <div class="bg-slate-50 rounded-xl p-3">
-              <p class="text-2xl font-black text-slate-900 tabular-nums">{{ fmtNum(data.total_students) }}</p>
-              <p class="text-xs text-slate-500"><i class="bi bi-people mr-1"></i> นักเรียนในระบบ</p>
+            <div class="bg-stone-50 rounded-xl p-3">
+              <p class="font-display text-2xl font-bold text-stone-900 tabular-nums">{{ fmtNum(data.total_students) }}</p>
+              <p class="text-xs text-stone-500"><i class="bi bi-people mr-1"></i> นักเรียนในระบบ</p>
             </div>
-            <div class="bg-slate-50 rounded-xl p-3">
-              <p class="text-2xl font-black text-slate-900 tabular-nums">{{ fmtNum(data.total_rooms) }}</p>
-              <p class="text-xs text-slate-500"><i class="bi bi-door-closed mr-1"></i> ห้องเรียน</p>
+            <div class="bg-stone-50 rounded-xl p-3">
+              <p class="font-display text-2xl font-bold text-stone-900 tabular-nums">{{ fmtNum(data.total_rooms) }}</p>
+              <p class="text-xs text-stone-500"><i class="bi bi-door-closed mr-1"></i> ห้องเรียน</p>
             </div>
           </div>
-          <div class="mt-3 pt-3 border-t border-slate-100">
+          <div class="mt-3 pt-3 border-t border-stone-100">
             <div class="flex items-center justify-between">
-              <p class="text-2xl font-black text-slate-900 tabular-nums">{{ fmtNum(data.usage_count) }}</p>
-              <span class="text-xs text-slate-400">ครั้ง (ยอดสะสม)</span>
+              <p class="font-display text-2xl font-bold text-stone-900 tabular-nums">{{ fmtNum(data.usage_count) }}</p>
+              <span class="text-xs text-stone-400">ครั้ง (ยอดสะสม)</span>
             </div>
-            <p class="text-xs text-slate-500 mt-1 mb-2"><i class="bi bi-person-check mr-1"></i> การเข้าใช้งานล่าสุด</p>
+            <p class="text-xs text-stone-500 mt-1 mb-2"><i class="bi bi-person-check mr-1"></i> การเข้าใช้งานล่าสุด</p>
             <div v-if="data.recent_logins.length" class="space-y-1.5">
               <div
                 v-for="(lg, idx) in data.recent_logins.slice(0, 5)"
                 :key="idx"
                 class="flex items-center justify-between text-xs"
               >
-                <span class="text-slate-600 truncate">{{ lg.actor }}</span>
-                <span class="text-slate-400 ml-2 shrink-0">{{ fmtDate(lg.at) }}</span>
+                <span class="text-stone-600 truncate">{{ lg.actor }}</span>
+                <span class="text-stone-400 ml-2 shrink-0">{{ fmtDate(lg.at) }}</span>
               </div>
             </div>
-            <p v-else class="text-sm text-slate-400 py-2">ยังไม่มีข้อมูลการเข้าใช้งาน</p>
+            <p v-else class="text-sm text-stone-400 py-2">ยังไม่มีข้อมูลการเข้าใช้งาน</p>
           </div>
         </div>
       </div>

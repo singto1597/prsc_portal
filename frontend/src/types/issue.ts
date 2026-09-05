@@ -195,10 +195,3 @@ export const DESTINATION_LABELS: Record<RequestedDestination, string> = {
   vote: 'โหวตสาธารณะ',
   talk: 'พูดคุยสาธารณะ',
 }
-
-// badge สีในรายการเรื่อง — ให้เห็นชัดว่าเรื่องไหนขอเผยแพร่เป็น board
-export function destinationBadgeClass(dest: RequestedDestination | undefined): string {
-  if (dest === 'vote') return 'bg-violet-100 text-violet-700'
-  if (dest === 'talk') return 'bg-sky-100 text-sky-700'
-  return ''
-}

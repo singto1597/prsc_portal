@@ -43,13 +43,13 @@ function go(n: number) {
       :disabled="page <= 1 || loading"
       @click="go(page - 1)"
       class="w-9 h-9 flex items-center justify-center rounded-xl border text-sm disabled:opacity-40 disabled:cursor-not-allowed"
-      :class="page > 1 ? 'border-slate-300 text-slate-600 hover:bg-slate-50' : 'border-slate-100 text-slate-300'"
+      :class="page > 1 ? 'border-stone-300 text-stone-600 hover:bg-stone-50' : 'border-stone-100 text-stone-300'"
     >
       <i class="bi bi-chevron-left"></i>
     </button>
 
     <template v-for="(it, i) in items" :key="`${it}-${i}`">
-      <span v-if="it === 'ellipsis'" class="px-0.5 text-slate-400">…</span>
+      <span v-if="it === 'ellipsis'" class="px-0.5 text-stone-400">…</span>
       <button
         v-else
         type="button"
@@ -58,8 +58,8 @@ function go(n: number) {
         class="min-w-9 h-9 px-2 flex items-center justify-center rounded-xl text-sm font-medium transition"
         :class="
           it === page
-            ? 'bg-red-600 text-white'
-            : 'border border-slate-200 text-slate-600 hover:border-red-300 hover:text-red-600'
+            ? 'bg-[#B91C1C] text-white'
+            : 'border border-stone-200 text-stone-600 hover:border-[#B91C1C] hover:text-[#B91C1C]'
         "
       >
         {{ it }}
@@ -71,7 +71,7 @@ function go(n: number) {
       :disabled="page >= pages || loading"
       @click="go(page + 1)"
       class="w-9 h-9 flex items-center justify-center rounded-xl border text-sm disabled:opacity-40 disabled:cursor-not-allowed"
-      :class="page < pages ? 'border-slate-300 text-slate-600 hover:bg-slate-50' : 'border-slate-100 text-slate-300'"
+      :class="page < pages ? 'border-stone-300 text-stone-600 hover:bg-stone-50' : 'border-stone-100 text-stone-300'"
     >
       <i class="bi bi-chevron-right"></i>
     </button>

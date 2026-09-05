@@ -5,10 +5,22 @@
 @tailwind utilities;
 
 :root {
-  /* ฟอนต์หลัก Noto Sans Thai (ไทย) — fallback sans-serif เสมอ กันหลุดไป serif */
+  /* ฟอนต์หลัก (body) Noto Sans Thai — fallback sans-serif เสมอ กันหลุดไป serif */
   font-family: 'Noto Sans Thai', Tahoma, Arial, system-ui, -apple-system, sans-serif;
+  /* Accent กลางของระบบ (Cardinal Red) — แทนที่ #dc2626 เดิม */
+  --piri-accent: #b91c1c;
+  --piri-accent-strong: #991b1b;
   line-height: 1.5;
   font-weight: 400;
+}
+
+/* พาดหัว/หัวข้อใหญ่ใช้ Anuphan (จับคู่กับ Landing) — ร่างกายยังเป็น Noto Sans Thai */
+h1,
+h2,
+h3,
+h4,
+h5 {
+  font-family: 'Anuphan', 'Noto Sans Thai', Tahoma, Arial, system-ui, -apple-system, sans-serif;
 }
 
 body {
@@ -18,26 +30,26 @@ body {
   @apply font-sans antialiased;
 }
 
-/* 🔧 ช่องพิมพ์ข้อความ: พื้นหลังขาว + ตัวหนังสือเข้ม (กัน daisyUI theme ครอบ) */
+/* 🔧 ช่องพิมพ์ข้อความ: พื้นหลังขาว + ตัวหนังสือเข้ม + เส้นขอบ stone (กัน daisyUI theme ครอบ) */
 input,
 textarea,
 select {
   background-color: #ffffff !important;
-  color: #1f2937 !important;
-  border-color: #d1d5db !important;
+  color: #1c1917 !important; /* stone-900 */
+  border-color: #d6d3d1 !important; /* stone-300 */
 }
 
 input::placeholder,
 textarea::placeholder {
-  color: #9ca3af !important;
+  color: #a8a29e !important; /* stone-400 */
 }
 
-/* ✨ Focus ring แดง (แทนน้ำเงินที่เหลือ) */
+/* ✨ Focus ring Cardinal Red */
 input:focus,
 textarea:focus,
 select:focus {
-  border-color: #dc2626 !important;
-  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15) !important;
+  border-color: #b91c1c !important;
+  box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.16) !important;
   outline: none;
 }
 
@@ -50,11 +62,11 @@ select:focus {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #d1d5db;
+  background: #d6d3d1; /* stone-300 */
   border-radius: 8px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
+  background: #a8a29e; /* stone-400 */
 }
 
 /* ✨ tap highlight เลือนบน mobile */
@@ -62,31 +74,31 @@ select:focus {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* ✨ Card hover ยกนิดหน่อย (เรียบหรู) */
+/* ✨ Card hover — ยกขอบเส้นบาง ๆ แทนการยกกล่อง + เงาฟุ้ง (Civic เรียบ ๆ) */
 .card-hover {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: border-color 0.2s ease, transform 0.2s ease;
 }
 .card-hover:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
+  border-color: #d6d3d1; /* stone-300 */
 }
 
-/* ===================== คอมโพเนนต์สไตล์กลาง (เรียบ หรู มืออาชีพ) ===================== */
+/* ===================== คอมโพเนนต์สไตล์กลาง (stone + cardinal, ไร้ gradient/glass) ===================== */
 @layer components {
-  /* การ์ดมาตรฐานของระบบ — ใช้แทน rounded-xl/shadow-sm ที่เคยเขียนซ้ำ ๆ */
+  /* การ์ดมาตรฐานของระบบ — hairline border แทนเงา */
   .page-card {
-    @apply bg-white rounded-2xl shadow-sm;
+    @apply bg-white rounded-2xl border border-stone-200;
   }
-  /* ปุ่มหลัก gradient แดง (ใช้กับทุกหน้าให้เป็นหนึ่งเดียว) */
+  /* ปุ่มหลัก flat cardinal (เดิมเคยเป็น gradient — รีแบรนด์แล้ว) */
   .btn-gradient {
-    @apply inline-flex items-center justify-center gap-1.5 py-2.5 px-4 bg-gradient-to-r from-red-600 to-rose-600
-           text-white rounded-xl font-semibold shadow-md shadow-red-200
-           hover:from-red-700 hover:to-rose-700 transition-all disabled:opacity-50 disabled:pointer-events-none;
+    @apply inline-flex items-center justify-center gap-1.5 py-2.5 px-4 bg-[#B91C1C]
+           text-white rounded-xl font-semibold
+           hover:bg-[#991B1B] transition-all disabled:opacity-50 disabled:pointer-events-none;
   }
-  /* ปุ่มรอง (ขอบบาง) */
+  /* ปุ่มรอง (ขอบบาง stone) */
   .btn-ghost-ui {
-    @apply inline-flex items-center justify-center gap-1.5 py-2.5 px-4 bg-white border border-slate-200
-           text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50 hover:text-slate-800 transition;
+    @apply inline-flex items-center justify-center gap-1.5 py-2.5 px-4 bg-white border border-stone-200
+           text-stone-600 rounded-xl text-sm font-medium hover:bg-stone-50 hover:text-stone-800 transition;
   }
 }
 
@@ -106,16 +118,9 @@ select:focus {
 }
 
 /* ============================================================
-   🎨 Premium motion tokens — ยกจาก Landing/Login มาใช้ทั่วแอป
-   (ตัว authed app: glass top bar, Home/Welcome, การ์ดลอย ฯลฯ)
+   🎨 Motion tokens (skeleton / fade / scale) — ลูกบอลเรืองแสงถูกถอดออกแล้ว
+   (คงเฉพาะที่จำเป็น ไม่มี glass gradient แบบเดิม)
    ============================================================ */
-@keyframes blob {
-  0% { transform: translate(0px, 0px) scale(1); }
-  33% { transform: translate(30px, -50px) scale(1.05); }
-  66% { transform: translate(-20px, 20px) scale(0.95); }
-  100% { transform: translate(0px, 0px) scale(1); }
-}
-
 @keyframes shimmer {
   100% { transform: translateX(100%); }
 }
@@ -135,15 +140,9 @@ select:focus {
   to { opacity: 1; transform: scale(1); }
 }
 
-/* ลูกบอลแสงเบลอ (พื้นหลังพรีเมียม) */
-.animate-blob {
-  animation: blob 15s infinite alternate ease-in-out;
-}
 .animate-floaty {
   animation: floaty 6s ease-in-out infinite;
 }
-.animation-delay-2000 { animation-delay: 2s; }
-.animation-delay-4000 { animation-delay: 4s; }
 
 /* กัน layout shift: ใส่ container ที่สะท้อนรูปทรงของ element จริง */
 .skeleton-shimmer {
@@ -168,7 +167,6 @@ select:focus {
 
 /* ♿ เคารพผู้ที่ปิดแอนิเมชัน */
 @media (prefers-reduced-motion: reduce) {
-  .animate-blob,
   .animate-floaty,
   .skeleton-shimmer::after,
   .animate-fade-up,

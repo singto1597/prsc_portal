@@ -272,7 +272,6 @@ const sparkDot = computed(() => {
  * 📣 Annotations & Announcements
  * ============================================================ */
 const heroAnnouncement = computed(() => announcements.value[0] ?? null);
-const hasUrgent = computed(() => announcements.value.some(a => a.priority === 'urgent'));
 
 function priorityDot(p: AnnouncementPriority) {
   if (p === 'urgent') return 'bg-[#B91C1C] animate-pulse';
@@ -334,7 +333,7 @@ watch([stats, isLoadingStats], () => {
     <!-- ============================================= -->
     <header
       class="fixed left-0 right-0 top-0 z-50 transition-all duration-400"
-      :class="isScrolled ? 'border-b border-stone-200/80 bg-white/80 backdrop-blur-lg shadow-[0_4px_30px_rgba(0,0,0,0.03)]' : 'border-transparent bg-transparent'"
+      :class="isScrolled ? 'border-b border-stone-200 bg-white' : 'border-transparent bg-transparent'"
     >
       <nav class="mx-auto flex h-[76px] max-w-7xl items-center justify-between px-5 sm:px-6 lg:px-8">
         
@@ -432,7 +431,7 @@ watch([stats, isLoadingStats], () => {
                 </button>
                 <button
                   type="button"
-                  class="inline-flex items-center gap-2.5 rounded-xl border-2 border-stone-200 bg-white/50 px-7 py-3.5 text-[15px] font-semibold text-stone-700 backdrop-blur-sm transition-all hover:border-stone-300 hover:bg-white active:scale-95"
+                  class="inline-flex items-center gap-2.5 rounded-xl border-2 border-stone-200 bg-white px-7 py-3.5 text-[15px] font-semibold text-stone-700 transition-all hover:border-stone-300 active:scale-95"
                   @click="goStats"
                 >
                   ดูรายงานสถิติ
@@ -445,7 +444,7 @@ watch([stats, isLoadingStats], () => {
               
               <!-- Card 1: Top Announcement -->
               <div
-                class="settle absolute left-4 top-8 z-10 w-[320px] rounded-2xl border border-stone-200/80 bg-white p-6 shadow-[0_20px_40px_-15px_rgba(28,25,23,0.15)] backdrop-blur-md"
+                class="settle absolute left-4 top-8 z-10 w-[320px] rounded-2xl border border-stone-200 bg-white p-6"
                 style="--rot: -4deg; animation-delay: 0.2s;"
               >
                 <div class="mb-3 flex items-center gap-2">
@@ -466,7 +465,7 @@ watch([stats, isLoadingStats], () => {
 
               <!-- Card 2: Recent Resolved Case -->
               <div
-                class="settle absolute right-0 top-[200px] z-20 w-[340px] rounded-2xl border border-stone-200/80 bg-[#FAFAFA] p-6 shadow-[0_25px_50px_-12px_rgba(28,25,23,0.25)]"
+                class="settle absolute right-0 top-[200px] z-20 w-[340px] rounded-2xl border border-stone-200 bg-[#FAFAF9] p-6"
                 style="--rot: 3deg; animation-delay: 0.35s;"
               >
                 <div class="mb-3 flex items-center gap-2">
@@ -783,8 +782,9 @@ watch([stats, isLoadingStats], () => {
               <!-- Added Gradient Text here! -->
               <h2 class="text-3xl font-bold tracking-tight sm:text-5xl leading-[1.25]">
                 มากกว่าการแจ้งเรื่อง<br>
-                <span class="text-transparent bg-clip-text bg-gradient-to-r from-rose-400 to-[#FF8E53]">
+                <span class="relative inline-block text-stone-100">
                   คือพื้นที่ของทุกความเห็น
+                  <span class="absolute -bottom-1 left-0 right-0 h-2 bg-[#B91C1C]/60 -skew-x-12"></span>
                 </span>
               </h2>
               <p class="mt-6 text-[16px] leading-relaxed text-stone-400">
@@ -794,7 +794,7 @@ watch([stats, isLoadingStats], () => {
 
             <div class="grid gap-5 sm:grid-cols-2">
               <!-- PIRI Talk -->
-              <div class="rounded-2xl border border-stone-800 bg-stone-900/50 p-6 backdrop-blur-sm sm:p-8 transition-colors hover:bg-stone-900">
+              <div class="rounded-2xl border border-stone-800 bg-stone-900 p-6 sm:p-8 transition-colors hover:bg-stone-900">
                 <div class="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-stone-800 text-stone-300">
                   <i class="bi bi-chat-text text-lg"></i>
                 </div>
@@ -808,7 +808,7 @@ watch([stats, isLoadingStats], () => {
               </div>
               
               <!-- PIRI Vote -->
-              <div class="rounded-2xl border border-stone-800 bg-stone-900/50 p-6 backdrop-blur-sm sm:p-8 transition-colors hover:bg-stone-900">
+              <div class="rounded-2xl border border-stone-800 bg-stone-900 p-6 sm:p-8 transition-colors hover:bg-stone-900">
                 <div class="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-stone-800 text-stone-300">
                   <i class="bi bi-bar-chart-steps text-lg"></i>
                 </div>

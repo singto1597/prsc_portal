@@ -36,7 +36,7 @@ function onChildClick() {
     <!-- หัวข้อหลัก: คลิก → หน้าหนังสือ, กด chevron → ขยาย/ย่อเมนู -->
     <div
       class="flex items-center rounded-xl transition-all"
-      :class="parentActive() ? 'bg-red-50 text-red-600 border border-red-100/50 shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'"
+      :class="parentActive() ? 'bg-stone-100 text-[#B91C1C] border border-stone-200' : 'text-stone-500 hover:bg-stone-50 hover:text-stone-900'"
     >
       <RouterLink to="/app/playbooks" class="flex-1 flex items-center px-3.5 py-3 text-sm font-semibold min-w-0">
         <i class="bi bi-journal-bookmark-fill text-lg mr-3"></i>
@@ -46,7 +46,7 @@ function onChildClick() {
         type="button"
         :title="isOpen ? 'ย่อเมนู' : 'ขยายเมนู'"
         :aria-expanded="isOpen"
-        class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-white/70 hover:text-slate-700 transition-colors shrink-0 mr-1.5"
+        class="w-8 h-8 flex items-center justify-center rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors shrink-0 mr-1.5"
         @click="isOpen = !isOpen"
       >
         <i :class="['bi text-xs transition-transform', isOpen ? 'bi-chevron-up' : 'bi-chevron-down']"></i>
@@ -55,16 +55,20 @@ function onChildClick() {
 
     <!-- เมนูย่อย 6 เล่ม -->
     <Transition name="expand">
-      <div v-if="isOpen" class="mt-1 ml-4 pl-3 border-l-2 border-red-100 space-y-0.5">
+      <div
+        v-if="isOpen"
+        class="mt-1 ml-4 pl-3 border-l-2 space-y-0.5"
+        :class="parentActive() ? 'border-[#B91C1C]' : 'border-stone-100'"
+      >
         <RouterLink
           v-for="pb in PLAYBOOKS"
           :key="pb.id"
           :to="{ name: 'playbook-reader', params: { id: pb.id } }"
           @click="onChildClick"
           class="flex items-center px-3 py-2 text-[13px] font-medium rounded-lg transition-colors"
-          :class="isChildActive(pb.id) ? 'bg-red-50 text-red-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'"
+          :class="isChildActive(pb.id) ? 'bg-stone-100 text-[#B91C1C]' : 'text-stone-500 hover:bg-stone-100 hover:text-stone-900'"
         >
-          <i class="bi bi-book-half text-sm mr-2.5 text-red-400"></i>
+          <i class="bi bi-book-half text-sm mr-2.5" :class="isChildActive(pb.id) ? 'text-[#B91C1C]' : 'text-stone-400'"></i>
           <span class="truncate">{{ pb.title }}</span>
         </RouterLink>
       </div>

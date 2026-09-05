@@ -7,12 +7,9 @@ import {
   listImportJobs,
   downloadImportTemplate,
 } from '@/services/student';
-import type { ImportJob } from '@/types/student';
+import type { ImportJob, ImportJobStatus } from '@/types/student';
 import {
   IMPORT_STATUS_LABELS,
-  IMPORT_STATUS_BADGES,
-  IMPORT_BAR_FILL,
-  IMPORT_BAR_TEXT,
   isImportJobRunning,
 } from '@/constants/importStatus';
 
@@ -32,6 +29,31 @@ const isJobsLoading = ref(true);
 const loadError = ref(false);
 // poll ติดกันเกินลิมิต — โชว์แบนเนอร์บอก user ว่าเชื่อมต่อไม่แน่นอน (ไม่ปิด poll — พอ network กลับมา update เอง)
 const isPollError = ref(false);
+
+// ป้ายสถานะ / หลอดความคืบหน้า (daisyUI badge-* เดิม → stone/cardinal/emerald แบบ Civic)
+const jobBadgeCls: Record<ImportJobStatus, string> = {
+  PENDING: 'bg-stone-100 text-stone-600',
+  QUEUED: 'bg-[#B91C1C]/10 text-[#B91C1C]',
+  PROCESSING: 'bg-[#B91C1C]/10 text-[#B91C1C]',
+  COMPLETED: 'bg-emerald-100 text-emerald-700',
+  FAILED: 'bg-[#B91C1C]/10 text-[#B91C1C]',
+};
+
+const barFillCls: Record<ImportJobStatus, string> = {
+  PENDING: 'bg-stone-300',
+  QUEUED: 'bg-[#B91C1C]',
+  PROCESSING: 'bg-[#B91C1C]',
+  COMPLETED: 'bg-emerald-600',
+  FAILED: 'bg-stone-400',
+};
+
+const barTextCls: Record<ImportJobStatus, string> = {
+  PENDING: 'text-stone-500',
+  QUEUED: 'text-[#B91C1C]',
+  PROCESSING: 'text-[#B91C1C]',
+  COMPLETED: 'text-emerald-700',
+  FAILED: 'text-stone-600',
+};
 
 // Polling — กัน poll ซ้อน: ใน-flight guard กัน request ค้างซ้อนกันคิว
 const POLL_FAIL_LIMIT = 3;
@@ -196,147 +218,149 @@ onBeforeUnmount(stopPolling);
 <template>
   <div class="max-w-5xl mx-auto">
     <!-- หัวข้อ + ปุ่มดาวน์โหลด Template -->
-    <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+    <div class="flex flex-wrap items-start justify-between gap-3 mb-5">
       <div>
-        <h1 class="text-xl font-black tracking-tight text-slate-900 leading-tight sm:text-2xl">
-          <i class="bi bi-file-earmark-excel mr-1 text-red-500"></i> นำเข้านักเรียนจาก Excel
+        <p class="mb-1 text-[11px] font-bold uppercase tracking-widest text-stone-400">Excel Import</p>
+        <h1 class="text-2xl font-bold tracking-tight text-stone-900 leading-tight sm:text-3xl">
+          <i class="bi bi-file-earmark-excel mr-1 text-[#B91C1C]"></i> นำเข้านักเรียนจาก Excel
         </h1>
-        <p class="text-sm text-slate-500">อัปโหลดรายชื่อ + ตำแหน่งในห้องเรียนเป็นชุด</p>
+        <p class="mt-1 text-sm text-stone-500">อัปโหลดรายชื่อ + ตำแหน่งในห้องเรียนเป็นชุด</p>
       </div>
       <button
         @click="handleDownloadTemplate"
         :disabled="isDownloadingTemplate"
-        class="btn btn-outline btn-error btn-sm gap-1 disabled:opacity-50"
+        class="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-600 transition hover:bg-stone-50 hover:text-stone-800 disabled:opacity-50"
       >
-        <i v-if="isDownloadingTemplate" class="loading loading-spinner loading-xs"></i>
+        <span v-if="isDownloadingTemplate" class="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
         <i v-else class="bi bi-file-earmark-excel"></i>
         ดาวน์โหลดตัวอย่างไฟล์ (Template)
       </button>
     </div>
 
     <!-- รูปแบบไฟล์ — อธิบายชัดเจนว่าคอลัมน์ต้องเป๊ะ -->
-    <div class="bg-red-50 border border-red-200 rounded-xl p-4 mb-5 text-sm">
-      <p class="font-semibold text-red-800 mb-2">
-        <i class="bi bi-info-circle mr-1"></i>
+    <div class="mb-5 rounded-2xl border border-stone-200 bg-white p-5 text-sm sm:p-6">
+      <p class="mb-3 font-semibold text-stone-900">
+        <i class="bi bi-info-circle mr-1.5 text-[#B91C1C]"></i>
         ไฟล์ต้องมีคอลัมน์และข้อมูลในลักษณะนี้ ระบบถึงจะอ่านได้แน่นอน — <span class="underline">คอลัมน์ต้องเป๊ะ</span>
         (ห้ามเพิ่ม / ลบ / เปลี่ยนชื่อ / ซ้ำ):
       </p>
-      <div class="overflow-x-auto rounded-lg border border-red-100 bg-white">
-        <table class="table table-xs w-full">
+      <div class="overflow-x-auto rounded-xl border border-stone-200">
+        <table class="w-full text-xs">
           <thead>
-            <tr class="bg-red-50 text-red-600">
-              <th>คอลัมน์</th>
-              <th>จำเป็น</th>
-              <th>ตัวอย่าง</th>
-              <th class="min-w-[200px]">คำอธิบาย</th>
+            <tr class="bg-stone-50 text-left text-stone-500">
+              <th class="px-3 py-2 font-semibold uppercase tracking-wider">คอลัมน์</th>
+              <th class="px-3 py-2 font-semibold uppercase tracking-wider">จำเป็น</th>
+              <th class="px-3 py-2 font-semibold uppercase tracking-wider">ตัวอย่าง</th>
+              <th class="min-w-[200px] px-3 py-2 font-semibold uppercase tracking-wider">คำอธิบาย</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody class="divide-y divide-stone-100">
             <tr>
-              <td class="font-mono">รหัสนักเรียน</td><td>✅ ต้องมี</td><td class="font-mono">47001</td>
-              <td>เลขประจำตัว (ใช้เป็น username + รหัสผ่านเริ่มต้น)</td>
+              <td class="px-3 py-2 font-mono text-stone-700">รหัสนักเรียน</td><td class="px-3 py-2 text-stone-600">✅ ต้องมี</td><td class="px-3 py-2 font-mono text-stone-700">47001</td>
+              <td class="px-3 py-2 text-stone-600">เลขประจำตัว (ใช้เป็น username + รหัสผ่านเริ่มต้น)</td>
             </tr>
             <tr>
-              <td class="font-mono">ห้องเรียน</td><td>✅ ต้องมี</td><td class="font-mono">ม.4/1</td>
-              <td>ระบบสร้างห้องอัตโนมัติถ้ายังไม่มี</td>
+              <td class="px-3 py-2 font-mono text-stone-700">ห้องเรียน</td><td class="px-3 py-2 text-stone-600">✅ ต้องมี</td><td class="px-3 py-2 font-mono text-stone-700">ม.4/1</td>
+              <td class="px-3 py-2 text-stone-600">ระบบสร้างห้องอัตโนมัติถ้ายังไม่มี</td>
             </tr>
             <tr>
-              <td class="font-mono">เลขที่</td><td>✅ ต้องมี</td><td class="font-mono">1</td>
-              <td>ตัวเลข (1, 2, 3 ...)</td>
+              <td class="px-3 py-2 font-mono text-stone-700">เลขที่</td><td class="px-3 py-2 text-stone-600">✅ ต้องมี</td><td class="px-3 py-2 font-mono text-stone-700">1</td>
+              <td class="px-3 py-2 text-stone-600">ตัวเลข (1, 2, 3 ...)</td>
             </tr>
             <tr>
-              <td class="font-mono">คำนำหน้า</td><td>เว้นได้</td><td class="font-mono">นาย / นางสาว</td><td>—</td>
+              <td class="px-3 py-2 font-mono text-stone-700">คำนำหน้า</td><td class="px-3 py-2 text-stone-600">เว้นได้</td><td class="px-3 py-2 font-mono text-stone-700">นาย / นางสาว</td><td class="px-3 py-2 text-stone-600">—</td>
             </tr>
             <tr>
-              <td class="font-mono">ชื่อ</td><td>แนะนำ</td><td class="font-mono">สมชาย</td>
-              <td>ห้ามเว้นทั้ง ชื่อ + นามสกุล</td>
+              <td class="px-3 py-2 font-mono text-stone-700">ชื่อ</td><td class="px-3 py-2 text-stone-600">แนะนำ</td><td class="px-3 py-2 font-mono text-stone-700">สมชาย</td>
+              <td class="px-3 py-2 text-stone-600">ห้ามเว้นทั้ง ชื่อ + นามสกุล</td>
             </tr>
             <tr>
-              <td class="font-mono">นามสกุล</td><td>แนะนำ</td><td class="font-mono">ใจดี</td><td>—</td>
+              <td class="px-3 py-2 font-mono text-stone-700">นามสกุล</td><td class="px-3 py-2 text-stone-600">แนะนำ</td><td class="px-3 py-2 font-mono text-stone-700">ใจดี</td><td class="px-3 py-2 text-stone-600">—</td>
             </tr>
             <tr>
-              <td class="font-mono">ชื่อเล่น</td><td>เว้นได้</td><td class="font-mono">ชาย</td><td>—</td>
+              <td class="px-3 py-2 font-mono text-stone-700">ชื่อเล่น</td><td class="px-3 py-2 text-stone-600">เว้นได้</td><td class="px-3 py-2 font-mono text-stone-700">ชาย</td><td class="px-3 py-2 text-stone-600">—</td>
             </tr>
             <tr>
-              <td class="font-mono">ตำแหน่งในห้องเรียน</td><td>เว้นได้</td><td class="font-mono">หัวหน้าห้อง</td>
-              <td>เว้นว่าง = นักเรียนธรรมดา</td>
+              <td class="px-3 py-2 font-mono text-stone-700">ตำแหน่งในห้องเรียน</td><td class="px-3 py-2 text-stone-600">เว้นได้</td><td class="px-3 py-2 font-mono text-stone-700">หัวหน้าห้อง</td>
+              <td class="px-3 py-2 text-stone-600">เว้นว่าง = นักเรียนธรรมดา</td>
             </tr>
           </tbody>
         </table>
       </div>
-      <ul class="mt-3 text-xs text-red-700 space-y-1">
+      <ul class="mt-3 space-y-1 text-xs text-stone-600">
         <li>
-          • <b>ตำแหน่ง</b> ที่รองรับ: หัวหน้าห้อง, รองวิชาการ, รองวินัย, รองกิจกรรม, รองปฏิคม,
+          • <b class="text-stone-700">ตำแหน่ง</b> ที่รองรับ: หัวหน้าห้อง, รองวิชาการ, รองวินัย, รองกิจกรรม, รองปฏิคม,
           ประธานระดับ, สภานักเรียน, ประธานสภา, ครู, ครูสภา, แอดมิน
         </li>
-        <li>• <b>ห้องเรียน</b> รูปแบบ: ม.4/1 (ระดับ/ห้อง)</li>
+        <li>• <b class="text-stone-700">ห้องเรียน</b> รูปแบบ: ม.4/1 (ระดับ/ห้อง)</li>
         <li>• 🔑 รหัสผ่านเริ่มต้น = เลขรหัสนักเรียน (เช่น 47001 → เข้าระบบด้วย 47001/47001)</li>
-        <li>• ⚠️ ไฟล์ตัวอย่างมีแถวตัวอย่าง (00001, 00002) — ระบบจะ<b>ข้ามแถวที่รหัสขึ้นต้น 000</b> อัตโนมัติ
+        <li>• ⚠️ ไฟล์ตัวอย่างมีแถวตัวอย่าง (00001, 00002) — ระบบจะ<b class="text-stone-700">ข้ามแถวที่รหัสขึ้นต้น 000</b> อัตโนมัติ
           (ลบออกก่อนอัปโหลดก็ได้เพื่อความเรียบร้อย)</li>
       </ul>
     </div>
 
     <!-- ขั้นตอนที่ 1: อัปโหลดเข้า Queue -->
-    <div class="bg-white rounded-2xl shadow-sm p-5 space-y-4">
+    <div class="space-y-4 rounded-2xl border border-stone-200 bg-white p-5 sm:p-6">
       <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1">
-          1. เลือกไฟล์ Excel <span class="text-slate-400 font-normal">(.xlsx)</span>
+        <label class="mb-2 block text-sm font-semibold text-stone-700">
+          1. เลือกไฟล์ Excel <span class="font-normal text-stone-400">(.xlsx)</span>
         </label>
         <div class="flex flex-wrap items-center gap-2">
           <input
             type="file"
             accept=".xlsx"
             @change="onFileChange"
-            class="flex-1 min-w-[200px] text-sm file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-red-600 file:text-white hover:file:bg-red-700"
+            class="min-w-[200px] flex-1 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-[#B91C1C] file:px-4 file:py-2 file:text-white hover:file:bg-[#991B1B]"
           />
           <!-- แสดงชื่อไฟล์ที่เลือก — custom file input ซ่อนข้อความ "No file chosen" ของ browser -->
           <span
             v-if="file"
-            class="inline-flex items-center gap-1.5 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 max-w-full"
+            class="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1.5 text-sm text-stone-700"
             :title="file.name"
           >
-            <i class="bi bi-file-earmark-excel text-red-600"></i>
-            <span class="truncate max-w-[260px]">{{ file.name }}</span>
-            <button type="button" class="text-slate-400 hover:text-red-600" title="ล้างไฟล์ที่เลือก" @click="file = null">
+            <i class="bi bi-file-earmark-excel text-[#B91C1C]"></i>
+            <span class="max-w-[260px] truncate">{{ file.name }}</span>
+            <button type="button" class="text-stone-400 transition hover:text-[#B91C1C]" title="ล้างไฟล์ที่เลือก" @click="file = null">
               <i class="bi bi-x-lg"></i>
             </button>
           </span>
-          <span v-else class="text-xs text-slate-400">ยังไม่ได้เลือกไฟล์ (.xlsx)</span>
+          <span v-else class="text-xs text-stone-400">ยังไม่ได้เลือกไฟล์ (.xlsx)</span>
         </div>
       </div>
       <button
         @click="handleUpload"
         :disabled="isUploading"
-        class="w-full py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 font-medium"
+        class="w-full rounded-lg bg-[#B91C1C] py-3 font-medium text-white transition hover:bg-[#991B1B] disabled:opacity-50"
       >
-        <i v-if="isUploading" class="loading loading-spinner loading-sm mr-1"></i>
+        <span v-if="isUploading" class="mr-1 inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent align-[-2px]"></span>
         {{ isUploading ? 'กำลังตรวจสอบและอัปโหลดเข้า Queue...' : 'อัปโหลดเข้า Queue' }}
       </button>
-      <p class="text-xs text-slate-400">
+      <p class="text-xs text-stone-400">
         <i class="bi bi-arrow-clockwise mr-1"></i>
-        อัปโหลดเสร็จ ไฟล์จะถูกส่งเข้า <b>Queue</b> ทันที — ไม่ต้องค้างหน้านี้รอ
-        จากนั้นกด <b>"เริ่มเดี๋ยวนี้"</b> ใน Queue List เพื่อสั่งให้ระบบทำงานเบื้องหลัง
+        อัปโหลดเสร็จ ไฟล์จะถูกส่งเข้า <b class="text-stone-600">Queue</b> ทันที — ไม่ต้องค้างหน้านี้รอ
+        จากนั้นกด <b class="text-stone-600">"เริ่มเดี๋ยวนี้"</b> ใน Queue List เพื่อสั่งให้ระบบทำงานเบื้องหลัง
       </p>
     </div>
 
     <!-- ขั้นตอนที่ 2: Queue List + Progress Bar -->
-    <div class="bg-white rounded-2xl shadow-sm p-5 mt-5">
-      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-        <h2 class="text-lg font-semibold text-slate-900">
-          <i class="bi bi-list-ul mr-1"></i> Queue List — คิวนำเข้านักเรียน
-          <span v-if="jobs.length" class="ml-1 text-sm font-normal text-slate-400">({{ jobs.length }})</span>
+    <div class="mt-5 rounded-2xl border border-stone-200 bg-white p-5 sm:p-6">
+      <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <h2 class="text-lg font-bold text-stone-900">
+          <i class="bi bi-list-ul mr-1 text-[#B91C1C]"></i> Queue List — คิวนำเข้านักเรียน
+          <span v-if="jobs.length" class="ml-1 text-sm font-normal text-stone-400">({{ jobs.length }})</span>
         </h2>
         <div class="flex items-center gap-2">
-          <span v-if="runningJobs.length" class="badge badge-info badge-sm gap-1">
-            <span class="loading loading-spinner loading-xs"></span>
+          <span v-if="runningJobs.length" class="inline-flex items-center gap-1.5 rounded-full bg-[#B91C1C]/10 px-2.5 py-1 text-xs font-semibold text-[#B91C1C]">
+            <span class="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
             กำลังทำงาน {{ runningJobs.length }} งาน
           </span>
           <button
             @click="refreshJobs(true)"
             :disabled="isRefreshing"
-            class="btn btn-xs btn-ghost gap-1 disabled:opacity-50"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 transition hover:bg-stone-50 hover:text-stone-800 disabled:opacity-50"
           >
-            <i :class="isRefreshing ? 'loading loading-spinner loading-xs' : 'bi bi-arrow-clockwise'"></i>
+            <span v-if="isRefreshing" class="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
+            <i v-else class="bi bi-arrow-clockwise"></i>
             รีเฟรช
           </button>
         </div>
@@ -345,113 +369,125 @@ onBeforeUnmount(stopPolling);
       <!-- poll ติดขัดต่อเนื่อง → บอก user ว่าระบบยังพยายามเชื่อมต่อ (bar ไม่ได้ค้างเงียบๆ) -->
       <div
         v-if="isPollError"
-        class="alert alert-warning py-2 px-3 text-sm mb-3"
+        class="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-[#B91C1C]/20 bg-[#B91C1C]/5 px-3 py-2.5 text-sm text-stone-700"
         role="alert"
       >
-        <i class="bi bi-wifi-off mr-1"></i>
+        <i class="bi bi-wifi-off mr-1 text-[#B91C1C]"></i>
         เชื่อมต่อกับระบบไม่เสถียร — สถานะอาจไม่ทันสมัย ระบบกำลังลองเชื่อมต่อใหม่ทุก
         {{ POLL_INTERVAL_MS / 1000 }} วินาที
         <button
           @click="refreshJobs(true)"
           :disabled="isRefreshing"
-          class="btn btn-xs btn-ghost ml-auto gap-1 disabled:opacity-50"
+          class="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-[#B91C1C]/20 bg-white px-3 py-1 text-xs font-bold text-[#B91C1C] transition hover:bg-[#B91C1C]/5 disabled:opacity-50"
         >
-          <i :class="isRefreshing ? 'loading loading-spinner loading-xs' : 'bi bi-arrow-clockwise'"></i>
+          <span v-if="isRefreshing" class="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
+          <i v-else class="bi bi-arrow-clockwise"></i>
           ลองใหม่
         </button>
       </div>
 
-      <div v-if="isJobsLoading" class="flex justify-center py-10">
-        <span class="loading loading-spinner loading-lg text-red-600"></span>
-      </div>
-
-      <!-- โหลดพลาด (ไม่ใช่ "ไม่มีไฟล์") — โชว์ error + ปุ่มลองใหม่ กันครูเห็น "ไม่มีไฟล์" แล้วอัปโหลดซ้ำซ้อน -->
-      <div v-else-if="loadError" class="text-sm text-red-600 text-center py-8" role="alert">
-        <i class="bi bi-wifi-off mr-1"></i>
-        ไม่สามารถโหลด Queue List ได้ — ตรวจสอบการเชื่อมต่อกับระบบ
-        <div class="mt-2">
-          <button
-            @click="refreshJobs(true)"
-            :disabled="isRefreshing"
-            class="btn btn-xs btn-outline btn-error gap-1 disabled:opacity-50"
-          >
-            <i :class="isRefreshing ? 'loading loading-spinner loading-xs' : 'bi bi-arrow-clockwise'"></i>
-            ลองใหม่
-          </button>
+      <!-- โหลดครั้งแรก/รีเฟรช → skeleton -->
+      <div v-if="isJobsLoading" class="overflow-hidden rounded-xl border border-stone-200" aria-busy="true">
+        <div class="divide-y divide-stone-100 bg-white">
+          <div v-for="i in 4" :key="i" class="flex items-center gap-4 p-4">
+            <div class="flex-1 space-y-2">
+              <div class="h-4 w-1/3 animate-pulse rounded bg-stone-100"></div>
+              <div class="h-3 w-1/2 animate-pulse rounded bg-stone-100"></div>
+            </div>
+            <div class="h-6 w-24 animate-pulse rounded-full bg-stone-100"></div>
+            <div class="hidden h-4 w-28 animate-pulse rounded bg-stone-100 sm:block"></div>
+          </div>
         </div>
       </div>
 
-      <div v-else-if="jobs.length === 0" class="text-sm text-slate-400 text-center py-8">
+      <!-- โหลดพลาด (ไม่ใช่ "ไม่มีไฟล์") — โชว์ error + ปุ่มลองใหม่ กันครูเห็น "ไม่มีไฟล์" แล้วอัปโหลดซ้ำซ้อน -->
+      <div v-else-if="loadError" class="rounded-xl border-2 border-dashed border-stone-200 bg-white py-12 text-center" role="alert">
+        <i class="bi bi-wifi-off mb-2 block text-3xl text-stone-300"></i>
+        <p class="text-sm font-semibold text-stone-700">ไม่สามารถโหลด Queue List ได้</p>
+        <p class="mt-1 text-xs text-stone-500">ตรวจสอบการเชื่อมต่อกับระบบแล้วลองอีกครั้ง</p>
+        <button
+          @click="refreshJobs(true)"
+          :disabled="isRefreshing"
+          class="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-[#B91C1C] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#991B1B] disabled:opacity-50"
+        >
+          <span v-if="isRefreshing" class="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
+          <i v-else class="bi bi-arrow-clockwise"></i>
+          ลองใหม่
+        </button>
+      </div>
+
+      <div v-else-if="jobs.length === 0" class="py-10 text-center text-sm text-stone-500">
+        <i class="bi bi-inbox mb-2 block text-3xl text-stone-300"></i>
         ยังไม่มีไฟล์ในคิว — อัปโหลดไฟล์ด้านบนก่อน
       </div>
 
-      <div v-else class="overflow-x-auto">
-        <table class="table table-sm w-full">
+      <div v-else class="overflow-x-auto rounded-xl border border-stone-200">
+        <table class="w-full text-sm">
           <thead>
-            <tr class="text-slate-500 text-xs">
-              <th>ไฟล์</th>
-              <th>สถานะ</th>
-              <th class="min-w-[220px]">ความคืบหน้า</th>
-              <th>นำเข้า / ข้าม</th>
-              <th class="text-right">จัดการ</th>
+            <tr class="bg-stone-50 text-left text-[11px] uppercase tracking-wider text-stone-500">
+              <th class="px-4 py-3 font-semibold">ไฟล์</th>
+              <th class="px-4 py-3 font-semibold">สถานะ</th>
+              <th class="min-w-[220px] px-4 py-3 font-semibold">ความคืบหน้า</th>
+              <th class="px-4 py-3 font-semibold">นำเข้า / ข้าม</th>
+              <th class="px-4 py-3 text-right font-semibold">จัดการ</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody class="divide-y divide-stone-100 bg-white">
             <template v-for="job in jobs" :key="job.id">
               <tr class="align-middle">
-                <td class="font-medium text-sm">
+                <td class="px-4 py-3 font-medium text-stone-800">
                   {{ job.file_name }}
-                  <div class="text-xs text-slate-400">
+                  <div class="text-xs text-stone-400">
                     {{ new Date(job.created_at).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }) }}
                   </div>
                 </td>
-                <td>
-                  <span class="badge badge-sm" :class="IMPORT_STATUS_BADGES[job.status]">
+                <td class="px-4 py-3">
+                  <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold" :class="jobBadgeCls[job.status]">
                     {{ IMPORT_STATUS_LABELS[job.status] }}
                   </span>
                   <!-- error_message โชว์เฉพาะ FAILED — กัน error เก่าค้างเมื่อลองใหม่แล้วสำเร็จ -->
-                  <div v-if="job.status === 'FAILED' && job.error_message" class="text-xs text-red-500 mt-1 max-w-[180px]">
+                  <div v-if="job.status === 'FAILED' && job.error_message" class="mt-1 max-w-[180px] text-xs text-[#B91C1C]">
                     {{ job.error_message }}
                   </div>
                 </td>
-                <td>
+                <td class="px-4 py-3">
                   <!-- หลอดเปอร์เซ็นต์: เติมตาม progress_percent, เขียวเต็มหลอดเมื่อเสร็จ -->
                   <div class="flex items-center gap-2">
-                    <div class="relative h-5 flex-1 min-w-[130px] rounded-full bg-slate-100 border border-slate-200 overflow-hidden">
+                    <div class="relative h-5 min-w-[130px] flex-1 overflow-hidden rounded-full border border-stone-200 bg-stone-100">
                       <div
                         class="absolute inset-y-0 left-0 rounded-full transition-all duration-500 ease-out"
-                        :class="[IMPORT_BAR_FILL[job.status], isImportJobRunning(job.status) ? 'animate-pulse' : '']"
+                        :class="[barFillCls[job.status], isImportJobRunning(job.status) ? 'animate-pulse' : '']"
                         :style="{ width: job.progress_percent + '%' }"
                       ></div>
                       <span
                         v-if="job.status === 'COMPLETED'"
-                        class="absolute inset-0 flex items-center justify-center text-white text-[11px] font-bold"
+                        class="absolute inset-0 flex items-center justify-center text-[11px] font-bold text-white"
                       >
                         <i class="bi bi-check-lg mr-0.5"></i> เสร็จสิ้น
                       </span>
                     </div>
-                    <span class="text-sm font-bold tabular-nums shrink-0" :class="IMPORT_BAR_TEXT[job.status]">
+                    <span class="shrink-0 font-display text-sm font-bold tabular-nums" :class="barTextCls[job.status]">
                       {{ job.progress_percent }}%
                     </span>
                   </div>
-                  <div class="text-xs text-slate-500 mt-1">
+                  <div class="mt-1 text-xs text-stone-500">
                     {{ job.processed_rows }}/{{ job.total_rows }} แถว
                   </div>
                 </td>
-                <td class="text-sm text-slate-600 whitespace-nowrap">
-                  <span class="text-green-600 font-semibold">{{ job.imported_count }}</span>
+                <td class="whitespace-nowrap px-4 py-3 text-sm text-stone-600">
+                  <span class="font-semibold text-emerald-700">{{ job.imported_count }}</span>
                   /
-                  <span class="text-amber-600 font-semibold">{{ job.skipped_count }}</span>
+                  <span class="font-semibold text-stone-500">{{ job.skipped_count }}</span>
                 </td>
-                <td class="text-right">
+                <td class="px-4 py-3 text-right">
                   <!-- รอเริ่มงาน → ปุ่มเริ่มเดี๋ยวนี้ -->
                   <button
                     v-if="job.status === 'PENDING'"
                     @click="handleStart(job.id)"
                     :disabled="isStartingJobId !== null"
-                    class="btn btn-sm btn-primary gap-1 disabled:opacity-50"
+                    class="inline-flex items-center gap-1.5 rounded-lg bg-[#B91C1C] px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-[#991B1B] disabled:opacity-50"
                   >
-                    <i v-if="isStartingJobId === job.id" class="loading loading-spinner loading-xs"></i>
+                    <span v-if="isStartingJobId === job.id" class="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
                     <i v-else class="bi bi-play-fill"></i>
                     เริ่มเดี๋ยวนี้
                   </button>
@@ -460,27 +496,27 @@ onBeforeUnmount(stopPolling);
                     v-else-if="job.status === 'FAILED'"
                     @click="handleStart(job.id)"
                     :disabled="isStartingJobId !== null"
-                    class="btn btn-sm btn-outline btn-error gap-1 disabled:opacity-50"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-[#B91C1C]/30 bg-white px-3.5 py-2 text-xs font-semibold text-[#B91C1C] transition hover:bg-[#B91C1C]/5 disabled:opacity-50"
                   >
-                    <i v-if="isStartingJobId === job.id" class="loading loading-spinner loading-xs"></i>
+                    <span v-if="isStartingJobId === job.id" class="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
                     <i v-else class="bi bi-arrow-counterclockwise"></i>
                     ลองใหม่
                   </button>
                   <!-- กำลังทำงาน/รอ worker → spinner -->
-                  <span v-else-if="isImportJobRunning(job.status)" class="inline-flex items-center gap-1 text-xs text-blue-500">
-                    <span class="loading loading-spinner loading-xs"></span> ทำงานอยู่
+                  <span v-else-if="isImportJobRunning(job.status)" class="inline-flex items-center gap-1.5 text-xs font-medium text-[#B91C1C]">
+                    <span class="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent"></span> ทำงานอยู่
                   </span>
-                  <span v-else class="text-xs text-slate-400">—</span>
+                  <span v-else class="text-xs text-stone-400">—</span>
                 </td>
               </tr>
               <!-- error_logs รายแถว (แถวที่ข้อมูลผิด/ถูกข้าม) -->
               <tr v-if="job.error_logs.length" :key="'err-' + job.id" class="border-t-0">
-                <td colspan="5" class="py-1">
-                  <details class="bg-red-50 border border-red-100 rounded-lg p-3 text-xs">
-                    <summary class="text-red-600 font-medium cursor-pointer">
+                <td colspan="5" class="px-4 py-2">
+                  <details class="rounded-xl border border-[#B91C1C]/15 bg-[#B91C1C]/5 p-3 text-xs">
+                    <summary class="cursor-pointer font-semibold text-[#B91C1C]">
                       {{ job.file_name }} — ข้อผิดพลาด {{ job.error_logs.length }} รายการ
                     </summary>
-                    <ul class="list-disc pl-4 mt-2 text-red-500 max-h-40 overflow-auto">
+                    <ul class="mt-2 max-h-40 list-disc space-y-1 pl-4 text-[#B91C1C]/90">
                       <li v-for="(e, idx) in job.error_logs" :key="idx">{{ e }}</li>
                     </ul>
                   </details>

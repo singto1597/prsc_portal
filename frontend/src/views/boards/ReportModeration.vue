@@ -7,7 +7,6 @@ import {
   REPORT_REASON_LABELS,
   REPORT_REASONS,
   REPORT_STATUS_LABELS,
-  reportStatusBadge,
   type ReportItem,
   type ReportReason,
   type ReportStatus,
@@ -43,6 +42,13 @@ const STATUS_TABS: Array<{ value: '' | ReportStatus; label: string; icon: string
   { value: 'resolved', label: 'ซ่อนแล้ว', icon: 'bi bi-eye-slash' },
   { value: 'dismissed', label: 'ปัดตก', icon: 'bi bi-check2-circle' },
 ]
+
+// ป้ายสถานะ (สีจำกัด: open → cardinal, resolved → emerald, dismissed → stone)
+function reportStatusBadge(s: ReportStatus): string {
+  if (s === 'open') return 'bg-[#B91C1C]/10 text-[#B91C1C]'
+  if (s === 'resolved') return 'bg-emerald-100 text-emerald-700'
+  return 'bg-stone-200 text-stone-500'
+}
 
 onMounted(load)
 
@@ -119,7 +125,7 @@ async function handleResolve(r: ReportItem, action: 'hide' | 'dismiss') {
     inputAttributes: { maxlength: '500' },
     showCancelButton: true,
     confirmButtonText: isHide ? 'ซ่อนคอมเมนต์' : 'ปัดตก',
-    confirmButtonColor: isHide ? '#ef4444' : '#6b7280',
+    confirmButtonColor: isHide ? '#b91c1c' : '#78716c',
     cancelButtonText: 'ยกเลิก',
   })
   if (!isConfirmed) return
@@ -145,65 +151,89 @@ async function handleResolve(r: ReportItem, action: 'hide' | 'dismiss') {
 
 <template>
   <div>
-    <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+    <!-- Editorial header -->
+    <div class="flex flex-wrap items-end justify-between gap-3 mb-6">
       <div>
-        <h1 class="text-xl font-black tracking-tight text-slate-900 leading-tight sm:text-2xl">
-          <i class="bi bi-flag-fill mr-1 text-red-500"></i> จัดการรายงาน
-        </h1>
-        <p class="text-sm text-slate-500">คอมเมนต์ที่นักเรียนแจ้งความไม่เหมาะสม — สภานักเรียน/แอดมินตรวจสอบ</p>
+        <p class="text-[11px] font-bold uppercase tracking-widest text-[#B91C1C] mb-1.5">
+          <i class="bi bi-flag-fill mr-1"></i> Moderation Queue
+        </p>
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-stone-900 leading-tight">จัดการรายงาน</h1>
+        <p class="text-sm text-stone-500 mt-1.5">คอมเมนต์ที่นักเรียนแจ้งความไม่เหมาะสม — สภานักเรียน/แอดมินตรวจสอบ</p>
       </div>
     </div>
 
     <!-- ไม่มีสิทธิ์ (กันผ่าน URL ตรง) -->
-    <div v-if="!authStore.isCouncilAuthority" class="bg-white rounded-2xl p-12 text-center text-slate-400">
+    <div v-if="!authStore.isCouncilAuthority" class="border border-stone-200 rounded-2xl bg-white p-12 text-center text-stone-400">
       <div class="text-4xl mb-2"><i class="bi bi-shield-lock"></i></div>
-      <p>เฉพาะสภานักเรียน/แอดมินที่เข้าถึงหน้านี้ได้</p>
+      <p class="text-stone-500">เฉพาะสภานักเรียน/แอดมินที่เข้าถึงหน้านี้ได้</p>
     </div>
 
     <template v-else>
       <!-- แถบกรอง + ค้นหา -->
       <div class="flex flex-wrap items-center gap-2 mb-5">
-        <div class="flex gap-1 p-1 bg-slate-100 rounded-xl">
+        <div class="flex gap-1 p-1 bg-stone-100 rounded-xl">
           <button
             v-for="t in STATUS_TABS"
             :key="t.value"
             type="button"
             @click="switchStatus(t.value)"
             class="px-3 py-2 rounded-lg text-sm font-medium transition flex items-center gap-1.5"
-            :class="statusFilter === t.value ? 'bg-white shadow text-red-600' : 'text-slate-500 hover:text-slate-700'"
+            :class="statusFilter === t.value ? 'bg-white border border-stone-200 text-[#B91C1C]' : 'text-stone-500 hover:text-stone-700'"
           >
             <i :class="t.icon"></i> {{ t.label }}
           </button>
         </div>
 
         <select v-model="reasonFilter" @change="onReasonChange"
-          class="px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white text-slate-600">
+          class="px-3 py-2.5 border border-stone-300 rounded-xl text-sm bg-white text-stone-600">
           <option value="">ทุกเหตุผล</option>
           <option v-for="r in REPORT_REASONS" :key="r" :value="r">{{ REPORT_REASON_LABELS[r] }}</option>
         </select>
 
         <div class="relative flex-1 min-w-[180px] sm:flex-none sm:w-64">
-          <i class="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+          <i class="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 text-sm"></i>
           <input
             v-model="q"
             type="search"
             placeholder="ค้นหา: ชื่อบอร์ด / คอมเมนต์..."
-            class="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-red-500"
+            class="w-full pl-9 pr-3 py-2.5 border border-stone-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-[#B91C1C]"
           />
         </div>
 
-        <span class="text-sm text-slate-400 ml-auto tabular-nums">{{ total.toLocaleString('en-US') }} รายการ</span>
+        <span class="text-sm text-stone-400 ml-auto tabular-nums">{{ total.toLocaleString('en-US') }} รายการ</span>
       </div>
 
-      <div v-if="isLoading" class="flex justify-center py-16">
-        <div class="animate-spin w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full"></div>
+      <!-- โหลด: skeleton รายการ -->
+      <div v-if="isLoading" class="space-y-3">
+        <div v-for="n in 5" :key="n" class="page-card p-4 border-l-4 border-l-stone-100 space-y-3">
+          <div class="flex items-center gap-2">
+            <div class="h-4 w-40 bg-stone-100 animate-pulse rounded"></div>
+            <div class="h-4 w-16 bg-stone-100 animate-pulse rounded-full"></div>
+            <div class="h-4 w-14 bg-stone-100 animate-pulse rounded-full"></div>
+          </div>
+          <div class="h-10 w-full bg-stone-100 animate-pulse rounded-lg"></div>
+          <div class="h-3 w-1/3 bg-stone-100 animate-pulse rounded"></div>
+        </div>
       </div>
-      <div v-else-if="error" class="text-red-500 text-center py-10">{{ error }}</div>
 
-      <div v-else-if="!reports.length" class="bg-white rounded-2xl p-12 text-center text-slate-400">
+      <!-- ข้อผิดพลาด -->
+      <div v-else-if="error" class="border-2 border-dashed border-stone-200 rounded-2xl py-20 px-6 text-center">
+        <i class="bi bi-wifi-off text-3xl text-stone-300 mb-3 inline-block"></i>
+        <p class="text-stone-600 font-medium">{{ error }}</p>
+        <button
+          type="button"
+          @click="load"
+          class="mt-5 inline-flex items-center gap-2 rounded-lg bg-[#B91C1C] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#991B1B] transition-colors"
+        >
+          <i class="bi bi-arrow-clockwise"></i> ลองอีกครั้ง
+        </button>
+      </div>
+
+      <!-- ว่าง -->
+      <div v-else-if="!reports.length" class="border border-dashed border-stone-200 rounded-2xl bg-white p-12 text-center text-stone-400">
         <div class="text-4xl mb-2"><i class="bi bi-flag"></i></div>
-        <p v-if="statusFilter === 'open'">ไม่มีรายงานค้าง — นักเรียนยังไม่แจ้ง หรือสภาจัดการหมดแล้ว</p>
-        <p v-else>ไม่พบรายงานในเงื่อนไขนี้</p>
+        <p v-if="statusFilter === 'open'" class="text-stone-500">ไม่มีรายงานค้าง — นักเรียนยังไม่แจ้ง หรือสภาจัดการหมดแล้ว</p>
+        <p v-else class="text-stone-500">ไม่พบรายงานในเงื่อนไขนี้</p>
       </div>
 
       <div v-else class="space-y-3">
@@ -211,17 +241,17 @@ async function handleResolve(r: ReportItem, action: 'hide' | 'dismiss') {
           v-for="r in reports"
           :key="r.id"
           :data-testid="'report-card-' + r.id"
-          class="bg-white rounded-2xl shadow-sm p-4 border-l-4"
-          :class="r.status === 'open' ? 'border-amber-400' : r.status === 'resolved' ? 'border-emerald-400' : 'border-slate-200'"
+          class="page-card p-4 border-l-4"
+          :class="r.status === 'open' ? 'border-l-[#B91C1C]' : r.status === 'resolved' ? 'border-l-emerald-500' : 'border-l-stone-200'"
         >
           <div class="flex flex-wrap items-center gap-2 mb-2">
             <RouterLink
               :to="{ name: 'board-detail', params: { id: r.board_id } }"
-              class="text-xs font-semibold text-rose-500 hover:underline flex items-center gap-1"
+              class="text-xs font-semibold text-stone-600 hover:text-[#B91C1C] hover:underline flex items-center gap-1"
             >
               <i class="bi bi-chat-dots"></i> {{ r.board_title }}
             </RouterLink>
-            <span class="px-2 py-0.5 bg-amber-50 text-amber-700 text-[11px] rounded-full font-medium">
+            <span class="px-2 py-0.5 bg-stone-100 text-stone-600 text-[11px] rounded-full font-medium">
               {{ REPORT_REASON_LABELS[r.reason] }}
             </span>
             <span class="px-2 py-0.5 text-[11px] rounded-full font-medium" :class="reportStatusBadge(r.status)">
@@ -229,14 +259,14 @@ async function handleResolve(r: ReportItem, action: 'hide' | 'dismiss') {
             </span>
           </div>
 
-          <p class="text-sm text-slate-700 bg-slate-50 rounded-lg px-3 py-2.5 whitespace-pre-wrap break-words">
+          <p class="text-sm text-stone-700 bg-stone-50 rounded-lg px-3 py-2.5 whitespace-pre-wrap break-words">
             “{{ r.comment_body }}”
           </p>
 
           <div class="flex flex-wrap items-center justify-between gap-2 mt-2.5">
-            <p class="text-xs text-slate-400">
+            <p class="text-xs text-stone-400">
               แจ้งโดย {{ r.reporter_name || 'ไม่ระบุชื่อ' }} · {{ fmtDate(r.created_at) }}
-              <span v-if="r.detail" class="block text-slate-500 mt-0.5"><i class="bi bi-info-circle mr-1"></i>{{ r.detail }}</span>
+              <span v-if="r.detail" class="block text-stone-500 mt-0.5"><i class="bi bi-info-circle mr-1"></i>{{ r.detail }}</span>
             </p>
 
             <!-- ปุ่มจัดการ (เฉพาะ open) -->
@@ -246,7 +276,7 @@ async function handleResolve(r: ReportItem, action: 'hide' | 'dismiss') {
                 :disabled="actingId === r.id"
                 data-testid="dismiss-btn"
                 @click="handleResolve(r, 'dismiss')"
-                class="px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-40"
+                class="px-3 py-1.5 text-xs font-medium rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 disabled:opacity-40"
               >
                 <i class="bi bi-check2-circle mr-1"></i> ปัดตก
               </button>
@@ -255,12 +285,12 @@ async function handleResolve(r: ReportItem, action: 'hide' | 'dismiss') {
                 :disabled="actingId === r.id"
                 data-testid="hide-btn"
                 @click="handleResolve(r, 'hide')"
-                class="px-3 py-1.5 text-xs font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-40"
+                class="px-3 py-1.5 text-xs font-medium rounded-lg bg-[#B91C1C] text-white hover:bg-[#991B1B] disabled:opacity-40"
               >
                 <i class="bi bi-eye-slash mr-1"></i> ซ่อนคอมเมนต์
               </button>
             </div>
-            <p v-else-if="r.resolution_note" class="text-xs text-slate-400 shrink-0">
+            <p v-else-if="r.resolution_note" class="text-xs text-stone-400 shrink-0">
               <i class="bi bi-journal-check mr-1"></i>{{ r.resolution_note }}
             </p>
           </div>

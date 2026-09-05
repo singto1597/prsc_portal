@@ -132,27 +132,28 @@ function go(n: NotificationItem) {
 
 <template>
   <div>
-    <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+    <div class="flex flex-wrap items-start justify-between gap-3 mb-5">
       <div>
-        <h1 class="text-xl font-black tracking-tight text-slate-900 leading-tight sm:text-2xl">
-          <i class="bi bi-bell-fill mr-1 text-red-500"></i> การแจ้งเตือน
+        <p class="mb-1 text-[11px] font-bold uppercase tracking-widest text-stone-400">Inbox</p>
+        <h1 class="text-2xl font-bold tracking-tight text-stone-900 leading-tight sm:text-3xl">
+          <i class="bi bi-bell-fill mr-1 text-[#B91C1C]"></i> การแจ้งเตือน
         </h1>
-        <p class="text-sm text-slate-500">
+        <p class="mt-1 text-sm text-stone-500">
           เรื่องที่ยังไม่ได้อ่าน {{ notificationsStore.total > 0 ? `(${notificationsStore.total})` : '' }}
         </p>
       </div>
       <div class="flex items-center gap-2">
         <button
           @click="unreadOnly = !unreadOnly"
-          class="px-3 py-2 rounded-xl text-sm font-semibold border transition-colors"
-          :class="unreadOnly ? 'bg-red-600 text-white border-red-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'"
+          class="rounded-xl border px-3 py-2 text-sm font-semibold transition-colors"
+          :class="unreadOnly ? 'bg-[#B91C1C] text-white border-[#B91C1C]' : 'bg-white text-stone-600 border-stone-200 hover:bg-stone-50'"
         >
           <i class="bi bi-envelope mr-1"></i> ยังไม่อ่าน
         </button>
         <button
           v-if="notificationsStore.total > 0"
           @click="markAll"
-          class="px-3 py-2 rounded-xl text-sm font-bold bg-white border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+          class="rounded-xl border border-[#B91C1C]/20 bg-white px-3 py-2 text-sm font-bold text-[#B91C1C] transition-colors hover:bg-[#B91C1C]/5"
         >
           <i class="bi bi-check2-all mr-1"></i> อ่านทั้งหมด
         </button>
@@ -160,79 +161,96 @@ function go(n: NotificationItem) {
     </div>
 
     <!-- แท็บกลุ่ม -->
-    <div class="flex gap-2 flex-wrap mb-4">
+    <div class="mb-4 flex flex-wrap gap-2">
       <button
         v-for="tab in GROUP_TABS"
         :key="tab.value"
         @click="activeTab = tab.value"
-        class="px-4 py-2 rounded-xl text-sm font-bold transition-all border"
+        class="rounded-xl border px-4 py-2 text-sm font-bold transition-all"
         :class="activeTab === tab.value
-          ? 'bg-red-600 text-white border-red-600 shadow-sm'
-          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'"
+          ? 'bg-[#B91C1C] text-white border-[#B91C1C]'
+          : 'bg-white text-stone-600 border-stone-200 hover:bg-stone-50'"
       >
         <i :class="[tab.icon, 'mr-1.5']"></i> {{ tab.label }}
         <span v-if="tab.value && (notificationsStore.counts[tab.value] ?? 0) > 0"
-          class="ml-1.5 text-[11px] font-bold px-1.5 py-0.5 rounded-full"
-          :class="activeTab === tab.value ? 'bg-white/25' : 'bg-red-100 text-red-600'">
+          class="ml-1.5 rounded-full px-1.5 py-0.5 text-[11px] font-bold"
+          :class="activeTab === tab.value ? 'bg-white/25' : 'bg-[#B91C1C]/10 text-[#B91C1C]'">
           {{ notificationsStore.counts[tab.value] ?? 0 }}
         </span>
       </button>
     </div>
 
-    <!-- loading -->
-    <div v-if="isLoading" class="flex justify-center py-16">
-      <div class="w-10 h-10 border-4 border-red-200 border-t-red-600 rounded-full animate-spin"></div>
+    <!-- loading skeleton -->
+    <div v-if="isLoading" class="overflow-hidden rounded-2xl border border-stone-200 bg-white" aria-busy="true">
+      <div class="divide-y divide-stone-100">
+        <div v-for="i in 6" :key="i" class="flex items-start gap-3 p-4">
+          <div class="h-10 w-10 shrink-0 animate-pulse rounded-xl bg-stone-100"></div>
+          <div class="flex-1 space-y-2">
+            <div class="h-4 w-1/3 animate-pulse rounded bg-stone-100"></div>
+            <div class="h-3 w-2/3 animate-pulse rounded bg-stone-100"></div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- error -->
-    <div v-else-if="error" class="bg-red-50 text-red-600 rounded-xl p-6 text-center text-sm">{{ error }}</div>
+    <div v-else-if="error" class="rounded-2xl border-2 border-dashed border-stone-200 bg-white py-16 text-center">
+      <i class="bi bi-bell-slash mb-3 block text-3xl text-stone-300"></i>
+      <p class="text-[15px] font-semibold text-stone-700">ไม่สามารถโหลดการแจ้งเตือนได้ในขณะนี้</p>
+      <p class="mx-auto mt-1 max-w-md text-sm text-stone-500">{{ error }}</p>
+      <button
+        type="button"
+        @click="load"
+        class="mt-5 inline-flex items-center gap-2 rounded-lg bg-[#B91C1C] px-5 py-2.5 text-[13px] font-bold text-white transition-colors hover:bg-[#991B1B]"
+      >
+        <i class="bi bi-arrow-clockwise"></i> ลองใหม่
+      </button>
+    </div>
 
     <!-- ว่าง -->
-    <div v-else-if="items.length === 0" class="bg-white rounded-2xl p-12 text-center text-slate-400">
-      <div class="text-4xl mb-3"><i class="bi bi-bell-slash"></i></div>
+    <div v-else-if="items.length === 0" class="rounded-2xl border-2 border-dashed border-stone-200 bg-white p-12 text-center text-stone-500">
+      <div class="mb-2 text-4xl"><i class="bi bi-bell-slash text-stone-300"></i></div>
       <p class="font-semibold">ไม่มีการแจ้งเตือน</p>
       <p class="text-sm">เมื่อมีเรื่องใหม่/บอร์ดใหม่/คอมเมนต์ตอบกลับ จะขึ้นตรงนี้</p>
     </div>
 
     <!-- รายการ -->
-    <div v-else class="space-y-2">
-      <div
-        v-for="n in items"
-        :key="n.id"
-        class="bg-white rounded-2xl border cursor-pointer transition-colors"
-        :class="n.read_at
-          ? 'border-slate-100 hover:border-slate-200'
-          : 'border-red-100 bg-red-50/40 hover:border-red-200'"
-        @click="go(n)"
-      >
-        <div class="flex items-start gap-3 p-4">
-          <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-            :class="n.read_at ? 'bg-slate-100 text-slate-400' : 'bg-red-100 text-red-600'">
+    <div v-else class="overflow-hidden rounded-2xl border border-stone-200 bg-white">
+      <div class="divide-y divide-stone-200">
+        <div
+          v-for="n in items"
+          :key="n.id"
+          class="relative flex cursor-pointer items-start gap-3 p-4 transition-colors"
+          :class="n.read_at ? 'hover:bg-stone-50' : 'bg-[#B91C1C]/5 hover:bg-[#B91C1C]/10'"
+          @click="go(n)"
+        >
+          <span v-if="!n.read_at" class="absolute left-2 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-[#B91C1C]" aria-hidden="true"></span>
+          <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+            :class="n.read_at ? 'bg-stone-100 text-stone-400' : 'bg-[#B91C1C]/10 text-[#B91C1C]'">
             <i :class="[iconFor(n), 'text-lg']"></i>
           </div>
-          <div class="flex-1 min-w-0">
+          <div class="min-w-0 flex-1">
             <div class="flex items-start justify-between gap-2">
-              <p class="font-bold text-sm text-slate-900 leading-snug">{{ n.title }}</p>
-              <span class="text-[11px] text-slate-400 whitespace-nowrap shrink-0">{{ fmtDate(n.created_at) }}</span>
+              <p class="text-sm font-bold leading-snug text-stone-900">{{ n.title }}</p>
+              <span class="shrink-0 whitespace-nowrap text-[11px] text-stone-400">{{ fmtDate(n.created_at) }}</span>
             </div>
-            <p class="text-sm text-slate-500 mt-0.5 leading-snug line-clamp-2">{{ n.body }}</p>
+            <p class="mt-0.5 line-clamp-2 text-sm leading-snug text-stone-500">{{ n.body }}</p>
             <div class="mt-1.5 flex items-center gap-2">
-              <span class="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 font-semibold">{{ n.actor_name || 'ระบบ' }}</span>
-              <span v-if="!n.read_at" class="w-2 h-2 rounded-full bg-red-500 inline-block"></span>
+              <span class="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-semibold text-stone-500">{{ n.actor_name || 'ระบบ' }}</span>
             </div>
           </div>
           <button
             v-if="!n.read_at"
             @click.stop="markOne(n)"
-            class="shrink-0 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-red-600 hover:bg-red-100 transition-colors"
+            class="shrink-0 rounded-lg px-2.5 py-1.5 text-[11px] font-bold text-[#B91C1C] transition-colors hover:bg-[#B91C1C]/5"
             title="ทำเครื่องหมายว่าอ่านแล้ว"
           >
             อ่านแล้ว
           </button>
         </div>
       </div>
-
-      <PaginationBar :total="total" :page="page" :page-size="pageSize" :loading="isLoading" @page-change="onPageChange" />
     </div>
+
+    <PaginationBar :total="total" :page="page" :page-size="pageSize" :loading="isLoading" @page-change="onPageChange" />
   </div>
 </template>

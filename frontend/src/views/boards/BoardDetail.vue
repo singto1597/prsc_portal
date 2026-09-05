@@ -96,7 +96,7 @@ async function handleHideBoard() {
     inputAttributes: { maxlength: '200' },
     showCancelButton: true,
     confirmButtonText: 'ซ่อนบอร์ด',
-    confirmButtonColor: '#ef4444',
+    confirmButtonColor: '#b91c1c',
     cancelButtonText: 'ยกเลิก',
   })
   if (!value || !String(value).trim()) {
@@ -132,59 +132,80 @@ const rootComments = computed(() => board.value?.comments ?? [])
 </script>
 
 <template>
-  <div v-if="isLoading" class="flex justify-center py-20">
-    <div class="animate-spin w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full"></div>
+  <!-- โหลด: skeleton เนื้อหา -->
+  <div v-if="isLoading" class="max-w-3xl mx-auto space-y-5">
+    <div class="page-card p-5 space-y-3">
+      <div class="flex items-center justify-between">
+        <div class="h-5 w-24 bg-stone-100 animate-pulse rounded-md"></div>
+        <div class="h-3 w-20 bg-stone-100 animate-pulse rounded"></div>
+      </div>
+      <div class="h-6 w-3/4 bg-stone-100 animate-pulse rounded"></div>
+      <div class="h-4 w-1/2 bg-stone-100 animate-pulse rounded"></div>
+      <div class="h-20 w-full bg-stone-100 animate-pulse rounded"></div>
+    </div>
+    <div class="page-card p-5 space-y-3">
+      <div class="h-5 w-24 bg-stone-100 animate-pulse rounded"></div>
+      <div class="h-14 w-full bg-stone-100 animate-pulse rounded-xl"></div>
+      <div class="h-14 w-full bg-stone-100 animate-pulse rounded-xl"></div>
+      <div class="h-14 w-full bg-stone-100 animate-pulse rounded-xl"></div>
+      <div class="h-11 w-full bg-stone-100 animate-pulse rounded-xl"></div>
+    </div>
   </div>
 
-  <div v-else-if="loadError" class="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm p-10 text-center">
-    <div class="text-4xl text-slate-300 mb-3"><i class="bi bi-file-earmark-x"></i></div>
-    <p class="text-slate-600 font-medium">{{ loadError }}</p>
-    <button @click="router.push({ name: 'boards' })" class="mt-4 px-4 py-2 bg-red-600 text-white rounded-xl text-sm hover:bg-red-700">
-      กลับไป PIRI Boards
-    </button>
+  <!-- ข้อผิดพลาด -->
+  <div v-else-if="loadError" class="max-w-3xl mx-auto border-2 border-dashed border-stone-200 rounded-2xl py-20 px-6 text-center">
+    <div class="text-4xl text-stone-300 mb-3"><i class="bi bi-file-earmark-x"></i></div>
+    <p class="text-stone-600 font-medium">{{ loadError }}</p>
+    <div class="mt-5 flex flex-wrap items-center justify-center gap-3">
+      <button @click="load" class="px-5 py-2.5 bg-[#B91C1C] text-white rounded-xl text-sm font-bold hover:bg-[#991B1B]">
+        <i class="bi bi-arrow-clockwise mr-1"></i> ลองอีกครั้ง
+      </button>
+      <button @click="router.push({ name: 'boards' })" class="px-5 py-2.5 bg-stone-100 text-stone-700 rounded-xl text-sm font-medium hover:bg-stone-200">
+        กลับไป PIRI Boards
+      </button>
+    </div>
   </div>
 
   <div v-else-if="board" class="max-w-3xl mx-auto space-y-5">
     <!-- ปุ่มกลับ -->
-    <button @click="router.push({ name: 'boards' })" class="flex items-center gap-1 text-sm text-slate-500 hover:text-red-600 font-medium">
+    <button @click="router.push({ name: 'boards' })" class="flex items-center gap-1 text-sm text-stone-500 hover:text-[#B91C1C] font-medium">
       <i class="bi bi-arrow-left"></i> PIRI Boards
     </button>
 
     <!-- Header -->
-    <div class="bg-white rounded-2xl shadow-sm p-5">
+    <div class="page-card p-5">
       <div class="flex items-center justify-between gap-3 mb-2">
-        <span class="flex items-center gap-1.5 text-xs font-semibold"
-          :class="board.board_type === 'vote' ? 'text-red-600' : 'text-rose-500'">
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-stone-100 text-stone-600 text-[11px] font-semibold">
           <i :class="boardTypeIcon(board.board_type)"></i> บอร์ด{{ BOARD_TYPE_LABELS[board.board_type] }}
         </span>
         <div class="flex items-center gap-2">
-          <span class="text-xs text-slate-400">{{ fmtDate(board.created_at) }}</span>
+          <span class="text-xs text-stone-400">{{ fmtDate(board.created_at) }}</span>
           <button
             v-if="authStore.isCouncilAuthority"
             type="button"
             @click="handleHideBoard"
             :disabled="hidingBoard"
             data-testid="hide-board-btn"
-            class="px-2.5 py-1 text-[11px] font-medium rounded-lg border border-red-200 text-red-500 hover:bg-red-50 disabled:opacity-40"
+            class="px-2.5 py-1 text-[11px] font-medium rounded-lg border border-[#B91C1C]/25 text-[#B91C1C] hover:bg-[#B91C1C]/5 disabled:opacity-40"
             title="ซ่อนบอร์ดนี้ (สภา/แอดมิน)"
           >
             <i class="bi bi-eye-slash mr-1"></i> ซ่อนบอร์ด
           </button>
         </div>
       </div>
-      <h1 class="text-lg sm:text-xl font-bold text-slate-900 leading-snug break-words">{{ board.title }}</h1>
-      <p class="text-slate-500 text-sm mt-1">โดย {{ board.is_anonymous ? 'ไม่ระบุชื่อ' : board.author_name || 'สภานักเรียน' }}</p>
-      <p class="text-slate-700 mt-3 whitespace-pre-wrap break-words">{{ board.description }}</p>
+      <h1 class="text-lg sm:text-xl font-bold text-stone-900 leading-snug break-words">{{ board.title }}</h1>
+      <p class="text-stone-500 text-sm mt-1">โดย {{ board.is_anonymous ? 'ไม่ระบุชื่อ' : board.author_name || 'สภานักเรียน' }}</p>
+      <p class="text-stone-700 mt-3 whitespace-pre-wrap break-words">{{ board.description }}</p>
       <div v-if="board.tags.length" class="flex flex-wrap gap-1.5 mt-3">
-        <span v-for="tag in board.tags" :key="tag" class="px-2 py-0.5 bg-slate-100 text-slate-600 text-[11px] rounded-full">#{{ tag }}</span>
+        <span v-for="tag in board.tags" :key="tag" class="px-2 py-0.5 bg-stone-100 text-stone-600 text-[11px] rounded-full">#{{ tag }}</span>
       </div>
     </div>
 
     <!-- ===================== Vote layout ===================== -->
-    <div v-if="board.board_type === 'vote'" class="bg-white rounded-2xl shadow-sm p-5">
+    <div v-if="board.board_type === 'vote'" class="page-card p-5">
       <div class="flex items-center justify-between mb-1">
-        <h2 class="text-lg font-bold text-slate-800"><i class="bi bi-bar-chart-fill mr-1 text-red-600"></i> โหวต</h2>
-        <span class="text-sm text-slate-500 tabular-nums">{{ board.total_votes.toLocaleString('en-US') }} เสียง</span>
+        <h2 class="text-lg font-bold text-stone-900"><i class="bi bi-bar-chart-fill mr-1 text-stone-500"></i> โหวต</h2>
+        <span class="text-sm text-stone-500 font-display tabular-nums">{{ board.total_votes.toLocaleString('en-US') }} เสียง</span>
       </div>
 
       <!-- แบนเนอร์: โหวตแล้ว → เปลี่ยนตัวเลือกไม่ได้ -->
@@ -203,33 +224,33 @@ const rootComments = computed(() => board.value?.comments ?? [])
           class="w-full text-left p-4 rounded-xl border-2 transition"
           :class="[
             !myVoted && selectedChoice === c.id
-              ? 'border-red-600 bg-red-50'
-              : 'border-slate-200 hover:border-red-300',
+              ? 'border-[#B91C1C] bg-[#B91C1C]/5'
+              : 'border-stone-200 hover:border-stone-300',
             board.my_vote_choice_id === c.id ? 'ring-2 ring-emerald-400 border-emerald-400' : '',
             myVoted ? 'cursor-default' : 'cursor-pointer',
           ]"
         >
           <div class="flex items-center justify-between gap-3 mb-2">
-            <span class="font-semibold text-slate-900 text-sm sm:text-base flex items-center gap-2">
+            <span class="font-semibold text-stone-900 text-sm sm:text-base flex items-center gap-2">
               <span v-if="board.my_vote_choice_id === c.id" class="text-emerald-600"><i class="bi bi-check-circle-fill"></i></span>
               {{ c.choice_text }}
             </span>
-            <span class="text-sm text-slate-500 tabular-nums whitespace-nowrap">
+            <span class="text-sm text-stone-500 font-display tabular-nums whitespace-nowrap">
               {{ c.vote_count.toLocaleString('en-US') }} เสียง · {{ choicePercent(c) }}%
             </span>
           </div>
           <!-- progress bar -->
-          <div class="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+          <div class="h-2.5 bg-stone-100 rounded-full overflow-hidden">
             <div
               class="h-full rounded-full transition-all duration-500"
-              :class="board.my_vote_choice_id === c.id ? 'bg-emerald-500' : 'bg-gradient-to-r from-red-500 to-rose-500'"
+              :class="board.my_vote_choice_id === c.id ? 'bg-emerald-500' : 'bg-[#B91C1C]'"
               :style="{ width: choicePercent(c) + '%' }"
             ></div>
           </div>
         </button>
       </div>
 
-      <p v-if="!board.choices.length" class="text-sm text-slate-400 py-2">ยังไม่มีตัวเลือกโหวต</p>
+      <p v-if="!board.choices.length" class="text-sm text-stone-400 py-2">ยังไม่มีตัวเลือกโหวต</p>
 
       <button
         v-if="!myVoted"
@@ -237,21 +258,21 @@ const rootComments = computed(() => board.value?.comments ?? [])
         :disabled="selectedChoice === null || voting"
         data-testid="vote-submit"
         @click="handleVote"
-        class="mt-4 w-full py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 disabled:opacity-50 font-medium"
+        class="mt-4 w-full py-3 bg-[#B91C1C] text-white rounded-xl hover:bg-[#991B1B] disabled:opacity-50 font-medium"
       >
         {{ voting ? 'กำลังส่งเสียง...' : selectedChoice === null ? 'เลือกตัวเลือกก่อนโหวต' : 'ส่งเสียงโหวต' }}
       </button>
     </div>
 
     <!-- ===================== Talk layout ===================== -->
-    <div v-else class="bg-white rounded-2xl shadow-sm p-5">
-      <h2 class="text-lg font-bold text-slate-800 mb-4">
-        <i class="bi bi-chat-left-text mr-1 text-rose-500"></i> พูดคุย
-        <span v-if="rootComments.length" class="text-sm font-normal text-slate-400">({{ board.comment_count }})</span>
+    <div v-else class="page-card p-5">
+      <h2 class="text-lg font-bold text-stone-900 mb-4">
+        <i class="bi bi-chat-left-text mr-1 text-stone-500"></i> พูดคุย
+        <span v-if="rootComments.length" class="text-sm font-normal text-stone-400">({{ board.comment_count }})</span>
       </h2>
 
       <!-- ปิดคอมเมนต์ -->
-      <div v-if="!board.allow_comments" class="mb-4 px-3 py-2 bg-slate-50 text-slate-500 text-sm rounded-xl">
+      <div v-if="!board.allow_comments" class="mb-4 px-3 py-2 bg-stone-100 text-stone-600 text-sm rounded-xl">
         <i class="bi bi-lock mr-1"></i> บอร์ดนี้ปิดคอมเมนต์ (อ่านอย่างเดียว)
       </div>
 
@@ -263,7 +284,7 @@ const rootComments = computed(() => board.value?.comments ?? [])
           data-testid="comment-input"
           placeholder="ร่วมแสดงความเห็น..."
           maxlength="1000"
-          class="flex-1 px-3 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-red-500"
+          class="flex-1 px-3 py-2.5 border border-stone-300 rounded-xl text-sm focus:ring-2 focus:ring-[#B91C1C]"
           @keyup.enter="submitComment"
         />
         <button
@@ -271,7 +292,7 @@ const rootComments = computed(() => board.value?.comments ?? [])
           :disabled="postingComment || !commentBody.trim()"
           data-testid="comment-submit"
           @click="submitComment"
-          class="px-4 py-2.5 bg-red-600 text-white rounded-xl text-sm hover:bg-red-700 disabled:opacity-50"
+          class="px-4 py-2.5 bg-[#B91C1C] text-white rounded-xl text-sm hover:bg-[#991B1B] disabled:opacity-50"
         >
           {{ postingComment ? '...' : 'ส่ง' }}
         </button>
@@ -281,7 +302,7 @@ const rootComments = computed(() => board.value?.comments ?? [])
       <div v-if="rootComments.length" class="space-y-4">
         <CommentThread v-for="c in rootComments" :key="c.id" :board-id="board.id" :comment="c" @refresh="load" />
       </div>
-      <p v-else-if="board.allow_comments" class="text-sm text-slate-400 py-2">ยังไม่มีความเห็น — เป็นคนแรกที่ร่วมพูดคุย</p>
+      <p v-else-if="board.allow_comments" class="text-sm text-stone-400 py-2">ยังไม่มีความเห็น — เป็นคนแรกที่ร่วมพูดคุย</p>
     </div>
   </div>
 </template>
