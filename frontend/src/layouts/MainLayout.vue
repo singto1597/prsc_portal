@@ -422,16 +422,20 @@ const goHome = () => {
         <!-- Backdrop -->
         <div class="absolute inset-0 bg-stone-900/30 backdrop-blur-sm transition-opacity" @click="isMoreOpen = false"></div>
         
-        <!-- Sheet Container -->
-        <div class="absolute inset-x-0 bottom-0 max-h-[86vh] overflow-y-auto rounded-t-[2rem] pb-safe shadow-[0_-10px_40px_rgba(0,0,0,0.15)]">
-          <!-- เลเยอร์กระจกของ Sheet -->
-          <div class="absolute inset-0 z-0 backdrop-blur-3xl bg-white/70 supports-[backdrop-filter]:bg-white/50"></div>
-          <div class="absolute inset-0 z-10 rounded-t-[2rem] shadow-[inset_0_2px_2px_0_rgba(255,255,255,0.8)] pointer-events-none"></div>
+        <!-- Sheet Container (แรปเปอร์หลัก กำหนดเงาและขอบ) -->
+        <div class="absolute inset-x-0 bottom-0 rounded-t-[2rem] shadow-[0_-10px_40px_rgba(0,0,0,0.15)]">
+          
+          <!-- 1. เลเยอร์กระจก (ยึดติดขอบเสมอ ไม่ไหลตามเวลาเลื่อน) -->
+          <div class="absolute inset-0 z-0 overflow-hidden rounded-t-[2rem] backdrop-blur-3xl bg-white/95 supports-[backdrop-filter]:bg-white/85">
+            <div class="absolute inset-0 rounded-t-[2rem] shadow-[inset_0_2px_4px_0_rgba(255,255,255,1)] pointer-events-none"></div>
+          </div>
 
-          <!-- เนื้อหา Sheet (z-20) -->
-          <div class="relative z-20">
-            <div class="mx-auto mt-3 h-1.5 w-10 rounded-full bg-stone-300/60 shadow-inner"></div>
+          <!-- 2. เนื้อหา Sheet (ทำหน้าที่ Scroll อย่างเดียวอยู่ชั้นบนสุด) -->
+          <div class="relative z-20 max-h-[86vh] overflow-y-auto pb-safe custom-scrollbar">
+            <!-- Handle -->
+            <div class="mx-auto mt-3 h-1.5 w-10 rounded-full bg-stone-300/80 shadow-inner"></div>
 
+            <!-- User header -->
             <div class="flex items-center gap-3 px-6 pb-4 pt-4">
               <button
                 @click="isMoreOpen = false; router.push({ name: 'profile' })"
@@ -453,6 +457,7 @@ const goHome = () => {
 
             <div class="mx-6 h-px bg-stone-200/50"></div>
 
+            <!-- Menu items -->
             <div class="space-y-1 px-3 py-3">
               <p class="px-3 pb-1 pt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-stone-500">เมนูทั้งหมด</p>
               <button
@@ -472,10 +477,9 @@ const goHome = () => {
               </button>
             </div>
 
-            <!-- 📖 Playbooks ... -->
+            <!-- 📖 Playbooks -->
             <div class="mx-6 h-px bg-stone-200/50"></div>
             <div class="px-3 py-3">
-              <!-- ส่วนของ Playbooks ไม่เปลี่ยนแปลงโครงสร้าง -->
               <div class="flex items-center justify-between px-3 pb-1">
                 <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-stone-500">P.R. Playbooks</p>
                 <button type="button" class="text-[11px] font-bold text-[#B91C1C]" @click="isMoreOpen = false; router.push({ name: 'playbooks' })">ดูทั้งหมด</button>
@@ -492,6 +496,7 @@ const goHome = () => {
               </div>
             </div>
 
+            <!-- Account -->
             <div class="mx-6 h-px bg-stone-200/50"></div>
             <div class="grid grid-cols-2 gap-2 px-6 py-4">
               <button @click="isMoreOpen = false; router.push({ name: 'profile-edit' })" class="flex items-center gap-2 rounded-xl bg-white/40 px-3 py-3 text-sm font-semibold text-stone-700 hover:bg-white/60">
@@ -505,6 +510,7 @@ const goHome = () => {
               </button>
             </div>
           </div>
+
         </div>
       </div>
     </Transition>
