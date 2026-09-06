@@ -1,5 +1,7 @@
 import json
 import os
+from typing import Optional
+
 import asyncpg
 from core.exceptions import ForbiddenError
 from core.config import settings
@@ -170,6 +172,82 @@ async def get_access_scope(conn: asyncpg.Connection, user_id: int) -> dict:
         return {"scope": "none", "level": None, "is_admin": is_admin}
 
     return {"scope": "pyramid", "level": None, "is_admin": is_admin}
+
+
+# ตำแหน่งที่ "ขอบเขตระดับชั้น" (grade) กำหนดให้ต้องเห็น/จัดการได้แค่ระดับชั้นของตัวเอง
+# - teacher: ระดับชั้นที่รับผิดชอบ (staff_level)
+# - level_president / level_vice_president: ระดับชั้นของห้องตัวเอง (rooms.level)
+GRADE_SCOPED_ROLES = {
+    "level_president", "level_vice_president",
+}
+
+
+# 🧭 ลำดับชั้นการจัดการ (hierarchy) สำหรับหน้า User Management — ใครจัดการ/แก้ไขใครได้บ้าง
+# ตัวเลขสูง = จัดการได้มากกว่า (จัดการคนที่ rank ≤ ตัวเองได้)
+# โดยยึดตามพีระมิด: ประธานสภา > สภานักเรียน > หัวหน้าระดับ = ผู้ช่วยหัวหน้าระดับ > คณะกรรมการห้อง > นักเรียน
+MANAGE_RANK = {
+    "student": 0,
+    # คณะกรรมการห้อง (หัวหน้าห้อง + รอง 4 ฝ่าย)
+    "class_president": 1,
+    "vice_academic": 1,
+    "vice_discipline": 1,
+    "vice_activity": 1,
+    "vice_reception": 1,
+    # ประธานระดับ / ผู้ช่วยหัวหน้าระดับ
+    "level_president": 2,
+    "level_vice_president": 2,
+    # สภานักเรียน
+    "council_member": 3,
+    "council_president": 4,
+}
+# บทบาทระดับสูงที่ดูแลทั้งโรงเรียน (bypass rank/grade — มี MANAGE_STUDENTS เต็มรูปแบบ)
+SCHOOL_WIDE_MANAGE_ROLES = {"admin", "teacher_council", "council_president"}
+
+
+async def get_user_grade_scope(conn: asyncpg.Connection, user_id: int) -> Optional[str]:
+    """
+    ระดับชั้น (grade) ที่ user ถูกจำกัดให้เห็น/จัดการได้เฉพาะห้องในระดับนั้น
+    เช่น 'ม.4' — หรือ None ถ้า user ไม่ได้ถูกจำกัดระดับชั้น (school-wide / student / council)
+
+    - ครูทั่วไป (teacher) → students.staff_level
+    - หัวหน้าระดับ / ผู้ช่วยหัวหน้าระดับ (level_president / level_vice_president)
+      → rooms.level ของห้องที่ตำแหน่งนั้นสังกัด (ผ่าน students.room_id)
+    - admin / ครูสภา / ประธานสภา / สภานักเรียน / นักเรียน → None (school-wide หรือไม่ผูก grade)
+    """
+    if settings.SUPER_ADMIN_ID and int(user_id) == int(settings.SUPER_ADMIN_ID):
+        return None
+
+    # 1. ครูทั่วไป — staff_level ระบุระดับชั้นที่รับผิดชอบไว้แล้ว
+    row = await conn.fetchrow(
+        """
+        SELECT staff_level FROM students
+        WHERE user_id = $1 AND class_role = 'teacher'
+          AND deleted_at IS NULL AND status = 'active'
+          AND staff_level IS NOT NULL
+        ORDER BY id LIMIT 1
+        """,
+        int(user_id)
+    )
+    if row and row["staff_level"]:
+        return row["staff_level"]
+
+    # 2. หัวหน้าระดับ / ผู้ช่วยหัวหน้าระดับ — ระดับชั้นของห้องตัวเอง (rooms.level)
+    row = await conn.fetchrow(
+        """
+        SELECT r.level FROM students s
+        JOIN rooms r ON r.id = s.room_id
+        WHERE s.user_id = $1
+          AND s.class_role IN ('level_president', 'level_vice_president')
+          AND s.deleted_at IS NULL AND s.status = 'active'
+          AND r.deleted_at IS NULL AND r.level IS NOT NULL
+        ORDER BY s.id LIMIT 1
+        """,
+        int(user_id)
+    )
+    if row and row["level"]:
+        return row["level"]
+
+    return None
 
 
 def _parse_permissions(raw_perms) -> list:

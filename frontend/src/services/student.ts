@@ -1,14 +1,23 @@
-import api from './api';
-import type { Student, Room, ImportJob } from '@/types/student';
+import api from './api'
+import type { Student, StudentCreatePayload, Room, ImportJob } from '@/types/student'
 
 // Student API
 
 export async function listRooms(): Promise<Room[]> {
-  return (await api.get('/api/rooms')) as Room[];
+  return (await api.get('/api/rooms')) as Room[]
 }
 
-export async function listStudents(params?: { room_id?: number; search?: string }): Promise<Student[]> {
-  return (await api.get('/api/students', { params })) as Student[];
+export async function listStudents(params?: {
+  room_id?: number
+  search?: string
+  role?: string
+}): Promise<Student[]> {
+  return (await api.get('/api/students', { params })) as Student[]
+}
+
+// เพิ่มผู้ใช้งานแบบ Manual (หน้า User Management — "เพิ่มผู้ใช้งาน")
+export async function addStudent(payload: StudentCreatePayload): Promise<{ student_id: number }> {
+  return (await api.post('/api/students', payload)) as { student_id: number }
 }
 
 // ===================== Import นักเรียนจาก Excel (Queue) =====================
@@ -16,8 +25,8 @@ export async function listStudents(params?: { room_id?: number; search?: string 
 
 export async function uploadStudentExcel(file: File, defaultPassword = '1234'): Promise<ImportJob> {
   // 1. สร้างกล่อง Form สำหรับใส่ไฟล์เท่านั้น
-  const form = new FormData();
-  form.append('file', file);
+  const form = new FormData()
+  form.append('file', file)
 
   // 2. ยิง API โดยแยกของ 2 อย่างให้ถูกต้องตามที่ Backend ต้องการ
   return (await api.post('/api/upload-student-excel', form, {
@@ -29,25 +38,31 @@ export async function uploadStudentExcel(file: File, defaultPassword = '1234'): 
     params: {
       default_password: defaultPassword,
     },
-  })) as ImportJob;
+  })) as ImportJob
 }
 
 export async function startImportJob(jobId: number): Promise<ImportJob> {
-  return (await api.post(`/api/start-import-job/${jobId}`)) as ImportJob;
+  return (await api.post(`/api/start-import-job/${jobId}`)) as ImportJob
 }
 
 export async function listImportJobs(): Promise<ImportJob[]> {
-  return (await api.get('/api/import-jobs')) as ImportJob[];
+  return (await api.get('/api/import-jobs')) as ImportJob[]
 }
 
 export async function downloadImportTemplate(): Promise<Blob> {
   // responseType:'blob' สำคัญ — ไฟล์ .xlsx เป็น binary ถ้าไม่ตั้งจะกลายเป็น text ที่เสียหาย
-  return (await api.get('/api/import-student-template', { responseType: 'blob' })) as Blob;
+  return (await api.get('/api/import-student-template', { responseType: 'blob' })) as Blob
 }
 
 export async function updateStudent(
   studentId: number,
-  data: { class_role?: string; status?: string; is_admin?: boolean; staff_level?: string | null },
+  data: {
+    class_role?: string
+    status?: string
+    is_admin?: boolean
+    staff_level?: string | null
+    responsibilities?: string[]
+  },
 ): Promise<void> {
-  await api.patch(`/api/students/${studentId}`, data);
+  await api.patch(`/api/students/${studentId}`, data)
 }

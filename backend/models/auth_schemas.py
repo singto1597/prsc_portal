@@ -29,6 +29,7 @@ class UserRoleInfo(BaseModel):
     staff_level: Optional[str] = None   # (ครูทั่วไป) ระดับชั้นที่รับผิดชอบ เช่น 'ม.4'
     is_admin: bool = False              # role นี้เป็น admin หรือไม่
     permissions: List[str] = []         # permissions ของ role นี้
+    responsibilities: List[str] = []    # หน้าที่รับผิดชอบ (เฉพาะ สภานักเรียน/ผู้ช่วยหัวหน้าระดับ) — ตรงกับ issues.category
 
 
 class UserOut(BaseModel):

@@ -140,6 +140,7 @@ async def get_user_roles(pool: asyncpg.Pool, user_id: int) -> list:
                 s.staff_level,
                 s.is_admin,
                 s.permissions,
+                s.responsibilities,
                 r.room_name,
                 r.level
             FROM students s
@@ -153,15 +154,20 @@ async def get_user_roles(pool: asyncpg.Pool, user_id: int) -> list:
             user_id
         )
 
+    def _parse_json_list(raw) -> list:
+        if not raw:
+            return []
+        if isinstance(raw, list):
+            return raw
+        try:
+            return json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            return []
+
     roles = []
     for row in rows:
-        perms = row["permissions"] or []
-        if isinstance(perms, str):
-            import json
-            try:
-                perms = json.loads(perms)
-            except json.JSONDecodeError:
-                perms = []
+        perms = _parse_json_list(row["permissions"])
+        resp = _parse_json_list(row["responsibilities"])
         roles.append({
             "role": row["class_role"],
             "room_id": row["room_id"],
@@ -171,6 +177,7 @@ async def get_user_roles(pool: asyncpg.Pool, user_id: int) -> list:
             "staff_level": row["staff_level"],
             "is_admin": row["is_admin"],
             "permissions": perms,
+            "responsibilities": resp,
         })
     return roles
 
@@ -309,6 +316,7 @@ def make_user_out(user_record, roles: list) -> dict:
                 "staff_level": r.get("staff_level"),
                 "is_admin": r.get("is_admin", False),
                 "permissions": r.get("permissions", []),
+                "responsibilities": r.get("responsibilities", []),
             }
             for r in roles
         ],

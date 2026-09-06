@@ -78,6 +78,7 @@ async def init_db(pool: asyncpg.Pool):
                     staff_level TEXT,                -- ระดับชั้นที่ครูทั่วไปรับผิดชอบ เช่น 'ม.4'
                     is_admin BOOLEAN DEFAULT FALSE,
                     permissions JSONB DEFAULT '[]'::jsonb,
+                    responsibilities JSONB DEFAULT '[]'::jsonb,  -- หน้าที่รับผิดชอบ (ตรงกับ issues.category) — สภา/ผู้ช่วยหัวหน้าระดับ
                     status TEXT DEFAULT 'active',
                     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -550,6 +551,8 @@ async def init_db(pool: asyncpg.Pool):
                 CREATE INDEX IF NOT EXISTS idx_students_role_active
                     ON students(class_role)
                     WHERE deleted_at IS NULL;
+                CREATE INDEX IF NOT EXISTS idx_students_responsibilities
+                    ON students USING GIN (responsibilities);
                 -- กันสร้าง student ซ้ำ (room, เลขประจำตัว) — import แบบ ON CONFLICT ใช้ index นี้
                 CREATE UNIQUE INDEX IF NOT EXISTS uq_students_room_student_active
                     ON students(room_id, student_id)

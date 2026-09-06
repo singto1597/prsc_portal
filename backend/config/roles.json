@@ -3,7 +3,7 @@
   "levels": {
     "student": "นักเรียน (แจ้งปัญหา / ดูสถานะของตัวเอง)",
     "class_committee": "หัวหน้าห้อง + รอง 4 ฝ่าย (รับเรื่องระดับห้อง)",
-    "level_president": "ประธานระดับ (รับเรื่องต่อจากห้อง)",
+    "level_president": "ประธานระดับ / ผู้ช่วยหัวหน้าระดับ (รับเรื่องต่อจากห้อง)",
     "student_council": "สภานักเรียน / ประธานสภา (รับเรื่องสูงสุด)",
     "teacher_council": "ครูสภา (สิทธิ์เทียบเท่าประธานนักเรียน — ดูแลทั้งโรงเรียน)",
     "teacher": "ครูทั่วไป (ดูแลเฉพาะระดับชั้นที่รับผิดชอบ เช่น ครู ม.4 ดูแลแค่ ม.4)",
@@ -36,6 +36,10 @@
     },
     "level_president": {
       "label": "ประธานระดับ",
+      "permissions": ["SUBMIT_ISSUE", "VIEW_OWN_ISSUES", "RECEIVE_ISSUES", "MANAGE_ISSUE_STEPS", "SET_COUNTDOWN", "ESCALATE_ISSUE", "VIEW_LEVEL_PYRAMID", "MANAGE_STUDENTS"]
+    },
+    "level_vice_president": {
+      "label": "ผู้ช่วยหัวหน้าระดับ",
       "permissions": ["SUBMIT_ISSUE", "VIEW_OWN_ISSUES", "RECEIVE_ISSUES", "MANAGE_ISSUE_STEPS", "SET_COUNTDOWN", "ESCALATE_ISSUE", "VIEW_LEVEL_PYRAMID", "MANAGE_STUDENTS"]
     },
     "council_member": {

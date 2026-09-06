@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from core.exceptions import NotFoundError, ForbiddenError, ValidationError, ConflictError
 from core.config import settings
 from core.categories import is_valid_category, all_main_category_codes
+from core.rbac import get_user_grade_scope
 
 # 🔔 Notification writer (อยู่ใน transaction เดียวกับข้อมูลหลัก — ลอกแบบ AuditLogger)
 from services.notification_service import (
@@ -27,6 +28,7 @@ ROLE_LEVEL = {
     "vice_activity": "room",
     "vice_reception": "room",
     "level_president": "level",
+    "level_vice_president": "level",
     "council_member": "council",
     "council_president": "council",
 }
@@ -788,11 +790,13 @@ async def _assert_can_view(conn, pool: asyncpg.Pool, user_id: int, issue_row) ->
     involved = await _is_involved(conn, user_id, issue_row)
     visible = can_see(level, issue_row["current_level"], issue_row["reporter_id"], user_id, issue_row["is_anonymous"]) or involved
 
-    # ครูทั่วไป: เห็นเฉพาะเรื่องของระดับชั้นตัวเอง (ยกเว้นเรื่องที่เกี่ยวข้อง/จัดการอยู่)
-    teacher_level = await _teacher_scope(conn, user_id)
-    if teacher_level:
-        issue_level = await _room_level(conn, issue_row["room_id"])
-        if issue_level != teacher_level and not involved:
+    # จำกัดระดับชั้น (grade scope): ครูทั่วไป (staff_level) + ประธานระดับ/ผู้ช่วยหัวหน้าระดับ (rooms.level)
+    # เห็นได้เฉพาะเรื่องของห้องในระดับชั้นตัวเอง — ยกเว้นเรื่องที่เกี่ยวข้อง/จัดการอยู่
+    # (แก้บั๊กเดิม: หัวหน้าระดับเห็นเรื่องทุกชั้นได้ — scope ต้องจำกัดเหมือนครู)
+    grade = await get_user_grade_scope(conn, user_id)
+    if grade:
+        issue_grade = await _room_level(conn, issue_row["room_id"])
+        if issue_grade != grade and not involved:
             visible = False
 
     if not visible:
@@ -882,7 +886,9 @@ async def list_issues(
     """
     รายการปัญหา — filter visibility ตามระดับผู้ใช้ + ค้นหา + แบ่งหน้า
 
-    received=True: แสดงทุกเรื่องที่ผู้ใช้มองเห็นได้ (พีระมิด — ระดับสูงมองลงเห็นทุกระดับล่าง)
+    received=True: "เรื่องที่รับ / ระดับฉัน" — EXACT LEVEL MATCH เฉพาะเรื่องที่อยู่ระดับตัวเองพอดี
+       (room→เฉพาะห้องตัวเองระดับ room, level→เฉพาะระดับชั้นตัวเองระดับ level, council→เฉพาะระดับ council)
+       กรองหน้าที่ (category) เพิ่มเติมได้จากฝั่งหน้า UI แต่ไม่เกินขอบเขตระดับ/ชั้นของตัวเอง
     main_category: กรองตามหมวดหลัก (suggestion / wellbeing / report) — ใช้จาก Dashboard
     level_filter: จำกัดให้ดูเฉพาะระดับที่เลือก (room/level/council)
     q: ค้นหาแบบคำต่อคำ (ILIKE partial match) ในชื่อเรื่อง/คำอธิบาย/ห้อง/ชื่อคน —
@@ -908,6 +914,56 @@ async def list_issues(
             # เรื่องที่ฉันแจ้งเท่านั้น (ไม่ต้องสร้าง visible_cond — กัน param เกิน)
             params.append(user_id)
             where.append(f"i.reporter_id = ${len(params)}")
+        elif received:
+            # 🎯 "เรื่องที่รับ / ระดับฉัน" — EXACT LEVEL MATCH (เรื่องที่อยู่ระดับของตัวเองพอดี)
+            # ห้ามดึงเรื่องระดับต่ำกว่าติดมาด้วย (level ของ room/level จะถูกจำกัดด้านล่าง)
+            teacher_level = await _teacher_scope(conn, user_id)
+            if teacher_level:
+                # 👩‍🏫 ครูทั่วไป: คงเดิม — เห็นทุก escalation level ภายในระดับชั้นตัวเอง (staff_level)
+                teacher_room_ids = await _level_room_ids(conn, teacher_level)
+                if not teacher_room_ids:
+                    where.append("1 = 0")
+                else:
+                    params.append(tuple(teacher_room_ids))
+                    pyramid_cond = f"i.room_id = ANY(${len(params)})"
+                    params.append(user_id)
+                    involved_cond = (
+                        f"i.reporter_id = ${len(params)}"
+                        f" OR i.current_assignee_id = ${len(params)}"
+                        f" OR EXISTS (SELECT 1 FROM issue_escalations e WHERE e.issue_id = i.id AND e.from_assignee_id = ${len(params)})"
+                        f" OR EXISTS (SELECT 1 FROM issue_countdowns cd WHERE cd.issue_id = i.id AND cd.assignee_id = ${len(params)})"
+                    )
+                    where.append(f"({pyramid_cond} OR ({involved_cond}))")
+            elif level == "student":
+                # นักเรียนไม่มี "เรื่องที่รับ" — ไม่เห็นเรื่องคนอื่น
+                where.append("1 = 0")
+            elif level == "room":
+                # คณะกรรมการห้อง: เฉพาะเรื่องระดับห้องของห้องตัวเอง (exact + ห้อง)
+                if not room_ids:
+                    where.append("1 = 0")
+                else:
+                    params.append(tuple(room_ids))
+                    params.append("room")
+                    where.append(f"i.room_id = ANY(${len(params)-1}) AND i.current_level = ${len(params)}")
+            elif level == "level":
+                # ประธานระดับ/ผู้ช่วย: เฉพาะเรื่องระดับ level ในระดับชั้นของตัวเอง (grade scope)
+                grade = await get_user_grade_scope(conn, user_id)
+                if not grade:
+                    where.append("1 = 0")  # หา grade ไม่เจอ → fail-closed (ห้ามเห็นทุกชั้น)
+                else:
+                    lvl_room_ids = await _level_room_ids(conn, grade)
+                    if not lvl_room_ids:
+                        where.append("1 = 0")
+                    else:
+                        params.append(tuple(lvl_room_ids))
+                        params.append("level")
+                        where.append(
+                            f"i.room_id = ANY(${len(params)-1}) AND i.current_level = ${len(params)}"
+                        )
+            else:
+                # สภานักเรียน/ประธานสภา/ครูสภา/admin: เฉพาะเรื่องระดับ council พอดี
+                params.append("council")
+                where.append(f"i.current_level = ${len(params)}")
         else:
             # 👩‍🏫 ครูทั่วไป: เห็นเฉพาะเรื่องของระดับชั้นตัวเอง (พีระมิดสูงสุดแต่จำกัดชั้น)
             teacher_level = await _teacher_scope(conn, user_id)
@@ -941,10 +997,24 @@ async def list_issues(
                 pyramid_cond = (
                     f"CASE i.current_level WHEN 'room' THEN 1 WHEN 'level' THEN 2 WHEN 'council' THEN 3 ELSE 0 END <= ${len(params)}"
                 )
-                # ห้องของ user (สำหรับเรื่องในระดับ room)
                 if room_ids and level == "room":
+                    # ห้องของ user (สำหรับเรื่องในระดับ room)
                     params.append(tuple(room_ids))
                     pyramid_cond += f" AND i.room_id = ANY(${len(params)})"
+                elif level == "level":
+                    # 🛡️ หัวหน้าระดับ/ผู้ช่วย: จำกัดเฉพาะระดับชั้นของตัวเอง (rooms.level)
+                    # แก้บั๊กเดิมที่เห็นเรื่องของทุกชั้น — scope เท่ากับ teacher (staff_level) แต่ดึงจากห้องตัวเอง
+                    grade = await get_user_grade_scope(conn, user_id)
+                    if grade:
+                        lvl_room_ids = await _level_room_ids(conn, grade)
+                        if lvl_room_ids:
+                            params.append(tuple(lvl_room_ids))
+                            pyramid_cond += f" AND i.room_id = ANY(${len(params)})"
+                        else:
+                            pyramid_cond += " AND 1 = 0"
+                    else:
+                        # หา grade ไม่เจอ → มองเห็นได้เฉพาะเรื่องที่เกี่ยวข้อง (involved) — fail-closed
+                        pyramid_cond += " AND 1 = 0"
 
                 # + เรื่องที่ user เกี่ยวข้อง (เคยรับ/อยู่ในห้องผู้แจ้ง) แม้ถูก escalate ขึ้นไปแล้ว
                 params.append(user_id)
@@ -969,8 +1039,17 @@ async def list_issues(
                 params.append(status_filter)
                 where.append(f"i.status = ${len(params)}")
         if category:
-            params.append(category)
-            where.append(f"i.category = ${len(params)}")
+            # รองรับหลายหมวดคั่นด้วย "," (เช่น "academic,discipline") — ใช้กับหน้า "เรื่องที่รับ ระดับฉัน"
+            # ที่กรองตามหน้าที่รับผิดชอบ (responsibilities) ซึ่งอาจมีหลายหมวด
+            cat_list = [c.strip() for c in category.split(",") if c.strip()]
+            if not cat_list:
+                raise ValueError("หมวดหมู่ไม่ถูกต้อง: ต้องระบุอย่างน้อย 1 หมวด")
+            if len(cat_list) > 1:
+                params.append(cat_list)
+                where.append(f"i.category = ANY(${len(params)}::text[])")
+            else:
+                params.append(cat_list[0])
+                where.append(f"i.category = ${len(params)}")
         if main_category:
             # ตรวจหมวดหลัก (กันค่าแปลก → 400 แทน 500)
             if main_category not in all_main_category_codes():
@@ -1175,11 +1254,13 @@ async def accept_issue(pool: asyncpg.Pool, user_id: int, issue_id: int, estimate
                 if not await _user_role_in(conn, user_id, issue["room_id"]):
                     can_accept = False
 
-            # ครูทั่วไป: รับได้เฉพาะเรื่องที่ห้องอยู่ในระดับชั้นตัวเอง (ยกเว้นเรื่องระดับสภา — เดิมรับได้ทุกเรื่อง)
-            teacher_level = await _teacher_scope(conn, user_id)
-            if teacher_level and issue["current_level"] != "council":
+            # จำกัดระดับชั้น (grade scope): ครูทั่วไป (staff_level) + ประธานระดับ/ผู้ช่วยหัวหน้าระดับ (rooms.level)
+            # รับได้เฉพาะเรื่องที่ห้องอยู่ในระดับชั้นตัวเอง (ยกเว้นเรื่องระดับสภา — เดิมรับได้ทุกเรื่อง)
+            # (แก้บั๊กเดิม: หัวหน้าระดับรับเรื่องห้องทุกชั้นได้ — ต้องจำกัดเหมือนครู)
+            grade = await get_user_grade_scope(conn, user_id)
+            if grade and issue["current_level"] != "council":
                 issue_room_level = await _room_level(conn, issue["room_id"])
-                if issue_room_level != teacher_level:
+                if issue_room_level != grade:
                     can_accept = False
 
             if not can_accept:

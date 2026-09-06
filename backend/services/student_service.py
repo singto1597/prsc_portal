@@ -11,6 +11,7 @@ ROLE_MAP = {
     "ประธานสภา": "council_president",
     "สภานักเรียน": "council_member",
     "ประธานระดับ": "level_president",
+    "ผู้ช่วยหัวหน้าระดับ": "level_vice_president",
     "หัวหน้าห้อง": "class_president",
     "รองวิชาการ": "vice_academic",
     "รองวินัย": "vice_discipline",
@@ -31,6 +32,56 @@ def map_role_label(label: str) -> str:
     """แปลงตำแหน่งจากภาษาไทย (ใน Excel) → role key"""
     label = (label or "").strip()
     return ROLE_MAP.get(label, "student")
+
+
+# ============================================================
+# 🎯 หน้าที่รับผิดชอบ (Responsibilities)
+# ============================================================
+# มีเฉพาะ 2 ตำแหน่งที่ถือ "หน้าที่" ได้ (ตรงกับ Requirement):
+# - สภานักเรียน (council_member)
+# - ผู้ช่วยหัวหน้าระดับ (level_vice_president)
+# ค่า = รหัส category ทั้ง 9 หมวด (academic / reception / ... / grievance)
+RESPONSIBLE_ROLES = {"council_member", "level_vice_president"}
+
+
+def _validate_responsibilities(values, role: str) -> list:
+    """
+    ตรวจ + ทำความสะอาดค่าหน้าที่ (responsibilities):
+    - role ไม่ใช่ RESPONSIBLE_ROLES → ต้องว่างเสมอ (ไม่อนุญาตตั้งหน้าที่กับ role นี้)
+    - แต่ละค่าต้องเป็นหมวดย่อยที่ถูกต้อง (จาก config/categories.json) → กันค่าปลอม
+    - ตัดซ้ำ (keep order)
+    """
+    values = list(values or [])
+    if role not in RESPONSIBLE_ROLES:
+        if values:
+            raise ValidationError(
+                "ตำแหน่งนี้ไม่รองรับการตั้งหน้าที่รับผิดชอบ (เฉพาะ สภานักเรียน / ผู้ช่วยหัวหน้าระดับ)"
+            )
+        return []
+    from core.categories import all_subcategory_codes
+    valid = set(all_subcategory_codes())
+    unknown = [v for v in values if v not in valid]
+    if unknown:
+        raise ValidationError(f"มีหมวดหน้าที่ไม่ถูกต้อง: {', '.join(str(u) for u in unknown)}")
+    seen = set()
+    out = []
+    for v in values:
+        if v not in seen:
+            seen.add(v)
+            out.append(v)
+    return out
+
+
+def _parse_json_list(raw) -> list:
+    """แปลง JSONB array → list (รองรับทั้ง str และ list จาก asyncpg)"""
+    if not raw:
+        return []
+    if isinstance(raw, list):
+        return list(raw)
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return []
 
 
 async def list_rooms(pool: asyncpg.Pool) -> list:
@@ -73,10 +124,11 @@ async def create_room(pool: asyncpg.Pool, room_code: str, room_name: str, level:
             return room_id
 
 
-async def list_students(pool: asyncpg.Pool, room_id: Optional[int] = None, search: Optional[str] = None, level: Optional[str] = None, limit: int = 500) -> list:
+async def list_students(pool: asyncpg.Pool, room_id: Optional[int] = None, search: Optional[str] = None, level: Optional[str] = None, role: Optional[str] = None, limit: int = 500) -> list:
     """
     รายชื่อนักเรียน/สมาชิก
-    - level: กรองเฉพาะระดับชั้น (เช่น 'ม.4') — ใช้กับ ครูทั่วไป (teacher) ที่เห็นได้แค่ระดับตัวเอง
+    - level: กรองเฉพาะระดับชั้น (เช่น 'ม.4') — ใช้กับ ครูทั่วไป/ประธานระดับ/ผู้ช่วย ที่เห็นได้แค่ระดับตัวเอง
+    - role: กรองเฉพาะตำแหน่ง (เช่น 'council_member') — ใช้กับหน้า User Management (default = role ผู้จัดการ)
     - room_id: กรองเฉพาะห้อง
     """
     async with pool.acquire() as conn:
@@ -88,6 +140,9 @@ async def list_students(pool: asyncpg.Pool, room_id: Optional[int] = None, searc
         if room_id:
             params.append(room_id)
             where.append(f"s.room_id = ${len(params)}")
+        if role:
+            params.append(role)
+            where.append(f"s.class_role = ${len(params)}")
         if search:
             params.append(f"%{search}%")
             where.append(f"(s.first_name ILIKE ${len(params)} OR s.last_name ILIKE ${len(params)} OR s.student_id ILIKE ${len(params)})")
@@ -97,7 +152,8 @@ async def list_students(pool: asyncpg.Pool, room_id: Optional[int] = None, searc
             SELECT
                 s.id, s.room_id, s.student_id, s.student_no,
                 s.prefix, s.first_name, s.last_name, s.nickname,
-                s.class_role, s.staff_level, s.is_admin, s.permissions, s.status,
+                s.class_role, s.staff_level, s.is_admin, s.permissions,
+                s.responsibilities, s.status,
                 r.room_code, r.room_name, r.level
             FROM students s
             JOIN rooms r ON r.id = s.room_id
@@ -132,21 +188,23 @@ def _student_to_dict(row) -> dict:
         "staff_level": row.get("staff_level"),
         "is_admin": row["is_admin"],
         "permissions": perms,
+        "responsibilities": _parse_json_list(row.get("responsibilities")),
         "status": row["status"],
     }
 
 
-async def update_student(pool: asyncpg.Pool, student_id: int, *, class_role: Optional[str] = None, status: Optional[str] = None, is_admin: Optional[bool] = None, staff_level: Optional[str] = None, actor_user_id: Optional[int] = None, client_source: str = "web") -> None:
+async def update_student(pool: asyncpg.Pool, student_id: int, *, class_role: Optional[str] = None, status: Optional[str] = None, is_admin: Optional[bool] = None, staff_level: Optional[str] = None, responsibilities: Optional[list] = None, actor_user_id: Optional[int] = None, client_source: str = "web") -> None:
     """
     แก้ไขนักเรียน/สมาชิก
     - เมื่อเปลี่ยน class_role → permissions + is_admin จะถูก recompute จาก config/roles.json เสมอ
+    - responsibilities (หน้าที่): เฉพาะ council_member / level_vice_president; role อื่นถูกบังคับให้ว่าง
     - ครูทั่วไป (teacher) ต้องมี staff_level (ระดับชั้นที่ดูแล) — ถ้าไม่ระบุ ดึงจากระดับชั้นของห้อง
     - บันทึก audit_logs ใน transaction เดียวกัน
     """
     async with pool.acquire() as conn:
         async with conn.transaction():
             current = await conn.fetchrow(
-                "SELECT id, room_id, class_role, status, is_admin, staff_level FROM students WHERE id = $1 AND deleted_at IS NULL",
+                "SELECT id, room_id, class_role, status, is_admin, staff_level, responsibilities FROM students WHERE id = $1 AND deleted_at IS NULL",
                 student_id
             )
             if not current:
@@ -156,6 +214,7 @@ async def update_student(pool: asyncpg.Pool, student_id: int, *, class_role: Opt
             new_status = status if status is not None else current["status"]
             new_admin = is_admin if is_admin is not None else current["is_admin"]
             new_staff_level = staff_level if staff_level is not None else current["staff_level"]
+            old_resp = _parse_json_list(current["responsibilities"])
 
             # เมื่อ role เปลี่ยน → permissions + is_admin ตาม config/roles.json เสมอ
             role_perms = get_role_permissions(new_role)
@@ -168,15 +227,24 @@ async def update_student(pool: asyncpg.Pool, student_id: int, *, class_role: Opt
                     "SELECT level FROM rooms WHERE id = $1", current["room_id"]
                 )
 
+            # responsibilities: ถ้าส่งมา → validate + ใช้ค่าใหม่
+            # ถ้าไม่ส่งมา แต่ role เปลี่ยนไปเป็น role ที่ไม่มีหน้าที่ → เคลียร์ให้ว่าง
+            if responsibilities is not None:
+                new_resp = _validate_responsibilities(responsibilities, new_role)
+            elif new_role not in RESPONSIBLE_ROLES:
+                new_resp = []
+            else:
+                new_resp = old_resp
+
             await conn.execute(
                 """
                 UPDATE students
                 SET class_role = $1, status = $2, is_admin = $3, staff_level = $4,
-                    permissions = $5, updated_at = NOW()
-                WHERE id = $6
+                    permissions = $5, responsibilities = $6, updated_at = NOW()
+                WHERE id = $7
                 """,
                 new_role, new_status, new_admin, new_staff_level,
-                json.dumps(role_perms), student_id
+                json.dumps(role_perms), json.dumps(new_resp), student_id
             )
 
             # 🛡️ Audit log (กฎ: ทุก UPDATE ต้องบันทึกใน transaction เดียวกัน)
@@ -194,14 +262,161 @@ async def update_student(pool: asyncpg.Pool, student_id: int, *, class_role: Opt
                     "status": current["status"],
                     "is_admin": current["is_admin"],
                     "staff_level": current["staff_level"],
+                    "responsibilities": old_resp,
                 },
                 new_values={
                     "class_role": new_role,
                     "status": new_status,
                     "is_admin": new_admin,
                     "staff_level": new_staff_level,
+                    "responsibilities": new_resp,
                 },
             )
+
+
+# ============================================================
+# ➕ เพิ่มผู้ใช้งานแบบ Manual (User Management)
+# ============================================================
+async def create_student(
+    pool: asyncpg.Pool,
+    *,
+    username: str,
+    password: Optional[str] = None,
+    prefix: Optional[str] = None,
+    first_name: Optional[str] = None,
+    last_name: Optional[str] = None,
+    nickname: Optional[str] = None,
+    student_id: Optional[str] = None,
+    student_no: Optional[int] = None,
+    room_code: Optional[str] = None,
+    class_role: str = "student",
+    responsibilities: Optional[list] = None,
+    actor_user_id: Optional[int] = None,
+    client_source: str = "web",
+) -> int:
+    """
+    เพิ่มผู้ใช้งานใหม่ (หน้า User Management — "เพิ่มผู้ใช้งาน") สำหรับกรณี import Excel ไม่ครบ
+    - username ไม่ซ้ำ (ถ้าซ้ำ → ConflictError) — manual add ไม่ใช่ re-import
+    - room_code ต้องมีอยู่แล้วในระบบ (เลือกจาก dropdown หน้า UI) — ครู/ประธานระดับ/ผู้ช่วยต้องระบุห้อง
+    - responsibilities: เฉพาะ council_member / level_vice_president
+    - ถ้าไม่ระบุ password → สุ่มรหัสชั่วคราว + บังคับเปลี่ยนครั้งแรก (must_change_password)
+    - permissions/is_admin ตาม config/roles.json; บันทึก audit CREATE_STUDENT
+    """
+    from core.logger import AuditLogger
+    from core.rbac import get_role_info
+    import secrets
+
+    username = (username or "").strip()
+    if not username:
+        raise ValidationError("ต้องระบุ username (รหัสนักเรียน/ผู้ใช้งาน)")
+    student_id = (student_id or username).strip()
+
+    # กัน role แปลกปลอม (ต้องตรงกับ config/roles.json)
+    if not get_role_info(class_role).get("label"):
+        raise ValidationError(f"ตำแหน่งไม่ถูกต้อง: {class_role}")
+
+    # permissions + is_admin ตามตำแหน่ง
+    role_perms = get_role_permissions(class_role)
+    role_is_admin = get_role_is_admin(class_role)
+    # responsibilities: validate ก่อน (role ไม่รองรับ + ค่าไม่ถูกต้อง → error)
+    new_resp = _validate_responsibilities(responsibilities, class_role)
+
+    hashed = auth_service.hash_password(password) if password else auth_service.hash_password(secrets.token_urlsafe(12))
+    must_change = bool(not password)
+
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            # 1. username ต้องไม่ซ้ำ
+            dup_user = await conn.fetchval(
+                "SELECT id FROM users WHERE username = $1 AND deleted_at IS NULL",
+                username
+            )
+            if dup_user:
+                raise ConflictError(f"username '{username}' มีผู้ใช้อยู่แล้วในระบบ")
+
+            # 2. room ตาม room_code (ต้องมีอยู่แล้ว — เลือกจาก dropdown)
+            room = None
+            if room_code:
+                room = await conn.fetchrow(
+                    "SELECT id, level, room_code FROM rooms WHERE room_code = $1 AND deleted_at IS NULL",
+                    room_code
+                )
+                if not room:
+                    raise NotFoundError(f"ไม่พบห้องเรียน {room_code}")
+
+            # 3. สร้าง user
+            full_name = f"{prefix or ''} {first_name or ''} {last_name or ''}".strip()
+            user_id = await conn.fetchval(
+                """
+                INSERT INTO users (username, password_hash, full_name, must_change_password)
+                VALUES ($1, $2, $3, $4)
+                RETURNING id
+                """,
+                username, hashed, full_name or None, must_change
+            )
+
+            # 4. ตรวจ student เดิมในห้องนั้น (student_id ซ้ำกันในห้อง) → Conflict
+            room_id = room["id"] if room else None
+            if room_id is not None:
+                dup_student = await conn.fetchval(
+                    """
+                    SELECT id FROM students
+                    WHERE room_id = $1 AND student_id = $2 AND deleted_at IS NULL
+                    """,
+                    room_id, student_id
+                )
+            else:
+                dup_student = await conn.fetchval(
+                    """
+                    SELECT id FROM students
+                    WHERE room_id IS NULL AND student_id = $1 AND deleted_at IS NULL
+                    """,
+                    student_id
+                )
+            if dup_student:
+                raise ConflictError(f"มีนักเรียนรหัส {student_id} ในระบบนี้อยู่แล้ว")
+
+            # 5. staff_level (ครูทั่วไป = ระดับชั้นของห้อง)
+            staff_level = room["level"] if class_role == "teacher" and room else None
+
+            # 6. สร้าง student
+            student_row_id = await conn.fetchval(
+                """
+                INSERT INTO students
+                    (room_id, user_id, student_id, student_no,
+                     prefix, first_name, last_name, nickname,
+                     class_role, staff_level, is_admin, permissions, responsibilities)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+                RETURNING id
+                """,
+                room_id, user_id, student_id, student_no,
+                prefix, first_name, last_name, nickname,
+                class_role, staff_level, role_is_admin,
+                json.dumps(role_perms), json.dumps(new_resp)
+            )
+
+            # 🛡️ Audit log (ทุก create ต้องบันทึกใน transaction เดียวกัน)
+            await AuditLogger("student_service").log(
+                conn=conn,
+                action="CREATE_STUDENT",
+                actor_identifier=str(actor_user_id) if actor_user_id else "system",
+                client_source=client_source,
+                user_id=actor_user_id,
+                entity_type="student",
+                entity_id=student_row_id,
+                new_values={
+                    "username": username,
+                    "student_id": student_id,
+                    "room_code": room_code,
+                    "class_role": class_role,
+                    "staff_level": staff_level,
+                    "responsibilities": new_resp,
+                    "must_change_password": must_change,
+                },
+                endpoint_or_command="POST /students",
+            )
+
+            return student_row_id
 
 
 # ============================================================
