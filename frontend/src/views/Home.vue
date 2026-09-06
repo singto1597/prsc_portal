@@ -70,7 +70,8 @@ const roleLine = computed(() => {
   return roleLabel.value;
 });
 const avatarChar = computed(() => {
-  const n = displayName.value;
+  // ตัวแรกของชื่อจริง (first_name) — ไม่เอาคำนำหน้า/ชื่อเล่น
+  const n = authStore.user?.first_name || displayName.value;
   return n ? n.charAt(0).toUpperCase() : 'ส';
 });
 

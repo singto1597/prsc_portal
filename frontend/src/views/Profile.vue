@@ -30,7 +30,8 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 const avatarChar = computed(() => {
-  const name = profile.value?.nickname || profile.value?.first_name || '';
+  // ตัวแรกของชื่อจริง (first_name) — ไม่เอาคำนำหน้า (prefix)/ชื่อเล่น (nickname)
+  const name = profile.value?.first_name || profile.value?.username || '';
   return name ? name.charAt(0).toUpperCase() : 'ส';
 });
 

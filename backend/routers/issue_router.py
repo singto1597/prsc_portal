@@ -65,6 +65,7 @@ async def list_issues(
     category: str | None = Query(None),
     main_category: str | None = Query(None, description="กรองตามหมวดหลัก: suggestion/wellbeing/report"),
     level: str | None = Query(None, description="กรองตามระดับ: room/level/council"),
+    levels: str | None = Query(None, description="ระดับที่อยากดู (comma เช่น room,level) — เฉพาะ received=true, มองลงตามพีระมิด ≤ ระดับตัวเอง"),
     q: str | None = Query(None, max_length=100, description="ค้นหาแบบคำต่อคำ: ชื่อเรื่อง/คำอธิบาย/ห้อง/ชื่อคน"),
     sort: str = Query("desc", pattern="^(asc|desc)$", description="เรียงตามวันที่สร้าง: asc=เก่าไปใหม่, desc=ใหม่ไปเก่า"),
     limit: int = Query(100, ge=1, le=500),
@@ -76,10 +77,14 @@ async def list_issues(
     uid = _ensure_user(user_ctx)
     if main_category and main_category not in all_main_category_codes():
         raise HTTPException(status_code=400, detail=f"หมวดหลักไม่ถูกต้อง: {main_category}")
+    if levels:
+        invalid = [lv for lv in (s.strip() for s in levels.split(",")) if lv and lv not in issue_service.LEVEL_ORDER]
+        if invalid:
+            raise HTTPException(status_code=400, detail=f"ระดับไม่ถูกต้อง: {', '.join(invalid)}")
     result = await issue_service.list_issues(
         pool, uid, only_mine=mine, received=received,
         status_filter=status, category=category, main_category=main_category,
-        level_filter=level, q=q, sort=sort, limit=limit, offset=offset,
+        level_filter=level, levels=levels, q=q, sort=sort, limit=limit, offset=offset,
     )
     # 🛡️ Audit: ดึงรายการเรื่อง (best-effort)
     await audit_service.log_read(pool, uid, "READ_ISSUES", "issue", endpoint="GET /api/issues")

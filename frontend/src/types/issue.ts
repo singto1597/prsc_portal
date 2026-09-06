@@ -63,6 +63,7 @@ export interface IssueComment {
   user_id: number | null
   commenter_name: string | null
   commenter_room: string | null
+  commenter_first_name?: string | null // ชื่อจริง (avatar ใช้ตัวแรกของชื่อ) — fallback commenter_name
   body: string
   created_at: string
   updated_at: string | null
@@ -216,6 +217,38 @@ export const LEVEL_LABELS: Record<IssueLevel, string> = {
   room: 'หัวหน้าห้อง / รองฝ่าย',
   level: 'ประธานระดับ',
   council: 'สภานักเรียน',
+}
+
+// ลำดับพีระมิด (room → level → council) — ใช้เทียบ rank ระดับสูงมองลงได้
+export const LEVEL_ORDER: IssueLevel[] = ['room', 'level', 'council']
+
+// บทบาท → ระดับในพีระมิด (mirror backend ROLE_LEVEL + school-wide roles)
+// - ครูทั่วไป (teacher) ไม่ได้ map → ไม่มีระดับพีระมิด (จัดการแยกฝั่ง backend ตาม staff_level)
+// - admin / ครูสภา / ประธานสภา / สภานักเรียน = ยอดพีระมิด (council)
+export const ROLE_TO_LEVEL: Record<string, IssueLevel> = {
+  class_president: 'room',
+  vice_academic: 'room',
+  vice_discipline: 'room',
+  vice_activity: 'room',
+  vice_reception: 'room',
+  level_president: 'level',
+  level_vice_president: 'level',
+  council_member: 'council',
+  council_president: 'council',
+  teacher_council: 'council',
+  admin: 'council',
+}
+
+// ระดับในพีระมิดของผู้ใช้ (สูงสุดจากทุก role) หรือ '' ถ้าไม่มีระดับ (เช่น นักเรียน/ครูทั่วไป)
+export function userPyramidLevel(roles: { role: string | null }[]): IssueLevel | '' {
+  let best: IssueLevel | '' = ''
+  for (const r of roles) {
+    if (!r.role) continue
+    const lv = ROLE_TO_LEVEL[r.role]
+    if (!lv) continue
+    if (!best || LEVEL_ORDER.indexOf(lv) > LEVEL_ORDER.indexOf(best)) best = lv
+  }
+  return best
 }
 
 // รูปแบบที่ผู้แจ้งขอ (PIRI Boards) — ตรงกับ backend requested_destination

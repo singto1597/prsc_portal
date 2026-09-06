@@ -25,6 +25,7 @@ class UserRoleInfo(BaseModel):
     room_id: Optional[int] = None
     room_name: Optional[str] = None
     student_no: Optional[int] = None
+    first_name: Optional[str] = None    # ชื่อจริง (avatar ใช้ตัวแรกของชื่อ)
     level: Optional[str] = None         # ระดับชั้น เช่น ม.4
     staff_level: Optional[str] = None   # (ครูทั่วไป) ระดับชั้นที่รับผิดชอบ เช่น 'ม.4'
     is_admin: bool = False              # role นี้เป็น admin หรือไม่
@@ -36,6 +37,7 @@ class UserOut(BaseModel):
     id: int
     username: str
     full_name: Optional[str] = None
+    first_name: Optional[str] = None    # ชื่อจริงตัวแรกจาก roles (fallback None) — avatar ใช้ตัวแรกของชื่อ
     is_admin: bool = False
     permissions: List[str] = []
     must_change_password: bool = False  # บัญชี seed: บังคับเปลี่ยนรหัสครั้งแรก

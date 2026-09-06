@@ -733,7 +733,7 @@ function countdownLabel(days: number): string {
               <div
                 class="w-8 h-8 rounded-full bg-stone-100 text-stone-700 flex items-center justify-center font-bold text-sm shrink-0"
               >
-                {{ (c.commenter_name || '?').charAt(0) }}
+                {{ (c.commenter_first_name || c.commenter_name || '?').charAt(0) }}
               </div>
               <div class="min-w-0">
                 <p class="text-sm font-medium text-stone-800 truncate">

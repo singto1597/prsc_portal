@@ -43,6 +43,7 @@ export async function listIssues(params: {
   category?: string
   main_category?: string
   level?: string
+  levels?: string
   q?: string
   sort?: IssueSort
   limit?: number
