@@ -124,12 +124,16 @@ async def create_room(pool: asyncpg.Pool, room_code: str, room_name: str, level:
             return room_id
 
 
-async def list_students(pool: asyncpg.Pool, room_id: Optional[int] = None, search: Optional[str] = None, level: Optional[str] = None, role: Optional[str] = None, limit: int = 500) -> list:
+async def list_students(pool: asyncpg.Pool, room_id: Optional[int] = None, search: Optional[str] = None, level: Optional[str] = None, role: Optional[str] = None, limit: Optional[int] = None) -> list:
     """
     รายชื่อนักเรียน/สมาชิก
     - level: กรองเฉพาะระดับชั้น (เช่น 'ม.4') — ใช้กับ ครูทั่วไป/ประธานระดับ/ผู้ช่วย ที่เห็นได้แค่ระดับตัวเอง
     - role: กรองเฉพาะตำแหน่ง (เช่น 'council_member') — ใช้กับหน้า User Management (default = role ผู้จัดการ)
     - room_id: กรองเฉพาะห้อง
+    - limit: ถ้าระบุ → ตัดจำนวนสูงสุด (ใช้กับกรณีที่ต้องการจำกัดจริงๆ)
+      ⚠️ default = None (ไม่ตัด) — หน้า User Management กรองเอง client-side (group/search)
+      ต้องได้รายชื่อครบทั้งชุดในขอบเขตตัวเอง เดิม hardcode LIMIT 500 → หน้าเห็นแค่ 500 คนแรก
+      (เรียงตาม room_code = ห้อง ม.1 ก่อน) ทั้งที่ทั้งโรงเรียนเกิน 500 คน
     """
     async with pool.acquire() as conn:
         where = ["s.deleted_at IS NULL"]
@@ -147,7 +151,11 @@ async def list_students(pool: asyncpg.Pool, room_id: Optional[int] = None, searc
             params.append(f"%{search}%")
             where.append(f"(s.first_name ILIKE ${len(params)} OR s.last_name ILIKE ${len(params)} OR s.student_id ILIKE ${len(params)})")
 
-        params.append(limit)
+        limit_clause = ""
+        if limit is not None:
+            params.append(limit)
+            limit_clause = f"LIMIT ${len(params)}"
+
         sql = f"""
             SELECT
                 s.id, s.room_id, s.student_id, s.student_no,
@@ -159,7 +167,7 @@ async def list_students(pool: asyncpg.Pool, room_id: Optional[int] = None, searc
             LEFT JOIN rooms r ON r.id = s.room_id
             WHERE {' AND '.join(where)}
             ORDER BY r.room_code, s.student_no
-            LIMIT ${len(params)}
+            {limit_clause}
         """
         rows = await conn.fetch(sql, *params)
     return [_student_to_dict(r) for r in rows]

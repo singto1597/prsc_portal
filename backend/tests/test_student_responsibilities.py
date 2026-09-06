@@ -343,3 +343,82 @@ async def test_grade_scoped_manager_never_sees_roomless(client, manage_world, db
     assert body, "ประธานระดับ ม.4 ควรเห็นสมาชิกชั้น ม.4 อย่างน้อย 1 คน"
     assert all(s["room_id"] is not None for s in body)
     assert {s["room_code"] for s in body} == {w["rooms"]["ม.4"]["room_code"]}
+
+
+# ============================================================
+# 🚫 ไม่ตัด LIMIT 500 — ผู้จัดการ school-wide ต้องเห็นสมาชิกทั้งโรงเรียนเกิน 500 คน
+# (Bug จริงตอน production: list_students hardcode LIMIT 500 + ORDER BY room_code
+#  → 500 คนแรกที่ได้ = ห้อง ม.1 ทั้งหมด → ครู/Admin (room-less) เห็นแค่ "นักเรียน ม.1 จำนวน 500")
+# Fix: limit default = None (ไม่ตัด) — หน้า User Management กรอง group/search client-side ต้องได้ทั้งชุด
+# ============================================================
+@pytest.mark.asyncio
+async def test_school_wide_roster_over_500_not_truncated(client, db_pool):
+    """ผู้จัดการ school-wide (room-less) เห็นสมาชิกเกิน 500 คนครบทุกคนทุกชั้น
+    — รวมคนห้อง ม.2 ที่อยู่นอก 500 คนแรก (เคยถูก LIMIT 500 ตัดหาย = เห็นแค่ ม.1)"""
+    actor = await _make_roomless(db_pool, f"boss{random.randint(1000, 9999)}", "ประธานสภา ทดสอบ", "council_president", 1)
+
+    # โครงสร้างห้อง: ม.1 หลายห้อง (520 คน) เรียงก่อนตาม room_code + ม.2 หนึ่งห้อง (30 คน) คั่นท้าย
+    # ถ้ายังตัด LIMIT 500 → 500 คนแรก = ม.1 ล้วน → ห้อง ม.2 หายไปทั้งห้อง
+    specs = [
+        ("M1-01", "ม.1", 65), ("M1-02", "ม.1", 65), ("M1-03", "ม.1", 65), ("M1-04", "ม.1", 65),
+        ("M1-05", "ม.1", 65), ("M1-06", "ม.1", 65), ("M1-07", "ม.1", 65), ("M1-08", "ม.1", 65),
+        ("M2-01", "ม.2", 30),
+    ]
+    m2_code = "M2-01"
+    total = sum(n for _, _, n in specs)
+
+    async with db_pool.acquire() as conn:
+        async with conn.transaction():
+            # users (ฝาก raw — password ไม่ต้อง hash เพราะไม่มีการ login ในเทสต์)
+            await conn.execute(
+                "INSERT INTO users (username, password_hash, full_name) "
+                "SELECT 'bulk' || g, 'x', 'คนที่' || g FROM generate_series(1, $1) g",
+                total
+            )
+            user_ids = [r["id"] for r in await conn.fetch(
+                "SELECT id FROM users WHERE username LIKE 'bulk%' ORDER BY id"
+            )]
+            assert len(user_ids) == total
+
+            # rooms + แบ่ง user ใส่ห้องตาม spec
+            room_slots = []  # (room_id, count) เรียงตามลำดับที่จะถูก ORDER BY room_code
+            slot_of_user = []  # room_id ต่อ user_index
+            for code, level, n in specs:
+                rid = await conn.fetchval(
+                    "INSERT INTO rooms (room_code, room_name, level) VALUES ($1, $2, $3) RETURNING id",
+                    code, f"ห้อง {code}", level
+                )
+                room_slots.extend([rid] * n)
+            for idx, rid in enumerate(room_slots):
+                slot_of_user.append(rid)
+
+            await conn.executemany(
+                "INSERT INTO students (room_id, user_id, student_id, student_no, first_name, class_role, status) "
+                "VALUES ($1, $2, $3, $4, $5, 'student', 'active')",
+                [
+                    (slot_of_user[i], uid, f"S{i + 1:04d}", (i % 50) + 1, f"คน{i + 1}")
+                    for i, uid in enumerate(user_ids)
+                ]
+            )
+
+    # จำนวนจริงใน DB (550 bulk + actor + บัญชี seed เริ่มต้นของ conftest) — ห้ามตัดทิ้งเหลือ 500
+    async with db_pool.acquire() as conn:
+        expected = await conn.fetchval(
+            "SELECT count(*) FROM students WHERE deleted_at IS NULL"
+        )
+    assert expected > 500, "โครงเทสต์ต้องมีสมาชิกเกิน 500 คนจริง ๆ (ไม่เช่นนั้นวัดผล LIMIT ไม่ได้)"
+
+    res = client.get("/api/students", headers={"Authorization": f"Bearer {actor['token']}"})
+    assert res.status_code == 200, res.text
+    body = res.json()
+
+    # ต้องได้ครบทั้งชุด (expected) — ไม่ถูกตัดที่ 500 (ขอ check 500 คนแรกที่เป็น ม.1)
+    assert len(body) == expected, (
+        f"รายชื่อถูกตัดเหลือ {len(body)}/{expected} คน → LIMIT ยังตัดอยู่ "
+        f"(โรงเรียนเกิน 500 คน แล้ว teacher/Admin เห็นแค่ 500 คนแรก)"
+    )
+    # และต้องเห็นนักเรียนห้อง ม.2 (คนที่เกิน 500 แรก) — ไม่งั้น = เห็นแค่ ม.1 เหมือน bug เดิม
+    codes = {s["room_code"] for s in body}
+    assert m2_code in codes, (
+        f"ไม่เห็นสมาชิกห้อง {m2_code} (เลย 500 คนแรก) → ยังถูกตัดเหลือแค่ห้อง ม.1: {sorted(codes)}"
+    )
