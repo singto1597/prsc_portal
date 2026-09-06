@@ -560,3 +560,17 @@
   - ตรวจว่า container อยู่ net เดียวกับ `test_db` + `DATABASE_URL` ถูกต้องก่อน
 - **กฎ: ติดตั้ง pytest ไม่ได้เพราะ network → อย่ารอ pip; หา container/image ที่มี deps ครบแล้ว mount backend เข้าไปแทน (network แค่ตอน first-install เท่านั้น)**
 - **Date Added:** 2026-09-01
+
+### 🛠️ `npm run format` (prettier --write src/) — reformat ทั้งโปรเจค + ทำลาย inline event handler แบบหลาย statement
+- **Context/Problem:** รัน `npm run format` เพื่อจัด format ไฟล์ feature ที่ตัวเองแก้ → prettier เขียนทับ `src/` ทั้งหมด → reformat ~44 ไฟล์ที่ไม่ได้แตะ (diff ล้นจน review ไม่ไหว) และที่แย่กว่านั้น **พัง build** เงียบ ๆ
+- **Root Cause:** repo นี้ยังไม่ prettier-clean (มีการจัดมือ ไม่ตรง rule ของ prettier) → prettier จึง "แก้" ไฟล์อื่นทั้งโปรเจค; และ prettier แปลง inline event handler แบบหลาย statement เช่น `@click="isMoreOpen = false; router.push({ name: 'profile' })"` (ปกติเขียน ;-คั่นบรรทัดเดียว ซึ่ง Vue รองรับ) ให้กลายเป็นแบบหลายบรรทัดโดย**ตัด `;` ทิ้ง**:
+  ```html
+  @click="
+    isMoreOpen = false
+    router.push({ name: 'profile' })
+  "
+  ```
+  Vue template compiler แยก statement ไม่ออก → `RolldownError: ... .vue:NNN:NN ... Unexpected token, expected ','` (error ชี้ไปที่บรรทัดของ attribute ได้พอดี)
+- **Correct Pattern/Solution:** format เฉพาะไฟล์ที่ตัวเองจะ commit: `npx prettier --write <files>` (ไม่ใช่ทั้ง `src/`); ถ้าโดน reformat collateral ไปแล้ว → `git restore` ไฟล์ที่ไม่เกี่ยวกับ feature ทิ้ง; ซ่อม handler ที่ถูกทำลายโดยใส่ `;` คั่นกลับ (หรือยุบเป็นบรรทัดเดียว) — `:class="..."`/`:style="..."` ที่เป็น multiline ternary ไม่พัง (เป็น expression เดียว จึงไม่ต้องซ่อม); ก่อน build ให้ grep จับ multiline directive ก่อนได้: `grep -rnE '^\s*@(click|submit|change|keyup|input)\.?[a-z.]*="\s*$' src`
+- **กฎ: อย่ารัน prettier ทับทั้ง `src/` ใน repo ที่ยังไม่ prettier-clean; event handler แบบหลาย statement ใน Vue ต้องมี `;` คั่นเสมอ (ถ้าจะ format ใช้ `prettier --write` เฉพาะไฟล์)**
+- **Date Added:** 2026-09-06

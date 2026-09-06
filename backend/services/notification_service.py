@@ -153,7 +153,7 @@ async def _level_president_ids(conn, level: str) -> List[int]:
         """
         SELECT s.user_id FROM students s
         JOIN rooms r ON r.id = s.room_id
-        WHERE s.class_role = 'level_president'
+        WHERE s.class_role IN ('level_president', 'level_vice_president')
           AND s.deleted_at IS NULL AND s.status = 'active'
           AND r.level = $1 AND r.deleted_at IS NULL
         """,

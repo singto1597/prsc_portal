@@ -19,6 +19,7 @@ _ROLE_DEPARTMENT = {
     "vice_activity": "รองกิจกรรม",
     "vice_reception": "รองปฏิคม",
     "level_president": "ประธานระดับ",
+    "level_vice_president": "ผู้ช่วยหัวหน้าระดับ",
     "council_member": "สภานักเรียน",
     "council_president": "ประธานสภา",
     "teacher_council": "ครูสภา",

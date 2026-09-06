@@ -174,6 +174,35 @@ export function subcategoryLabel(main_category: MainCategory, category: string):
   return MAIN_CATEGORIES[main_category]?.subcategories[category] ?? category
 }
 
+// หมวดย่อยทั้ง 9 เป็น list แบน (value + label + หมวดหลัก) — ใช้เลือก "หน้าที่" (responsibilities)
+// ที่หน้า User Management / กรองเรื่องตามหน้าที่ (เหมือน backend core.categories.all_subcategory_codes())
+export interface CategoryOption {
+  value: string
+  label: string
+  main: MainCategory
+}
+
+export const CATEGORY_OPTIONS: CategoryOption[] = (
+  Object.keys(MAIN_CATEGORIES) as MainCategory[]
+).flatMap((mc) =>
+  Object.entries(MAIN_CATEGORIES[mc].subcategories).map(([value, label]) => ({
+    value,
+    label,
+    main: mc,
+  })),
+)
+
+// role ที่ถือ "หน้าที่" ได้ (ตรงกับ backend student_service.RESPONSIBLE_ROLES)
+export const RESPONSIBLE_ROLES = ['council_member', 'level_vice_president']
+
+export function categoryLabel(code: string): string {
+  return CATEGORY_OPTIONS.find((c) => c.value === code)?.label ?? code
+}
+
+export function categoryMain(code: string): MainCategory | '' {
+  return CATEGORY_OPTIONS.find((c) => c.value === code)?.main ?? ''
+}
+
 export const STATUS_LABELS: Record<string, string> = {
   pending: 'รอรับเรื่อง',
   in_progress: 'กำลังดำเนินการ',
