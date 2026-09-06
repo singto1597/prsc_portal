@@ -156,7 +156,7 @@ async def list_students(pool: asyncpg.Pool, room_id: Optional[int] = None, searc
                 s.responsibilities, s.status,
                 r.room_code, r.room_name, r.level
             FROM students s
-            JOIN rooms r ON r.id = s.room_id
+            LEFT JOIN rooms r ON r.id = s.room_id
             WHERE {' AND '.join(where)}
             ORDER BY r.room_code, s.student_no
             LIMIT ${len(params)}

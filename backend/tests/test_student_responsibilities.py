@@ -292,3 +292,54 @@ async def test_council_member_cannot_use_user_management(client, manage_world):
     w = manage_world
     res = client.get("/api/students", headers={"Authorization": f"Bearer {w['council_member']['token']}"})
     assert res.status_code == 403
+
+
+# ============================================================
+# 👑 ตำแหน่งพิเศษที่ไม่ได้สังกัดห้อง (room_id NULL) — ต้องเห็น/จัดการได้ในหน้า จัดการสมาชิก
+# (admin / ครูสภา / ประธานสภา / สภานักเรียน ถูกสร้างแบบไม่ผูกห้อง เหมือน seed_users)
+# Fix: เดิม list_students ใช้ INNER JOIN rooms → ตัดสมาชิก room-less ทิ้ง → เปลี่ยนเป็น LEFT JOIN
+# ============================================================
+async def _make_roomless(db_pool, username: str, full_name: str, role: str, no: int) -> dict:
+    """สร้าง user + student แบบ room-less (room_id NULL) ตาม pattern seed_users"""
+    uid = await auth_service.register_user(
+        db_pool, username, "1234", full_name, username, None, no, role
+    )
+    return {"user_id": uid, "token": auth_service.create_access_token(uid)}
+
+
+@pytest.mark.asyncio
+async def test_school_wide_sees_roomless_special_members(client, db_pool):
+    """ประธานสภา (room-less, is_admin) เห็นสมาชิกตำแหน่งพิเศษ room-less ทั้งหมดใน GET /students
+    — แก้ bug: หน้า จัดการสมาชิก กลุ่ม 'สภานักเรียน' ว่าง เพราะ INNER JOIN ตัดคนที่ไม่ได้สังกัดห้องทิ้ง"""
+    actor = await _make_roomless(db_pool, f"act{random.randint(1000, 9999)}", "ประธานสภา ทดสอบ", "council_president", 1)
+    await _make_roomless(db_pool, f"adm{random.randint(1000, 9999)}", "แอดมิน ทดสอบ", "admin", 2)
+    await _make_roomless(db_pool, f"tch{random.randint(1000, 9999)}", "ครูสภา ทดสอบ", "teacher_council", 3)
+    await _make_roomless(db_pool, f"mem{random.randint(1000, 9999)}", "สภานักเรียน ทดสอบ", "council_member", 4)
+
+    res = client.get("/api/students", headers={"Authorization": f"Bearer {actor['token']}"})
+    assert res.status_code == 200, res.text
+    body = res.json()
+    roles = {s["class_role"] for s in body}
+
+    # ต้องเห็นทุกตำแหน่งพิเศษ room-less (รวมตัวเอง) — ไม่ใช่เห็นแค่คนที่มีห้อง
+    assert {"council_president", "admin", "teacher_council", "council_member"} <= roles, (
+        f"ตำแหน่งพิเศษ room-less หายจากรายการ (กลุ่มสภานักเรียนจะว่าง) → {sorted(roles)}"
+    )
+    # สมาชิกที่เห็นเป็น room-less ล้วน (room_code None) — ยังแสดงผล/แก้ไขได้ตามปกติ
+    assert all(s["room_code"] is None for s in body), body
+
+
+@pytest.mark.asyncio
+async def test_grade_scoped_manager_never_sees_roomless(client, manage_world, db_pool):
+    """ประธานระดับ ม.4 ยังต้องไม่เห็นตำแหน่งพิเศษ room-less (LEFT JOIN ไม่รั่วขอบเขตระดับชั้น)"""
+    w = manage_world
+    # เพิ่มตำแหน่งพิเศษ room-less เข้าระบบ — ควรเห็นเฉพาะผู้จัดการ school-wide เท่านั้น
+    await _make_roomless(db_pool, f"sc{random.randint(1000, 9999)}", "คนสภา ทดสอบ", "council_president", 9)
+
+    res = client.get("/api/students", headers={"Authorization": f"Bearer {w['m4_level']['token']}"})
+    assert res.status_code == 200, res.text
+    body = res.json()
+    # ทุกคนที่ประธานระดับเห็นต้องมีห้อง และเป็นห้องชั้น ม.4 เท่านั้น (ไม่เห็น room-less/คนต่างชั้น)
+    assert body, "ประธานระดับ ม.4 ควรเห็นสมาชิกชั้น ม.4 อย่างน้อย 1 คน"
+    assert all(s["room_id"] is not None for s in body)
+    assert {s["room_code"] for s in body} == {w["rooms"]["ม.4"]["room_code"]}
