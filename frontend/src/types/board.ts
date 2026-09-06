@@ -19,6 +19,7 @@ export interface BoardComment {
   parent_comment_id: number | null
   user_id: number | null
   commenter_name: string | null
+  commenter_first_name?: string | null // ชื่อจริง (avatar ใช้ตัวแรกของชื่อ) — fallback commenter_name
   body: string
   is_edited: boolean
   created_at: string

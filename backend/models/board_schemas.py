@@ -54,6 +54,7 @@ class BoardCommentOut(BaseModel):
     parent_comment_id: Optional[int] = None
     user_id: Optional[int] = None
     commenter_name: Optional[str] = None
+    commenter_first_name: Optional[str] = None  # ชื่อจริง (avatar ใช้ตัวแรกของชื่อ) — fallback commenter_name
     body: str
     is_edited: bool = False
     created_at: datetime

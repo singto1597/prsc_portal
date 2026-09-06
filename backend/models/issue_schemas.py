@@ -141,6 +141,7 @@ class CommentOut(BaseModel):
     user_id: Optional[int] = None          # ให้ frontend เทียบกับ authStore.user.id (เหมือน reporter_id ใน IssueOut)
     commenter_name: Optional[str] = None   # ชื่อจริงเสมอ (แม้เรื่อง anonymous)
     commenter_room: Optional[str] = None
+    commenter_first_name: Optional[str] = None  # ชื่อจริง (avatar ใช้ตัวแรกของชื่อ) — fallback commenter_name
     body: str
     created_at: datetime
     updated_at: Optional[datetime] = None

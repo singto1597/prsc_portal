@@ -8,9 +8,12 @@ import {
   subcategoryLabel,
   STATUS_LABELS,
   LEVEL_LABELS,
+  LEVEL_ORDER,
   DESTINATION_LABELS,
   categoryLabel,
+  userPyramidLevel,
   type Issue,
+  type IssueLevel,
   type MainCategory,
 } from '@/types/issue'
 import { STATUS_BADGE } from '@/constants/status'
@@ -57,12 +60,47 @@ const subcategoryFilter = ref('') // '' = ทุกหมวดย่อย, aca
 // สถานะ "ยังไม่เสร็จ" = pending + in_progress + escalated (ให้ server กรอง — กันหน้าว่างตอน 100 เรื่องแรกเสร็จหมด)
 const NOT_RESOLVED_STATUSES = 'pending,in_progress,escalated'
 
+// 🧭 ระดับที่อยากดู (มองลงตามพีระมิด) — เฉพาะผู้ที่มีระดับ (teacher/student ไม่มี → ซ่อนกล่อง)
+// ระดับตัวเอง = ระดับสูงสุดจาก roles; selectable = ตั้งแต่ระดับตัวเองลงล่าง (room→[room], level→[room,level], council→[room,level,council])
+const myLevel = computed<IssueLevel | ''>(() => userPyramidLevel(authStore.roles))
+const selectableLevels = computed<IssueLevel[]>(() => {
+  if (!myLevel.value) return []
+  return LEVEL_ORDER.slice(0, LEVEL_ORDER.indexOf(myLevel.value) + 1)
+})
+const hasLevelChoice = computed(() => selectableLevels.value.length > 1)
+// ระดับที่ติ๊กอยู่ — default = ระดับตัวเองเท่านั้น (ดูเฉพาะเรื่องระดับตัวเอง เหมือนเดิม)
+const levelSelections = ref<IssueLevel[]>([])
+watch(
+  myLevel,
+  (lv) => {
+    levelSelections.value = lv ? [lv] : []
+  },
+  { immediate: true },
+)
+// ตัวกรองระดับ "ต่างจากค่าเริ่มต้น" → นับเป็น active filter (badge)
+const levelsChanged = computed(() => {
+  if (!hasLevelChoice.value || !myLevel.value) return false
+  const def = [myLevel.value]
+  return (
+    levelSelections.value.length !== def.length ||
+    levelSelections.value.some((x, i) => x !== def[i])
+  )
+})
+function toggleLevel(lv: IssueLevel) {
+  levelSelections.value = levelSelections.value.includes(lv)
+    ? levelSelections.value.filter((x) => x !== lv)
+    : [...levelSelections.value, lv]
+  page.value = 1
+  load()
+}
+
 // จำนวนตัวกรองที่ active (badge บนปุ่ม filter) — ไม่นับ default 'not_resolved' และตัวกรองหน้าที่
 const activeFilters = computed(
   () =>
     (statusFilter.value !== 'not_resolved' ? 1 : 0) +
     (mainCategoryFilter.value ? 1 : 0) +
-    (subcategoryFilter.value ? 1 : 0),
+    (subcategoryFilter.value ? 1 : 0) +
+    (levelsChanged.value ? 1 : 0),
 )
 
 // ⭐ หมวดหน้าที่ที่ฉันรับผิดชอบ (จาก /auth/me) — council_member / level_vice_president เท่านั้น
@@ -205,6 +243,14 @@ async function load() {
   isLoading.value = true
   error.value = ''
   try {
+    // 🧭 ระดับที่อยากดู: เลือกได้เฉพาะระดับ ≤ ระดับตัวเอง (ระดับที่สูงกว่ามองลงดูระดับล่างได้)
+    // ไม่เลือกเลย → ไม่เห็นเรื่องใด (server ไม่มีค่า "none" — default คือระดับตัวเอง)
+    if (hasLevelChoice.value && levelSelections.value.length === 0) {
+      issues.value = []
+      total.value = 0
+      return
+    }
+    const levelsParam = hasLevelChoice.value ? levelSelections.value.join(',') : undefined
     // "not_resolved" = ส่งสถานะที่ยังไม่เสร็จให้ server กรอง (ไม่โหลดทุกสถานะแล้วตัด client)
     const raw = statusFilter.value === 'not_resolved'
     // หมวดที่ใช้กรอง: ปกติ = ตัวกรอง manual; ถ้าเปิด "กรองตามหน้าที่" → ใช้หมวดหน้าที่รวม (comma)
@@ -222,6 +268,7 @@ async function load() {
       status: raw ? NOT_RESOLVED_STATUSES : statusFilter.value || undefined,
       main_category: mainCat,
       category: cat,
+      levels: levelsParam,
       q: q.value.trim() || undefined,
       sort: sort.value,
       limit: pageSize,
@@ -358,6 +405,42 @@ async function load() {
               <option value="cancelled">ถูกยกเลิก</option>
               <option value="rejected">ถูกปัดตก</option>
             </select>
+          </div>
+          <!-- 🧭 ระดับที่อยากดู (ติ๊กได้ — ผู้ระดับสูงมองลงตามพีระมิด; default = ระดับตัวเอง) -->
+          <div v-if="hasLevelChoice">
+            <label class="block text-xs font-semibold text-stone-500 mb-1.5">
+              ระดับที่อยากดู
+            </label>
+            <div class="space-y-1.5">
+              <label
+                v-for="lv in selectableLevels"
+                :key="lv"
+                class="flex cursor-pointer select-none items-center gap-2 text-sm text-stone-700"
+              >
+                <input
+                  type="checkbox"
+                  :checked="levelSelections.includes(lv)"
+                  @change="toggleLevel(lv)"
+                  class="h-4 w-4 rounded border-stone-300 text-[#B91C1C] accent-[#B91C1C]"
+                />
+                <span>{{ LEVEL_LABELS[lv] }}</span>
+                <span
+                  v-if="lv === myLevel"
+                  class="rounded-full bg-[#B91C1C]/10 px-1.5 py-px text-[10px] font-semibold text-[#B91C1C]"
+                >
+                  ระดับฉัน
+                </span>
+              </label>
+            </div>
+            <p
+              v-if="levelSelections.length === 0"
+              class="mt-1.5 text-[11px] text-stone-400"
+            >
+              ยังไม่เลือกระดับ → จะไม่เห็นเรื่องใด (ติ๊กอย่างน้อย 1 ระดับเพื่อดู)
+            </p>
+            <p v-else class="mt-1.5 text-[11px] text-stone-400">
+              ระดับที่สูงกว่ามองลงดูระดับล่างได้ (ตามพีระมิด)
+            </p>
           </div>
         </div>
       </template>

@@ -39,9 +39,9 @@ onBeforeUnmount(() => {
 
 const displayName = computed(() => authStore.displayName)
 
-// ตัวอักษรตัวแรกของชื่อ → avatar
+// ตัวอักษรตัวแรกของชื่อจริง (first_name) → avatar — ไม่เอาคำนำหน้า/ชื่อเล่น
 const avatarChar = computed(() => {
-  const name = authStore.user?.full_name || authStore.displayName || ''
+  const name = authStore.user?.first_name || authStore.displayName || ''
   return name ? name.charAt(0).toUpperCase() : 'ส'
 })
 

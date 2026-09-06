@@ -132,7 +132,7 @@ async function handleHide() {
       <div
         class="w-8 h-8 rounded-full bg-[#B91C1C]/10 text-[#B91C1C] flex items-center justify-center font-bold text-sm shrink-0"
       >
-        {{ (comment.commenter_name || '?').charAt(0) }}
+        {{ (comment.commenter_first_name || comment.commenter_name || '?').charAt(0) }}
       </div>
       <div class="min-w-0 flex-1">
         <div class="flex items-center gap-2 flex-wrap">

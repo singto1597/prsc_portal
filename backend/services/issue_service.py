@@ -878,6 +878,7 @@ async def list_issues(
     category: Optional[str] = None,
     main_category: Optional[str] = None,
     level_filter: Optional[str] = None,
+    levels: Optional[str] = None,
     q: Optional[str] = None,
     sort: str = "desc",
     limit: int = 100,
@@ -886,11 +887,14 @@ async def list_issues(
     """
     รายการปัญหา — filter visibility ตามระดับผู้ใช้ + ค้นหา + แบ่งหน้า
 
-    received=True: "เรื่องที่รับ / ระดับฉัน" — EXACT LEVEL MATCH เฉพาะเรื่องที่อยู่ระดับตัวเองพอดี
-       (room→เฉพาะห้องตัวเองระดับ room, level→เฉพาะระดับชั้นตัวเองระดับ level, council→เฉพาะระดับ council)
-       กรองหน้าที่ (category) เพิ่มเติมได้จากฝั่งหน้า UI แต่ไม่เกินขอบเขตระดับ/ชั้นของตัวเอง
+    received=True: "เรื่องที่รับ / ระดับฉัน" — เริ่มจากระดับตัวเองพอดี (EXACT LEVEL MATCH):
+       room→เฉพาะห้องตัวเองระดับ room, level→เฉพาะระดับชั้นตัวเองระดับ level, council→เฉพาะระดับ council
+       ถ้าเลือก `levels` (comma เช่น "room,level") → ขยายดูระดับล่างลงมาตามพีระมิด (มองลงได้เท่านั้น)
+       ขอบเขตห้อง/ระดับชั้นของผู้ดูยังบังคับเหมือนเดิม (room→ห้องตัวเอง, level→ชั้นตัวเอง, council→ทั้งโรงเรียน)
     main_category: กรองตามหมวดหลัก (suggestion / wellbeing / report) — ใช้จาก Dashboard
-    level_filter: จำกัดให้ดูเฉพาะระดับที่เลือก (room/level/council)
+    level_filter: จำกัดให้ดูเฉพาะระดับที่เลือก (room/level/council) — ใช้กับ list ปกติ (received=False)
+    levels: ระดับที่อยากดูใน received mode (comma, เช่น "room,level") — เฉพาะ ≤ ระดับตัวเองเท่านั้น;
+       ไม่ส่ง = ระดับตัวเองพอดี (พฤติกรรมเดิม)
     q: ค้นหาแบบคำต่อคำ (ILIKE partial match) ในชื่อเรื่อง/คำอธิบาย/ห้อง/ชื่อคน —
        อยู่ในขอบเขต visibility เดียวกับ list ปกติ (ค้นได้เฉพาะที่ตัวเองมองเห็น)
     sort: 'asc' = เก่าไปใหม่, 'desc' (default) = ใหม่ไปเก่า
@@ -937,33 +941,43 @@ async def list_issues(
             elif level == "student":
                 # นักเรียนไม่มี "เรื่องที่รับ" — ไม่เห็นเรื่องคนอื่น
                 where.append("1 = 0")
-            elif level == "room":
-                # คณะกรรมการห้อง: เฉพาะเรื่องระดับห้องของห้องตัวเอง (exact + ห้อง)
-                if not room_ids:
+            else:
+                # 🎯 ระดับ room/level/council — เริ่มจากระดับตัวเองพอดี แล้วมองลงได้ตามพีระมิด
+                # (student ถูกกรองออกด้านบนแล้ว — ตรงนี้คือ room/level/council เท่านั้น)
+                # band = ทุกระดับที่มองเห็น (ตาม LEVEL_RANK); scope_room_ids จำกัดห้องตอนมองระดับล่าง
+                band = [lv for lv in LEVEL_ORDER if LEVEL_RANK[lv] <= LEVEL_RANK[level]]
+                if levels:
+                    # รับเฉพาะที่อยู่ใน band (ตัดระดับที่สูงกว่า/ไม่รู้จักออก) — ถ้าเหลือว่าง = fail-closed
+                    req = {lv for lv in levels.split(",") if lv and lv in LEVEL_ORDER} & set(band)
+                else:
+                    req = {level}  # default = ระดับตัวเองพอดี (EXACT LEVEL MATCH เดิม)
+                # ขอบเขตห้องสำหรับระดับ room/level:
+                #   room   → เฉพาะห้องของตัวเอง
+                #   level  → เฉพาะระดับชั้นของตัวเอง (grade scope) / [] fail-closed
+                #   council→ None = ทั้งโรงเรียน (มองระดับล่างได้ทุกห้อง)
+                scope_room_ids: Optional[list] = None
+                if level == "room":
+                    scope_room_ids = room_ids
+                elif level == "level":
+                    grade = await get_user_grade_scope(conn, user_id)
+                    scope_room_ids = await _level_room_ids(conn, grade) if grade else []
+                # OR เงื่อนไขรายระดับที่เลือก (ไม่อ้าง `params` เกิน — ใช้ literal สำหรับค่าคงที่ระดับ)
+                conds = []
+                for lv in LEVEL_ORDER:
+                    if lv not in req:
+                        continue
+                    if lv == "council":
+                        conds.append("i.current_level = 'council'")
+                    elif scope_room_ids is None:
+                        conds.append(f"i.current_level = '{lv}'")
+                    elif scope_room_ids:
+                        params.append(tuple(scope_room_ids))
+                        conds.append(f"(i.current_level = '{lv}' AND i.room_id = ANY(${len(params)}))")
+                    # scope_room_ids == [] → ข้าม (fail-closed — มองไม่เห็นห้องใดเลย)
+                if not conds:
                     where.append("1 = 0")
                 else:
-                    params.append(tuple(room_ids))
-                    params.append("room")
-                    where.append(f"i.room_id = ANY(${len(params)-1}) AND i.current_level = ${len(params)}")
-            elif level == "level":
-                # ประธานระดับ/ผู้ช่วย: เฉพาะเรื่องระดับ level ในระดับชั้นของตัวเอง (grade scope)
-                grade = await get_user_grade_scope(conn, user_id)
-                if not grade:
-                    where.append("1 = 0")  # หา grade ไม่เจอ → fail-closed (ห้ามเห็นทุกชั้น)
-                else:
-                    lvl_room_ids = await _level_room_ids(conn, grade)
-                    if not lvl_room_ids:
-                        where.append("1 = 0")
-                    else:
-                        params.append(tuple(lvl_room_ids))
-                        params.append("level")
-                        where.append(
-                            f"i.room_id = ANY(${len(params)-1}) AND i.current_level = ${len(params)}"
-                        )
-            else:
-                # สภานักเรียน/ประธานสภา/ครูสภา/admin: เฉพาะเรื่องระดับ council พอดี
-                params.append("council")
-                where.append(f"i.current_level = ${len(params)}")
+                    where.append("(" + " OR ".join(conds) + ")")
         else:
             # 👩‍🏫 ครูทั่วไป: เห็นเฉพาะเรื่องของระดับชั้นตัวเอง (พีระมิดสูงสุดแต่จำกัดชั้น)
             teacher_level = await _teacher_scope(conn, user_id)
@@ -1803,6 +1817,7 @@ async def add_comment(pool: asyncpg.Pool, user_id: int, issue_id: int, body: str
                 """
                 SELECT
                     NULLIF(TRIM(CONCAT_WS(' ', s.prefix, s.first_name, s.last_name)), '') AS student_name,
+                    s.first_name,
                     u.full_name,
                     r.room_name
                 FROM students s
@@ -1815,15 +1830,18 @@ async def add_comment(pool: asyncpg.Pool, user_id: int, issue_id: int, body: str
             )
             commenter_name = (c["student_name"] or c["full_name"]) if c else None
             commenter_room = c["room_name"] if c else None
+            # ชื่อจริง (first_name) แยกเก็บ — avatar ใช้ตัวแรกของชื่อ (ไม่ใช่ prefix/ชื่อเล่น)
+            commenter_first_name = c["first_name"].strip() if (c and c["first_name"]) else None
 
             comment_id = await conn.fetchval(
                 """
-                INSERT INTO issue_comments (issue_id, user_id, commenter_name, commenter_room, body)
-                VALUES ($1, $2, $3, $4, $5)
+                INSERT INTO issue_comments
+                    (issue_id, user_id, commenter_name, commenter_room, commenter_first_name, body)
+                VALUES ($1, $2, $3, $4, $5, $6)
                 RETURNING id
                 """,
                 issue_id, user_id,
-                commenter_name, commenter_room,
+                commenter_name, commenter_room, commenter_first_name,
                 body
             )
 
@@ -2020,6 +2038,8 @@ def _comment_to_dict(row) -> dict:
         "user_id": row["user_id"],
         "commenter_name": row["commenter_name"],
         "commenter_room": row["commenter_room"],
+        # avatar ใช้ตัวแรกของชื่อ — fallback: .get กันคอลัมน์ยังไม่มา (row เก่า/DB ยังไม่ migrate)
+        "commenter_first_name": row.get("commenter_first_name"),
         "body": row["body"],
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],

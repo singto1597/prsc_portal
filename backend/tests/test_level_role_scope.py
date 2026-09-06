@@ -240,3 +240,100 @@ async def test_issue_category_multi_filter_normal_list(client, grade_world):
     body = _list(client, w["m4_student"]["token"], category="academic,discipline").json()
     ids = {i["id"] for i in body["items"]}
     assert a_id in ids and d_id in ids
+
+
+# ============================================================
+# 4) received=true + levels (มองลงตามพีระมิด — ระดับที่สูงกว่าดูระดับล่างได้)
+# ============================================================
+@pytest.mark.asyncio
+async def test_received_council_levels_multi(client, grade_world, db_pool):
+    """สภา (admin/council_president) received + levels=room,level,council →
+    เห็นระดับล่างทั้งห้อง ม.4 + ม.5 (scope ทั้งโรงเรียน); default (ไม่ส่ง levels) ยังเป็น council เท่านั้น"""
+    w = grade_world
+    m4 = w["rooms"]["ม.4"]["room_id"]
+    m5 = w["rooms"]["ม.5"]["room_id"]
+
+    room_m4 = _post_issue(client, w["m4_student"]["token"], m4, title="เรื่องห้อง ม.4")
+    room_m5 = _post_issue(client, w["m5_student"]["token"], m5, title="เรื่องห้อง ม.5")
+    lvl_m4 = _post_issue(client, w["m4_student"]["token"], m4, title="เรื่องระดับ ม.4")
+    await _promote_level(db_pool, lvl_m4, "level")
+    council_issue = _post_issue(client, w["admin"]["token"], m4, title="เรื่องสภา", start="council")
+
+    # default: ไม่ส่ง levels → เห็นเฉพาะระดับ council พอดี
+    default_ids = {i["id"] for i in _list(client, w["admin"]["token"], received="true").json()["items"]}
+    assert council_issue in default_ids
+    assert room_m4 not in default_ids and room_m5 not in default_ids and lvl_m4 not in default_ids
+
+    # มองลงทุกระดับ (ทั้ง ม.4 + ม.5 — council scope ทั้งโรงเรียน)
+    body = _list(client, w["admin"]["token"], received="true", levels="room,level,council").json()
+    ids = {i["id"] for i in body["items"]}
+    assert council_issue in ids
+    assert room_m4 in ids and room_m5 in ids      # เห็นระดับห้องทั้ง 2 ชั้น
+    assert lvl_m4 in ids                          # เห็นระดับ level ด้วย
+
+    # เลือกเฉพาะ room → เห็นแต่ระดับห้อง (ทั้ง 2 ชั้น) ไม่เห็น level/council
+    body = _list(client, w["admin"]["token"], received="true", levels="room").json()
+    ids = {i["id"] for i in body["items"]}
+    assert room_m4 in ids and room_m5 in ids
+    assert lvl_m4 not in ids and council_issue not in ids
+
+
+@pytest.mark.asyncio
+async def test_received_level_president_levels_down(client, grade_world, db_pool):
+    """ประธานระดับ ม.4 received + levels=room,level → เห็นระดับ room+level เฉพาะชั้น ม.4
+    (grade scope ยังบังคับ — ไม่เห็น ม.5; ไม่เห็น council ทั้งที่ขอมา)"""
+    w = grade_world
+    m4 = w["rooms"]["ม.4"]["room_id"]
+    m5 = w["rooms"]["ม.5"]["room_id"]
+
+    room_m4 = _post_issue(client, w["m4_student"]["token"], m4, title="เรื่องห้อง ม.4")
+    room_m5 = _post_issue(client, w["m5_student"]["token"], m5, title="เรื่องห้อง ม.5")
+    lvl_m4 = _post_issue(client, w["m4_student"]["token"], m4, title="เรื่องระดับ ม.4")
+    await _promote_level(db_pool, lvl_m4, "level")
+    lvl_m5 = _post_issue(client, w["m5_student"]["token"], m5, title="เรื่องระดับ ม.5")
+    await _promote_level(db_pool, lvl_m5, "level")
+    council_issue = _post_issue(client, w["admin"]["token"], m4, title="เรื่องสภา ม.4", start="council")
+
+    body = _list(client, w["m4_level"]["token"], received="true", levels="room,level,council").json()
+    ids = {i["id"] for i in body["items"]}
+    assert room_m4 in ids and lvl_m4 in ids       # เห็น room+level ในชั้นตัวเอง
+    assert room_m5 not in ids and lvl_m5 not in ids  # ไม่รั่วข้ามชั้น
+    assert council_issue not in ids               # ขอ council มาแต่ band ไม่มี → ถูกตัด
+
+
+@pytest.mark.asyncio
+async def test_received_cannot_request_above_band(client, grade_world, db_pool):
+    """ขอดูระดับสูงกว่าระดับตัวเอง (เกิน band) → ว่าง / ถูกตัด (fail-closed)"""
+    w = grade_world
+    m4 = w["rooms"]["ม.4"]["room_id"]
+    m5 = w["rooms"]["ม.5"]["room_id"]
+
+    lvl_m4 = _post_issue(client, w["m4_student"]["token"], m4, title="เรื่องระดับ ม.4")
+    await _promote_level(db_pool, lvl_m4, "level")
+    council_issue = _post_issue(client, w["admin"]["token"], m4, title="เรื่องสภา", start="council")
+    room_m5 = _post_issue(client, w["m5_student"]["token"], m5, title="เรื่องห้อง ม.5")
+
+    # ประธานระดับขอ levels=council → band ของ level ไม่มี council → ว่าง (ทั้งที่ council มีเรื่องจริง)
+    body = _list(client, w["m4_level"]["token"], received="true", levels="council").json()
+    assert body["items"] == []
+
+    # หัวหน้าห้อง (room) ขอดูระดับ level → ว่าง (มองขึ้นไม่ได้)
+    code = w["rooms"]["ม.4"]["room_code"]
+    sid = f"R{random.randint(1000, 9999)}HD"
+    uid = await auth_service.register_user(
+        db_pool, sid, "1234", "หัวหน้า ห้อง", sid, code, 5, "class_president"
+    )
+    head_token = auth_service.create_access_token(uid)
+    body = _list(client, head_token, received="true", levels="level").json()
+    assert body["items"] == []
+    assert room_m5 not in {i["id"] for i in body["items"]}
+
+
+@pytest.mark.asyncio
+async def test_received_invalid_levels_400(client, grade_world):
+    """levels ที่ไม่รู้จัก (banana) → 400 — validate ฝั่ง router"""
+    w = grade_world
+    res = _list(client, w["admin"]["token"], received="true", levels="banana")
+    assert res.status_code == 400
+    res = _list(client, w["admin"]["token"], received="true", levels="room,council,xxx")
+    assert res.status_code == 400

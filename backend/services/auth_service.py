@@ -137,6 +137,7 @@ async def get_user_roles(pool: asyncpg.Pool, user_id: int) -> list:
                 s.room_id,
                 s.student_no,
                 s.class_role,
+                s.first_name,
                 s.staff_level,
                 s.is_admin,
                 s.permissions,
@@ -173,6 +174,7 @@ async def get_user_roles(pool: asyncpg.Pool, user_id: int) -> list:
             "room_id": row["room_id"],
             "room_name": row["room_name"],
             "student_no": row["student_no"],
+            "first_name": row["first_name"],
             "level": row["level"],
             "staff_level": row["staff_level"],
             "is_admin": row["is_admin"],
@@ -298,11 +300,14 @@ def make_user_out(user_record, roles: list) -> dict:
     is_admin = any(r.get("is_admin") for r in roles)
     # รวม permissions ทั้งหมด
     permissions = sorted({p for r in roles for p in r.get("permissions", [])})
+    # ชื่อจริง (first_name) ตัวแรกจาก roles ที่ไม่ว่าง — avatar ใช้ตัวแรกของชื่อ
+    first_name = next((r.get("first_name") for r in roles if r.get("first_name")), None)
 
     return {
         "id": user_record["id"],
         "username": user_record["username"],
         "full_name": user_record["full_name"],
+        "first_name": first_name,
         "is_admin": is_admin,
         "permissions": permissions,
         "must_change_password": bool(user_record.get("must_change_password")),
@@ -312,6 +317,7 @@ def make_user_out(user_record, roles: list) -> dict:
                 "room_id": r["room_id"],
                 "room_name": r["room_name"],
                 "student_no": r["student_no"],
+                "first_name": r.get("first_name"),
                 "level": r["level"],
                 "staff_level": r.get("staff_level"),
                 "is_admin": r.get("is_admin", False),
