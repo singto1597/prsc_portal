@@ -404,12 +404,17 @@ watch([stats, isLoadingStats], () => {
               </div>
 
               <!-- Main Headline -->
-              <h1 class="leading-[1.15] tracking-tight text-stone-900">
-                <span class="mb-3 block text-xl font-semibold text-stone-500 sm:text-2xl">ศูนย์กลางรับฟังเสียงนักเรียน</span>
+              <h1 class="leading-[1.2] tracking-tight text-stone-900">
+                <span class="mb-4 block text-xl font-semibold text-stone-500 sm:text-2xl">ศูนย์กลางรับฟังเสียงนักเรียน</span>
                 <span class="block text-[2.75rem] font-bold sm:text-6xl lg:text-[4.2rem]">
-                  สร้างสรรค์พิริยาลัย<br />
+                  <span class="block">
+                    ทุกเสียง<span class="text-[#B91C1C]">มีความหมาย</span>
+                  </span>
+                  <span class="block">
+                    ทุกเสียง<span class="text-[#B91C1C]">พาพิริยาลัย</span>
+                  </span>
                   <span class="relative inline-block">
-                    ให้ดีกว่าเดิม
+                    ก้าวไปด้วยกัน
                     <span class="absolute -bottom-2 left-0 right-0 h-3 bg-[#B91C1C]/10 -skew-x-12"></span>
                   </span>
                 </span>
